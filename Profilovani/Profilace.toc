@@ -1,0 +1,18 @@
+\select@language {czech}
+\contentsline {section}{\numberline {1}\IeC {\'U}vod}{1}{section.1}
+\contentsline {section}{\numberline {2}Postup}{1}{section.2}
+\contentsline {subsection}{\numberline {2.1}Perf+Hotspot}{1}{subsection.2.1}
+\contentsline {subsection}{\numberline {2.2}Intel\IeC {\textregistered } VTune\IeC {\texttrademark } Amplifier XE 2017 Update 4 for Linux}{1}{subsection.2.2}
+\contentsline {section}{\numberline {3}Popis programu}{2}{section.3}
+\contentsline {subsection}{\numberline {3.1}T\IeC {\v r}\IeC {\'\i }dy}{2}{subsection.3.1}
+\contentsline {subsection}{\numberline {3.2}Pr\IeC {\r u}b\IeC {\v e}h}{3}{subsection.3.2}
+\contentsline {section}{\numberline {4}V\IeC {\'y}sledky}{3}{section.4}
+\contentsline {subsection}{\numberline {4.1}Perf}{3}{subsection.4.1}
+\contentsline {subsubsection}{\numberline {4.1.1}LLC References}{4}{subsubsection.4.1.1}
+\contentsline {paragraph}{\numberline {4.1.1.1}Hlavn\IeC {\'\i } vl\IeC {\'a}kno}{6}{paragraph.4.1.1.1}
+\contentsline {paragraph}{\numberline {4.1.1.2}Vedlej\IeC {\v s}\IeC {\'\i } vl\IeC {\'a}kna}{6}{paragraph.4.1.1.2}
+\contentsline {subsubsection}{\numberline {4.1.2}LLC Miss}{7}{subsubsection.4.1.2}
+\contentsline {paragraph}{\numberline {4.1.2.1}Hlavn\IeC {\'\i } vl\IeC {\'a}kno}{9}{paragraph.4.1.2.1}
+\contentsline {paragraph}{\numberline {4.1.2.2}Vedlej\IeC {\v s}\IeC {\'\i } vl\IeC {\'a}kna}{9}{paragraph.4.1.2.2}
+\contentsline {subsection}{\numberline {4.2}Intel\IeC {\textregistered } VTune\IeC {\texttrademark } Amplifier XE 2017 Update 4}{10}{subsection.4.2}
+\contentsline {subsection}{\numberline {4.3}Porovn\IeC {\'a}n\IeC {\'\i } v\IeC {\'y}sledk\IeC {\r u}}{11}{subsection.4.3}

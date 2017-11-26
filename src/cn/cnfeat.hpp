@@ -30,6 +30,30 @@ public:
         }
         return cn_feat;
     }
+///////////////////////////////////////////////////////////////
+//CUDA    
+//     static std::vector<cv::cuda::GpuMat> extract_cuda(const cv::cuda::GpuMat & patch_rgb)
+//     {
+//         std::vector<cv::cuda::GpuMat> cn_feat(p_cn_channels);
+//         for (int i = 0; i < p_cn_channels; ++i) {
+//             cn_feat[i].create(patch_rgb.size(), CV_32FC1);
+//         }
+// 
+//         float * ch_ptr[p_cn_channels];
+//         for (int y = 0; y < patch_rgb.rows; ++y) {
+//             for (int i = 0; i < p_cn_channels; ++i)
+//                 ch_ptr[i] = cn_feat[i].ptr<float>(y);
+//             for (int x = 0; x < patch_rgb.cols; ++x) {
+//                 //images in opencv stored in BGR order
+// 		const cv::Vec3b *row_ptr = patch_rgb.ptr<cv::Vec3b>(y);
+// 		cv::Vec3b bgr_val = row_ptr[x];
+//                 for (int i = 0; i < p_cn_channels; ++i)
+//                     ch_ptr[i][x] = p_id2feat[rgb2id(bgr_val[2], bgr_val[1], bgr_val[0])][i];
+//             }
+//         }
+//         return cn_feat;
+//     }
+///////////////////////////////////////////////////////////////////////////////////////
 
 private:
     inline static int rgb2id(int r, int g, int b)
@@ -37,6 +61,5 @@ private:
     static const int p_cn_channels = 10;
     static float p_id2feat[32768][10];
 };
-
 
 #endif //KCF_TRACKER_CNFEAT_H

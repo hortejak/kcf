@@ -2,6 +2,7 @@
 #include <numeric>
 #include <thread>
 #include <future>
+#include <algorithm>
 
 void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
 {
@@ -40,13 +41,26 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     p_pose.cx = x1 + p_pose.w/2.;
     p_pose.cy = y1 + p_pose.h/2.;
 
-    cv::Mat input_gray, input_rgb = img.clone();
-    if (img.channels() == 3){
-        cv::cvtColor(img, input_gray, CV_BGR2GRAY);
-        input_gray.convertTo(input_gray, CV_32FC1);
-    }else
-        img.convertTo(input_gray, CV_32FC1);
+    
+    cv::cuda::HostMem hostmem_rgb(img.size(), img.type(), cv::cuda::HostMem::SHARED);
+    cv::cuda::HostMem hostmem_gray(img.size(), CV_32FC1, cv::cuda::HostMem::SHARED);
+    
+    cv::Mat input_rgb = hostmem_rgb.createMatHeader();
+    cv::Mat input_gray = hostmem_gray.createMatHeader();
+    
+    cv::cuda::GpuMat input_rgb_d = hostmem_rgb.createGpuMatHeader();
+    cv::cuda::GpuMat input_gray_d = hostmem_gray.createGpuMatHeader();
+    
+    img.copyTo(input_rgb);
 
+    if (img.channels() == 3){
+	   cv::cuda::cvtColor(input_rgb_d,input_gray_d,CV_BGR2GRAY);
+	   input_gray_d.convertTo(input_gray_d,CV_32FC1);
+    }else{	
+	   input_rgb_d.convertTo(input_gray_d,CV_32FC1);
+    }
+    
+    //TODO use unified memory on resize
     // don't need too large image
     if (p_pose.w * p_pose.h > 100.*100.) {
         std::cout << "resizing image by factor of 2" << std::endl;
@@ -55,7 +69,12 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
         cv::resize(input_gray, input_gray, cv::Size(0,0), 0.5, 0.5, cv::INTER_AREA);
         cv::resize(input_rgb, input_rgb, cv::Size(0,0), 0.5, 0.5, cv::INTER_AREA);
     }
-
+    
+//     cv::imshow("RGB",input_rgb);
+//     cv::waitKey();
+//     cv::imshow("GRAY",input_gray);
+//     cv::waitKey();
+    
     //compute win size + fit to fhog cell size
     p_windows_size[0] = round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
     p_windows_size[1] = round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size;
@@ -83,11 +102,11 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     //window weights, i.e. labels
     p_yf = fft2(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
     p_cos_window = cosine_window_function(p_yf.cols, p_yf.rows);
-
+    
     //obtain a sub-window for training initial model
     std::vector<cv::Mat> path_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1]);
     p_model_xf = fft2(path_feat, p_cos_window);
-
+    
     if (m_use_linearkernel) {
         ComplexMat xfconj = p_model_xf.conj();
         p_model_alphaf_num = xfconj.mul(p_yf);
@@ -133,20 +152,32 @@ BBox_c KCF_Tracker::getBBox()
 }
 
 void KCF_Tracker::track(cv::Mat &img)
-{
-    cv::Mat input_gray, input_rgb = img.clone();
-    if (img.channels() == 3){
-        cv::cvtColor(img, input_gray, CV_BGR2GRAY);
-        input_gray.convertTo(input_gray, CV_32FC1);
-    }else
-        img.convertTo(input_gray, CV_32FC1);
+{   
+    
+    cv::cuda::HostMem hostmem_rgb(img.size(), img.type(), cv::cuda::HostMem::SHARED);
+    cv::cuda::HostMem hostmem_gray(img.size(), CV_32FC1, cv::cuda::HostMem::SHARED);
+    
+    cv::Mat input_rgb = hostmem_rgb.createMatHeader();
+    cv::Mat input_gray = hostmem_gray.createMatHeader();
+    
+    cv::cuda::GpuMat input_rgb_d = hostmem_rgb.createGpuMatHeader();
+    cv::cuda::GpuMat input_gray_d = hostmem_gray.createGpuMatHeader();
+    
+    img.copyTo(input_rgb);
 
-    // don't need too large image
+    if (img.channels() == 3){
+	   cv::cuda::cvtColor(input_rgb_d,input_gray_d,CV_BGR2GRAY);
+	   input_gray_d.convertTo(input_gray_d,CV_32FC1);
+    }else{	
+	   input_rgb_d.convertTo(input_gray_d,CV_32FC1);
+    }
+	
     if (p_resize_image) {
+      	cudaDeviceSynchronize();
         cv::resize(input_gray, input_gray, cv::Size(0, 0), 0.5, 0.5, cv::INTER_AREA);
         cv::resize(input_rgb, input_rgb, cv::Size(0, 0), 0.5, 0.5, cv::INTER_AREA);
     }
-
+    
     std::vector<cv::Mat> patch_feat;
     double max_response = -1.;
     cv::Mat max_response_map;
@@ -259,7 +290,7 @@ void KCF_Tracker::track(cv::Mat &img)
     p_model_xf = p_model_xf * (1. - p_interp_factor) + xf * p_interp_factor;
 
     ComplexMat alphaf_num, alphaf_den;
-
+    
     if (m_use_linearkernel) {
         ComplexMat xfconj = xf.conj();
         alphaf_num = xfconj.mul(p_yf);
@@ -422,50 +453,123 @@ cv::Mat KCF_Tracker::circshift(const cv::Mat &patch, int x_rot, int y_rot)
 
 ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
 {
-    cv::Mat complex_result;
-//    cv::Mat padded;                            //expand input image to optimal size
-//    int m = cv::getOptimalDFTSize( input.rows );
-//    int n = cv::getOptimalDFTSize( input.cols ); // on the border add zero pixels
-//    copyMakeBorder(input, padded, 0, m - input.rows, 0, n - input.cols, cv::BORDER_CONSTANT, cv::Scalar::all(0));
-//    cv::dft(padded, complex_result, cv::DFT_COMPLEX_OUTPUT);
-//    return ComplexMat(complex_result(cv::Range(0, input.rows), cv::Range(0, input.cols)));
-
-    cv::dft(input, complex_result, cv::DFT_COMPLEX_OUTPUT);
-    return ComplexMat(complex_result);
+    //TODO Zero allocate memory is not working for DFT.
+    cv::Mat flip_h,imag_h,complex_result_h;
+    
+    cv::cuda::HostMem hostmem_input(input.size(), input.type(), cv::cuda::HostMem::SHARED);
+    cv::cuda::HostMem hostmem_real(cv::Size(input.cols/2+1,input.rows), CV_32FC2, cv::cuda::HostMem::SHARED);
+    
+    cv::Mat input_h = hostmem_input.createMatHeader();
+    cv::Mat real_h = hostmem_real.createMatHeader();
+    
+    cv::cuda::GpuMat input_d = hostmem_input.createGpuMatHeader();
+    cv::cuda::GpuMat real_d = hostmem_input.createGpuMatHeader();
+    
+    input.copyTo(input_h);
+    
+    cv::cuda::dft(input_d,real_d,input_d.size(),0,stream);
+    stream.waitForCompletion();
+    //TODO get rid of the download.
+    real_d.download(real_h);
+    
+    //create reversed copy of result and merge them
+    cv::flip(real_h,flip_h,1);
+    flip_h(cv::Range(0, flip_h.rows), cv::Range(1, flip_h.cols)).copyTo(imag_h);
+     
+    std::vector<cv::Mat> matarray = {real_h,imag_h};
+    
+    cv::hconcat(matarray,complex_result_h);
+    
+//     //extraxt x and y channels
+//     cv::Mat xy[2]; //X,Y
+//     cv::split(complex_result_h, xy);
+// 
+//     //calculate angle and magnitude
+//     cv::Mat magnitude, angle;
+//     cv::cartToPolar(xy[0], xy[1], magnitude, angle, true);
+// 
+//     //translate magnitude to range [0;1]
+//     double mag_max;
+//     cv::minMaxLoc(magnitude, 0, &mag_max);
+//     magnitude.convertTo(magnitude, -1, 1.0 / mag_max);
+// 
+//     //build hsv image
+//     cv::Mat _hsv[3], hsv;
+//     _hsv[0] = angle;
+//     _hsv[1] = cv::Mat::ones(angle.size(), CV_32F);
+//     _hsv[2] = magnitude;
+//     cv::merge(_hsv, 3, hsv);
+// 
+//     //convert to BGR and show
+//     cv::Mat bgr;//CV_32FC3 matrix
+//     cv::cvtColor(hsv, bgr, cv::COLOR_HSV2BGR);
+//     cv::imshow("DFT", bgr);
+// 
+//     cv::waitKey(0);
+    
+    return ComplexMat(complex_result_h);
 }
 
 ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &cos_window)
 {
     int n_channels = input.size();
+    cv::Size roi( input[0].cols,input[0].rows);
+    cv::cuda::createContinuous(roi,CV_32FC1,src_gpu);
+    cv::Size roi1( src_gpu.cols/2+1,src_gpu.rows);
+    cv::cuda::createContinuous(roi1,CV_32FC1,dst_gpu);
+    
+    cv::Mat complex_result,tmp1,tmp2,tmp3;
+    
+    float *h_input;
+    int rows = input[0].rows,cols = input[0].cols;
+    
+    cudaMallocManaged(&h_input, sizeof(float)*rows*cols);  
+    
+    cv::cuda::GpuMat input_gpu(cvSize(cols,rows),input[0].type(),h_input);
+    
     ComplexMat result(input[0].rows, input[0].cols, n_channels);
     for (int i = 0; i < n_channels; ++i){
-        cv::Mat complex_result;
-//        cv::Mat padded;                            //expand input image to optimal size
-//        int m = cv::getOptimalDFTSize( input[0].rows );
-//        int n = cv::getOptimalDFTSize( input[0].cols ); // on the border add zero pixels
-
-//        copyMakeBorder(input[i].mul(cos_window), padded, 0, m - input[0].rows, 0, n - input[0].cols, cv::BORDER_CONSTANT, cv::Scalar::all(0));
-//        cv::dft(padded, complex_result, cv::DFT_COMPLEX_OUTPUT);
-//        result.set_channel(i, complex_result(cv::Range(0, input[0].rows), cv::Range(0, input[0].cols)));
-
-        cv::dft(input[i].mul(cos_window), complex_result, cv::DFT_COMPLEX_OUTPUT);
+      
+      std::memcpy(h_input,input[i].data,input[i].total() * input[i].elemSize()); 
+      cv::cuda::multiply(input_gpu,p_cos_window_gpu,src_gpu);
+//         cv::dft(input[i].mul(cos_window), complex_result, cv::DFT_COMPLEX_OUTPUT);
+	cv::cuda::dft(src_gpu,dst_gpu,src_gpu.size(),0,stream);
+	stream.waitForCompletion();
+	
+	dst_gpu.download(tmp1);
+	//create reversed copy of result and merge them
+	cv::flip(tmp1,tmp2,1);
+	tmp2(cv::Range(0, tmp2.rows), cv::Range(1, tmp2.cols)).copyTo(tmp3);//1
+     
+	std::vector<cv::Mat> matarray = {tmp1,tmp3};
+	cv::hconcat(matarray,complex_result);
+	
         result.set_channel(i, complex_result);
     }
+    cudaFree(h_input);
     return result;
 }
 
 cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
 {
 
-    cv::Mat real_result;
+    cv::Mat real_result,tmp1,tmp2;
     if (inputf.n_channels == 1){
-        cv::dft(inputf.to_cv_mat(), real_result, cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
+// 	src.upload(inputf.to_cv_mat());
+        cv::dft(/*src, dst, src.size()*/inputf.to_cv_mat(),real_result, cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
+//  	dst.download(real_result);
     } else {
+        cv::Mat tmp;
         std::vector<cv::Mat> mat_channels = inputf.to_cv_mat_vector();
         std::vector<cv::Mat> ifft_mats(inputf.n_channels);
         for (int i = 0; i < inputf.n_channels; ++i) {
-            cv::dft(mat_channels[i], ifft_mats[i], cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
+//     	   src.upload(mat_channels[i]);
+//   	   dst.upload(ifft_mats[i]);
+	    cv::dft(mat_channels[i], ifft_mats[i], cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
+//  	   cv::cuda::dft(src, dst, src.size(),  cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
+//  	   dst.download(ifft_mats[i]);
         }
+    
         cv::merge(ifft_mats, real_result);
     }
     return real_result;
@@ -482,6 +586,8 @@ cv::Mat KCF_Tracker::cosine_window_function(int dim1, int dim2)
     for (int i = 0; i < dim2; ++i)
         m2.at<float>(i) = 0.5*(1. - std::cos(2. * CV_PI * static_cast<double>(i) * N_inv));
     cv::Mat ret = m2*m1;
+    cv::cuda::createContinuous(cv::Size(ret.cols,ret.rows),CV_32FC1,p_cos_window_gpu);
+    p_cos_window_gpu.upload(ret);
     return ret;
 }
 
@@ -530,7 +636,11 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     if (x2 - x1 == 0 || y2 - y1 == 0)
         patch = cv::Mat::zeros(height, width, CV_32FC1);
     else
+    {
         cv::copyMakeBorder(input(cv::Range(y1, y2), cv::Range(x1, x2)), patch, top, bottom, left, right, cv::BORDER_REPLICATE);
+// 	imshow( "copyMakeBorder", patch);
+// 	cv::waitKey();
+    }
 
     //sanity check
     assert(patch.cols == width && patch.rows == height);

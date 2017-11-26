@@ -1,0 +1,17 @@
+\BOOKMARK [1][-]{section.1}{\332vod}{}% 1
+\BOOKMARK [1][-]{section.2}{Postup}{}% 2
+\BOOKMARK [2][-]{subsection.2.1}{Perf+Hotspot}{section.2}% 3
+\BOOKMARK [2][-]{subsection.2.2}{Intel\256 VTune\222 Amplifier XE 2017 Update 4 for Linux}{section.2}% 4
+\BOOKMARK [1][-]{section.3}{Popis programu}{}% 5
+\BOOKMARK [2][-]{subsection.3.1}{Tr\355dy}{section.3}% 6
+\BOOKMARK [2][-]{subsection.3.2}{Prubeh}{section.3}% 7
+\BOOKMARK [1][-]{section.4}{V\375sledky}{}% 8
+\BOOKMARK [2][-]{subsection.4.1}{Perf}{section.4}% 9
+\BOOKMARK [3][-]{subsubsection.4.1.1}{LLC References}{subsection.4.1}% 10
+\BOOKMARK [4][-]{paragraph.4.1.1.1}{Hlavn\355 vl\341kno}{subsubsection.4.1.1}% 11
+\BOOKMARK [4][-]{paragraph.4.1.1.2}{Vedlej\235\355 vl\341kna}{subsubsection.4.1.1}% 12
+\BOOKMARK [3][-]{subsubsection.4.1.2}{LLC Miss}{subsection.4.1}% 13
+\BOOKMARK [4][-]{paragraph.4.1.2.1}{Hlavn\355 vl\341kno}{subsubsection.4.1.2}% 14
+\BOOKMARK [4][-]{paragraph.4.1.2.2}{Vedlej\235\355 vl\341kna}{subsubsection.4.1.2}% 15
+\BOOKMARK [2][-]{subsection.4.2}{Intel\256 VTune\222 Amplifier XE 2017 Update 4}{section.4}% 16
+\BOOKMARK [2][-]{subsection.4.3}{Porovn\341n\355 v\375sledku}{section.4}% 17

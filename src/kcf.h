@@ -1,8 +1,11 @@
 #ifndef KCF_HEADER_6565467831231
 #define KCF_HEADER_6565467831231
 
+//TODO workout the includes
 #include <opencv2/opencv.hpp>
 #include <vector>
+#include </usr/local/cuda-8.0/targets/aarch64-linux/include/cuda.h>
+#include </usr/local/cuda-8.0/targets/aarch64-linux/include/cuda_runtime.h>
 #include "fhog.hpp"
 #include "complexmat.hpp"
 #include "cnfeat.hpp"
@@ -29,8 +32,8 @@ struct BBox_c
 class KCF_Tracker
 {
 public:
-    bool m_use_scale {true};
-    bool m_use_color {true};
+    bool m_use_scale {false};//true
+    bool m_use_color {false};//true
     bool m_use_subpixel_localization {true};
     bool m_use_subgrid_scale {true};
     bool m_use_multithreading {true};
@@ -62,6 +65,9 @@ public:
 private:
     BBox_c p_pose;
     bool p_resize_image = false;
+    
+    bool first = true;
+    cv::cuda::Stream stream;
 
     double p_padding = 1.5;
     double p_output_sigma_factor = 0.1;
@@ -77,6 +83,7 @@ private:
     double p_current_scale = 1.;
     double p_min_max_scale[2];
     std::vector<double> p_scales;
+     cv::cuda::GpuMat src_gpu,dst_gpu,p_cos_window_gpu;
 
     //model
     ComplexMat p_yf;
