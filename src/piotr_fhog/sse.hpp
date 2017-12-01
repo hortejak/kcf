@@ -5,11 +5,7 @@
 *******************************************************************************/
 #ifndef _SSE_HPP_
 #define _SSE_HPP_
-//#include <emmintrin.h> // SSE2:<e*.h>, SSE3:<p*.h>, SSE4:<s*.h>
-//TODO remove the absolute adress
-#include "/home/nvidia/Documents/KCF/sse2neon/SSE2NEON.h" 
-//Covnerts the x86 instructions to work on ARM chip
-//http://codesuppository.blogspot.cz/2015/02/sse2neonh-porting-guide-and-header-file.html
+#include <emmintrin.h> // SSE2:<e*.h>, SSE3:<p*.h>, SSE4:<s*.h>
 
 #define RETf inline __m128
 #define RETi inline __m128i

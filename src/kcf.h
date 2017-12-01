@@ -4,8 +4,8 @@
 //TODO workout the includes
 #include <opencv2/opencv.hpp>
 #include <vector>
-#include </usr/local/cuda-8.0/targets/aarch64-linux/include/cuda.h>
-#include </usr/local/cuda-8.0/targets/aarch64-linux/include/cuda_runtime.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include "fhog.hpp"
 #include "complexmat.hpp"
 #include "cnfeat.hpp"

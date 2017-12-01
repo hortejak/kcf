@@ -3,9 +3,9 @@ cmake_minimum_required(VERSION 2.8)
 project(kcf_tracker)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra -pedantic -O3 -Wno-long-long -fno-omit-frame-pointer")
-set(OpenCV_DIR /home/nvidia/Libraries/opencv-3.2-release/share/OpenCV)
-SET( CUFFT_LIB /usr/local/cuda/lib64/libcufft.so.8.0 )
-SET( CUDA_LIB /usr/local/cuda-8.0/targets/aarch64-linux/lib/libcudart.so)
+#set(OpenCV_DIR /home/nvidia/Libraries/opencv-3.2-release/share/OpenCV)
+SET( CUFFT_LIB libcufft.so.8.0 )
+SET( CUDA_LIB libcudart.so)
 
 FIND_PACKAGE( OpenCV REQUIRED )
 link_directories ( ${OpenCV_LIB_DIR} )
@@ -20,6 +20,8 @@ MESSAGE(STATUS "OpenCV_INCLUDE_DIRS: ${OpenCV_INCLUDE_DIRS}")
 
 INCLUDE_DIRECTORIES( ${CMAKE_BINARY_DIR}/)
 include_directories(${CMAKE_SOURCE_DIR}/src/ ${CMAKE_SOURCE_DIR}/src/piotr_fhog ${CMAKE_SOURCE_DIR}/src/cn)
+
+include_directories(${CMAKE_SOURCE_DIR}/sse2neon)
 
 add_subdirectory(src)
 
