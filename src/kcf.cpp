@@ -455,31 +455,25 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
 {
     //TODO Zero allocate memory is not working for DFT.
     cv::Mat flip_h,imag_h,complex_result_h;
-    
+
     cv::cuda::HostMem hostmem_input(input.size(), input.type(), cv::cuda::HostMem::SHARED);
-    cv::cuda::HostMem hostmem_real(cv::Size(input.cols/2+1,input.rows), CV_32FC2, cv::cuda::HostMem::SHARED);
-    
-    cv::Mat input_h = hostmem_input.createMatHeader();
-    cv::Mat real_h = hostmem_real.createMatHeader();
-    
-    cv::cuda::GpuMat input_d = hostmem_input.createGpuMatHeader();
-    cv::cuda::GpuMat real_d = hostmem_input.createGpuMatHeader();
-    
-    input.copyTo(input_h);
-    
-    cv::cuda::dft(input_d,real_d,input_d.size(),0,stream);
+    cv::cuda::HostMem hostmem_real(cv::Size(input.cols,input.rows/2+1), CV_32FC2, cv::cuda::HostMem::SHARED);
+
+    input.copyTo(hostmem_input);
+
+    cv::cuda::dft(hostmem_input,hostmem_real,hostmem_input.size(),0,stream);
     stream.waitForCompletion();
-    //TODO get rid of the download.
-    real_d.download(real_h);
-    
+
+    cv::Mat real_h = hostmem_real.createMatHeader();
+
     //create reversed copy of result and merge them
-    cv::flip(real_h,flip_h,1);
+    cv::flip(hostmem_real,flip_h,1);
     flip_h(cv::Range(0, flip_h.rows), cv::Range(1, flip_h.cols)).copyTo(imag_h);
-     
+
     std::vector<cv::Mat> matarray = {real_h,imag_h};
-    
+
     cv::hconcat(matarray,complex_result_h);
-    
+
 //     //extraxt x and y channels
 //     cv::Mat xy[2]; //X,Y
 //     cv::split(complex_result_h, xy);
