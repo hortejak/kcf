@@ -1,7 +1,6 @@
 #ifndef KCF_HEADER_6565467831231
 #define KCF_HEADER_6565467831231
 
-//TODO workout the includes
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <cuda.h>
@@ -32,8 +31,8 @@ struct BBox_c
 class KCF_Tracker
 {
 public:
-    bool m_use_scale {false};//true
-    bool m_use_color {false};//true
+    bool m_use_scale {true};//true
+    bool m_use_color {true};//true
     bool m_use_subpixel_localization {true};
     bool m_use_subgrid_scale {true};
     bool m_use_multithreading {true};

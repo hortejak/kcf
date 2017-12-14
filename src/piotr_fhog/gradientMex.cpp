@@ -8,10 +8,6 @@
 #include <math.h>
 #include "string.h"
 
-#ifdef __ARM_NEON
-#include "SSE2NEON.h"
-#endif
-
 #include "sse.hpp"
 
 #define PI 3.14159265f
