@@ -31,10 +31,11 @@ int main()
 
         bb = tracker.getBBox();
         vot_io.outputBoundingBox(cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h));
-
-//        cv::rectangle(image, cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h), CV_RGB(0,255,0), 2);
-//        cv::imshow("output", image);
-//        cv::waitKey();
+#ifdef VISULIZE_RESULT
+       cv::rectangle(image, cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h), CV_RGB(0,255,0), 2);
+       cv::imshow("output", image);
+       cv::waitKey();
+#endif //VISULIZE
 
 //        std::stringstream s;
 //        std::string ss;

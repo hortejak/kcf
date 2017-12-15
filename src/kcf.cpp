@@ -87,7 +87,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     p_cos_window = cosine_window_function(p_yf.cols, p_yf.rows);
     
     //obtain a sub-window for training initial model
-    std::vector<cv::Mat> path_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1]);
+    std::vector<cv::Mat> path_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1]);   
     p_model_xf = fft2(path_feat, p_cos_window);
     
     if (m_use_linearkernel) {
@@ -197,7 +197,7 @@ void KCF_Tracker::track(cv::Mat &img)
     } else {
         for (size_t i = 0; i < p_scales.size(); ++i) {
             patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i]);
-            ComplexMat zf = fft2(patch_feat, p_cos_window);
+	    ComplexMat zf = fft2(patch_feat, p_cos_window);
             cv::Mat response;
             if (m_use_linearkernel)
                 response = ifft2((p_model_alphaf * zf).sum_over_channels());
@@ -426,12 +426,11 @@ cv::Mat KCF_Tracker::circshift(const cv::Mat &patch, int x_rot, int y_rot)
 
 ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
 {
-    cv::Mat flip_h,imag_h,complex_result_h;
+#ifdef OPENCV_CUFFT
+    cv::Mat flip_h,imag_h,complex_result;
 
-    cv::cuda::HostMem hostmem_input(input.size(), input.type(), cv::cuda::HostMem::SHARED);
+    cv::cuda::HostMem hostmem_input(input, cv::cuda::HostMem::SHARED);
     cv::cuda::HostMem hostmem_real(cv::Size(input.cols,input.rows/2+1), CV_32FC2, cv::cuda::HostMem::SHARED);
-
-    input.copyTo(hostmem_input);
 
     cv::cuda::dft(hostmem_input,hostmem_real,hostmem_input.size(),0,stream);
     stream.waitForCompletion();
@@ -444,8 +443,8 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
 
     std::vector<cv::Mat> matarray = {real_h,imag_h};
 
-    cv::hconcat(matarray,complex_result_h);
-
+    cv::hconcat(matarray,complex_result);
+    
 //     //extraxt x and y channels
 //     cv::Mat xy[2]; //X,Y
 //     cv::split(complex_result_h, xy);
@@ -472,25 +471,44 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
 //     cv::imshow("DFT", bgr);
 // 
 //     cv::waitKey(0);
+#else
+    cv::Mat complex_result;
+    cv::dft(input, complex_result, cv::DFT_COMPLEX_OUTPUT);
+#endif //OPENCV_CUFFT
     
-    return ComplexMat(complex_result_h);
+    return ComplexMat(complex_result);
 }
 
 ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &cos_window)
 {
     int n_channels = input.size();
+    cv::Mat complex_result;
+#ifdef OPENCV_CUFFT
+    cv::Mat flip_h,imag_h;
+    cv::cuda::GpuMat src_gpu;
+    cv::cuda::HostMem hostmem_real(cv::Size(input[0].cols,input[0].rows/2+1), CV_32FC2, cv::cuda::HostMem::SHARED);
+#endif //OPENCV_CUFFT
     ComplexMat result(input[0].rows, input[0].cols, n_channels);
     for (int i = 0; i < n_channels; ++i){
-        cv::Mat complex_result;
-//        cv::Mat padded;                            //expand input image to optimal size
-//        int m = cv::getOptimalDFTSize( input[0].rows );
-//        int n = cv::getOptimalDFTSize( input[0].cols ); // on the border add zero pixels
+#ifdef OPENCV_CUFFT
+	cv::cuda::HostMem hostmem_input(input[i], cv::cuda::HostMem::SHARED);
+	cv::cuda::multiply(hostmem_input,p_cos_window_d,src_gpu);
+	cv::cuda::dft(src_gpu,hostmem_real,src_gpu.size(),0,stream);
+	stream.waitForCompletion();
 
-//        copyMakeBorder(input[i].mul(cos_window), padded, 0, m - input[0].rows, 0, n - input[0].cols, cv::BORDER_CONSTANT, cv::Scalar::all(0));
-//        cv::dft(padded, complex_result, cv::DFT_COMPLEX_OUTPUT);
-//        result.set_channel(i, complex_result(cv::Range(0, input[0].rows), cv::Range(0, input[0].cols)));
+	cv::Mat real_h = hostmem_real.createMatHeader();
 
-        cv::dft(input[i].mul(cos_window), complex_result, cv::DFT_COMPLEX_OUTPUT);
+	//create reversed copy of result and merge them
+	cv::flip(hostmem_real,flip_h,1);
+	flip_h(cv::Range(0, flip_h.rows), cv::Range(1, flip_h.cols)).copyTo(imag_h);
+
+	std::vector<cv::Mat> matarray = {real_h,imag_h};
+	
+	cv::hconcat(matarray,complex_result);
+#else
+	cv::dft(input[i].mul(cos_window), complex_result, cv::DFT_COMPLEX_OUTPUT);
+#endif //OPENCV_CUFFT
+	
         result.set_channel(i, complex_result);
     }
     return result;
@@ -532,8 +550,10 @@ cv::Mat KCF_Tracker::cosine_window_function(int dim1, int dim2)
     for (int i = 0; i < dim2; ++i)
         m2.at<float>(i) = 0.5*(1. - std::cos(2. * CV_PI * static_cast<double>(i) * N_inv));
     cv::Mat ret = m2*m1;
-    cv::cuda::createContinuous(cv::Size(ret.cols,ret.rows),CV_32FC1,p_cos_window_gpu);
-    p_cos_window_gpu.upload(ret);
+#ifdef OPENCV_CUFFT
+    cv::cuda::createContinuous(cv::Size(ret.cols,ret.rows),CV_32FC1,p_cos_window_d);
+    p_cos_window_d.upload(ret);
+#endif
     return ret;
 }
 

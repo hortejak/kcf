@@ -6,10 +6,6 @@
 #ifndef _SSE_HPP_
 #define _SSE_HPP_
 
-#ifndef __ARM_NEON
-#define __ARM_NEON
-#endif
-
 #ifdef __ARM_NEON
 #include "SSE2NEON.h"
 #else

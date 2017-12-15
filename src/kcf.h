@@ -31,11 +31,20 @@ struct BBox_c
 class KCF_Tracker
 {
 public:
-    bool m_use_scale {true};//true
-    bool m_use_color {true};//true
+#ifdef OPENCV_CUFFT
+    bool m_use_scale {false};
+    bool m_use_color {false};
+#else //OPENCV_CUFFT
+    bool m_use_scale {true};
+    bool m_use_color {true};
+#endif //OPENCV_CUFFT
+#ifdef ASYNC
+    bool m_use_multithreading {true};
+#else
+    bool m_use_multithreading {false};
+#endif //ASYNC
     bool m_use_subpixel_localization {true};
     bool m_use_subgrid_scale {true};
-    bool m_use_multithreading {true};
     bool m_use_cnfeat {true};
     bool m_use_linearkernel {false};
 
@@ -66,7 +75,6 @@ private:
     bool p_resize_image = false;
     
     bool first = true;
-    cv::cuda::Stream stream;
 
     double p_padding = 1.5;
     double p_output_sigma_factor = 0.1;
@@ -82,8 +90,12 @@ private:
     double p_current_scale = 1.;
     double p_min_max_scale[2];
     std::vector<double> p_scales;
-     cv::cuda::GpuMat src_gpu,dst_gpu,p_cos_window_gpu;
-
+    
+    #ifdef OPENCV_CUFFT
+    cv::cuda::GpuMat src_gpu,dst_gpu,p_cos_window_d;
+    cv::cuda::Stream stream;
+    #endif //OPENCV_CUFFT
+    
     //model
     ComplexMat p_yf;
     ComplexMat p_model_alphaf;
@@ -99,6 +111,7 @@ private:
     cv::Mat cosine_window_function(int dim1, int dim2);
     ComplexMat fft2(const cv::Mat & input);
     ComplexMat fft2(const std::vector<cv::Mat> & input, const cv::Mat & cos_window);
+
     cv::Mat ifft2(const ComplexMat & inputf);
     std::vector<cv::Mat> get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx, int cy, int size_x, int size_y, double scale = 1.);
     cv::Point2f sub_pixel_peak(cv::Point & max_loc, cv::Mat & response);
