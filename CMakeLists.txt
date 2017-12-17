@@ -39,8 +39,7 @@ include_directories(${CMAKE_SOURCE_DIR}/sse2neon)
 
 add_subdirectory(src)
 
-# add_executable(kcf_vot main_vot.cpp vot.hpp)
-
+if(OPENCV_CUFFT)
 find_package(CUDA REQUIRED)
 link_directories ( ${CUDA_LIB_DIR} )
 MESSAGE(STATUS "CUDA_LIB_DIR: ${CUDA_LIB_DIR} ")
@@ -55,6 +54,7 @@ list( APPEND CUDA_NVCC_FLAGS "-O3 --gpu-architecture compute_62 -std=c++11")
 cuda_add_executable( kcf_vot main_vot.cpp vot.hpp )
 
 target_link_libraries(kcf_vot ${CUDA_LIBRARIES} ${OpenCV_LIBS}  kcf)
-#target_link_libraries(kcf_vot ${OpenCV_LIBS} kcf)
-#ENDIF()
-
+else()
+add_executable(kcf_vot main_vot.cpp vot.hpp)
+target_link_libraries(kcf_vot ${OpenCV_LIBS} kcf)
+endif() #OPENCV_CUFFT

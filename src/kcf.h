@@ -3,11 +3,14 @@
 
 #include <opencv2/opencv.hpp>
 #include <vector>
-#include <cuda.h>
-#include <cuda_runtime.h>
 #include "fhog.hpp"
 #include "complexmat.hpp"
 #include "cnfeat.hpp"
+
+#ifdef OPENCV_CUFFT
+#include <cuda.h>
+#include <cuda_runtime.h>
+#endif //OPENCV_CUFFT
 
 struct BBox_c
 {
