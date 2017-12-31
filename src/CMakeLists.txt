@@ -6,10 +6,10 @@ add_subdirectory(cn)
 set(KCF_LIB_SRC kcf.cpp kcf.h complexmat.hpp)
 
 add_library(kcf STATIC ${KCF_LIB_SRC})
-if(OPENCV_CUFFT)
+IF(OPENCV_CUFFT)
 include_directories(${CUDA_INCLUDE_DIRS})
 target_link_libraries(kcf ${CUDA_LIBRARIES} ${OpenCV_LIBS} fhog cndata)
-else()
+ELSE()
 target_link_libraries(kcf ${OpenCV_LIBS} fhog cndata)
-endif() #OPENCV_CUFFT
+ENDIF() #OPENCV_CUFFT
 set_target_properties(kcf PROPERTIES VERSION 1.0.0 SOVERSION 1)
