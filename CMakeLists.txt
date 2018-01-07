@@ -6,10 +6,10 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra -pedantic -O3 -
 
 option(OPENCV_CUFFT "If OFF CPU implementation using OpenCV implementation of fft will be used. If ON Nvidia CUFFT implemented in OpenCV will be used. Together with Hostmem from OpenCV." OFF)
 option(FFTW "Use FFTW implementation of DFT." OFF)
+option(FFTW_PARALLEL "Use FFTW implementation of DFT." OFF)
 option(ASYNC "Default setting is on. Works only if OPENCV_CUFFT is not ON. Will enable C++ async directive." OFF)
 option(VISULIZE_RESULT "Check if you want to visulize the result." OFF)
-option(DEBUG_MODE "Debug terminal output." OFF)
-option(DEBUG_MODE_DETAILED "Additional terminal outputs and screens." OFF)
+option(DEBUG_MODE "Additional debug output." OFF)
 
 IF(VISULIZE_RESULT)
   add_definitions(-DVISULIZE_RESULT)
@@ -19,10 +19,6 @@ ENDIF() #VISULIZE_RESULT
 IF(DEBUG_MODE )
   add_definitions(-DDEBUG_MODE )
   MESSAGE(STATUS "Debug mode")
-  IF(DEBUG_MODE_DETAILED)
-     add_definitions(-DDEBUG_MODE_DETAILED )
-    MESSAGE(STATUS "Debug mode detailed")
-  ENDIF() #DEBUG_MODE_DETAILED
 ENDIF() #DEBUG_MODE 
 
 IF(OPENCV_CUFFT)
@@ -31,9 +27,13 @@ IF(OPENCV_CUFFT)
 ELSEIF(FFTW)
   add_definitions(-DFFTW)
   MESSAGE(STATUS "FFTW")
+  IF(FFTW_PARALLEL)
+  add_definitions(-DFFTW_PARALLEL)
+  MESSAGE(STATUS "FFTW_PARALLEL")
+  ENDIF() #FFTW_PARALLEL
 ENDIF() #OPENCV_CUFFT
 
-IF(ASYNC AND NOT OPENCV_CUFFT)
+IF(ASYNC AND NOT OPENCV_CUFFT AND NOT FFTW)
   add_definitions(-DASYNC)
   MESSAGE(STATUS "ASYNC")
 ENDIF() #ASYNC
@@ -75,6 +75,9 @@ ELSE()
 add_executable(kcf_vot main_vot.cpp vot.hpp)
 target_link_libraries(kcf_vot ${OpenCV_LIBS} kcf)
     IF(FFTW)
-    target_link_libraries(kcf_vot fftw3 fftw3f)
+        target_link_libraries(kcf_vot fftw3f)
+        IF(FFTW_PARALLEL)
+            target_link_libraries(kcf_vot fftw3_threads)
+        ENDIF() #ASYNC
     ENDIF() #FFTW
 ENDIF() #OPENCV_CUFFT
