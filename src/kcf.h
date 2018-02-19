@@ -12,6 +12,10 @@
 #include <cuda_runtime.h>
 #endif //OPENCV_CUFFT
 
+#ifdef FFTW
+#include <fftw3.h>
+#endif
+
 struct BBox_c
 {
     double cx, cy, w, h;

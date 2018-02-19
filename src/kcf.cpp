@@ -82,10 +82,14 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
 
     p_output_sigma = std::sqrt(p_pose.w*p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
 
+#ifdef FFTW_PARALLEL
+        fftw_init_threads();
+        fftw_plan_with_nthreads(2);
+# endif
+    
     //window weights, i.e. labels
     p_yf = fft2(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
     p_cos_window = cosine_window_function(p_yf.cols, p_yf.rows);
-    
     //obtain a sub-window for training initial model
     std::vector<cv::Mat> path_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1]);   
     p_model_xf = fft2(path_feat, p_cos_window);
@@ -300,7 +304,7 @@ std::vector<cv::Mat> KCF_Tracker::get_features(cv::Mat & input_rgb, cv::Mat & in
         cv::resize(patch_gray, patch_gray, cv::Size(size_x, size_y), 0., 0., cv::INTER_LINEAR);
     }
 
-    // get hog features
+    // get hog(Histogram of Oriented Gradients) features
     std::vector<cv::Mat> hog_feat = FHoG::extract(patch_gray, 2, p_cell_size, 9);
 
     //get color rgb features (simple r,g,b channels)
@@ -348,7 +352,7 @@ cv::Mat KCF_Tracker::gaussian_shaped_labels(double sigma, int dim1, int dim2)
         float * row_ptr = labels.ptr<float>(j);
         double y_s = y*y;
         for (int x = range_x[0], i = 0; x < range_x[1]; ++x, ++i){
-            row_ptr[i] = std::exp(-0.5 * (y_s + x*x) / sigma_s);
+            row_ptr[i] = std::exp(-0.5 * (y_s + x*x) / sigma_s);//-1/2*e^((y^2+x^2)/sigma^2)
         }
     }
 
@@ -426,8 +430,9 @@ cv::Mat KCF_Tracker::circshift(const cv::Mat &patch, int x_rot, int y_rot)
 
 ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
 {
+    cv::Mat complex_result;
 #ifdef OPENCV_CUFFT
-    cv::Mat flip_h,imag_h,complex_result;
+    cv::Mat flip_h,imag_h;
 
     cv::cuda::HostMem hostmem_input(input, cv::cuda::HostMem::SHARED);
     cv::cuda::HostMem hostmem_real(cv::Size(input.cols,input.rows/2+1), CV_32FC2, cv::cuda::HostMem::SHARED);
@@ -444,38 +449,93 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
     std::vector<cv::Mat> matarray = {real_h,imag_h};
 
     cv::hconcat(matarray,complex_result);
+#elif FFTW
+    // Prepare variables and FFTW plan for float precision FFT
+    float *data_in;
+    fftwf_complex    *fft; 
     
-//     //extraxt x and y channels
-//     cv::Mat xy[2]; //X,Y
-//     cv::split(complex_result_h, xy);
-// 
-//     //calculate angle and magnitude
-//     cv::Mat magnitude, angle;
-//     cv::cartToPolar(xy[0], xy[1], magnitude, angle, true);
-// 
-//     //translate magnitude to range [0;1]
-//     double mag_max;
-//     cv::minMaxLoc(magnitude, 0, &mag_max);
-//     magnitude.convertTo(magnitude, -1, 1.0 / mag_max);
-// 
-//     //build hsv image
-//     cv::Mat _hsv[3], hsv;
-//     _hsv[0] = angle;
-//     _hsv[1] = cv::Mat::ones(angle.size(), CV_32F);
-//     _hsv[2] = magnitude;
-//     cv::merge(_hsv, 3, hsv);
-// 
-//     //convert to BGR and show
-//     cv::Mat bgr;//CV_32FC3 matrix
-//     cv::cvtColor(hsv, bgr, cv::COLOR_HSV2BGR);
-//     cv::imshow("DFT", bgr);
-// 
-//     cv::waitKey(0);
+    fftwf_plan       plan_f;
+    
+    int  width, height;   
+    
+    width  	  = input.cols;
+    height 	  = input.rows;
+    
+    float* outdata = new float[2*width * height];
+     
+    data_in =  fftwf_alloc_real(width * height);
+    fft = fftwf_alloc_complex((width/2+1) * height);
+    
+    plan_f=fftwf_plan_dft_r2c_2d( height , width , data_in , fft ,  FFTW_MEASURE );
+    // Prepare input data
+    for(int i = 0,k=0; i < height; ++i) {
+        const float* row = input.ptr<float>(i);
+        for(int j = 0; j < width; j++) {
+            data_in[k]=(float)row[j];
+            k++;
+        }
+    }
+    
+    // Exectue fft
+    fftwf_execute( plan_f );
+
+    // Get output data to right format
+    int width2=2*width;
+    for(int  i = 0, k = 0,l=0 ; i < height; i++ ) {
+        for(int  j = 0 ; j < width2 ; j++ ) {
+            if(j<=width2/2-1){
+            outdata[i * width2 + j] = (float)fft[k][0];
+            outdata[i * width2 + j+1] = (float)fft[k][1];
+
+            j++;
+            k++;
+            l++;
+            }else{
+                l--;
+            outdata[i * width2 + j] = (float)fft[l][0];
+            outdata[i * width2 + j+1] = (float)fft[l][1];
+            
+            j++;
+            }
+        }
+    }
+   cv::Mat tmp(height,width,CV_32FC2,outdata);
+   complex_result=tmp;
+    // Destroy FFTW plan and variables
+    fftwf_destroy_plan(plan_f);
+    fftwf_free(fft); fftwf_free(data_in);
+    
 #else
-    cv::Mat complex_result;
     cv::dft(input, complex_result, cv::DFT_COMPLEX_OUTPUT);
 #endif //OPENCV_CUFFT
-    
+#ifdef DEBUG_MODE
+    //extraxt x and y channels
+    cv::Mat xy[2]; //X,Y
+    cv::split(complex_result, xy);
+
+    //calculate angle and magnitude
+    cv::Mat magnitude, angle;
+    cv::cartToPolar(xy[0], xy[1], magnitude, angle, true);
+
+    //translate magnitude to range [0;1]
+    double mag_max;
+    cv::minMaxLoc(magnitude, 0, &mag_max);
+    magnitude.convertTo(magnitude, -1, 1.0 / mag_max);
+
+    //build hsv image
+    cv::Mat _hsv[3], hsv;
+    _hsv[0] = angle;
+    _hsv[1] = cv::Mat::ones(angle.size(), CV_32F);
+    _hsv[2] = magnitude;
+    cv::merge(_hsv, 3, hsv);
+
+    //convert to BGR and show
+    cv::Mat bgr;//CV_32FC3 matrix
+    cv::cvtColor(hsv, bgr, cv::COLOR_HSV2BGR);
+    cv::resize(bgr, bgr, cv::Size(600,600));
+    cv::imshow("DFT", bgr);
+    cv::waitKey(0);
+#endif //DEBUG_MODE
     return ComplexMat(complex_result);
 }
 
@@ -483,11 +543,32 @@ ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &c
 {
     int n_channels = input.size();
     cv::Mat complex_result;
+    
 #ifdef OPENCV_CUFFT
     cv::Mat flip_h,imag_h;
     cv::cuda::GpuMat src_gpu;
     cv::cuda::HostMem hostmem_real(cv::Size(input[0].cols,input[0].rows/2+1), CV_32FC2, cv::cuda::HostMem::SHARED);
+#elif FFTW
+    // Prepare variables and FFTW plan for float precision FFT
+    float *data_in;
+    fftwf_complex    *fft; 
+    
+    fftwf_plan       plan_f;
+    
+    int  width, height, width2;   
+    
+    width  	  = input[0].cols;
+    height 	  = input[0].rows;
+    width2=2*width;
+
+    float* outdata = new float[2*width * height];
+     
+    data_in =  fftwf_alloc_real(width * height);
+    fft = fftwf_alloc_complex((width/2+1) * height);
+    
+    plan_f=fftwf_plan_dft_r2c_2d( height , width , data_in , fft ,  FFTW_MEASURE );
 #endif //OPENCV_CUFFT
+
     ComplexMat result(input[0].rows, input[0].cols, n_channels);
     for (int i = 0; i < n_channels; ++i){
 #ifdef OPENCV_CUFFT
@@ -505,35 +586,164 @@ ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &c
 	std::vector<cv::Mat> matarray = {real_h,imag_h};
 	
 	cv::hconcat(matarray,complex_result);
+#elif FFTW
+    // Prepare input data
+    cv::Mat in_img = input[i].mul(cos_window);
+    for(int x = 0,k=0; x< height; ++x) {
+        const float* row = in_img.ptr<float>(x);
+        for(int j = 0; j < width; j++) {
+            data_in[k]=(float)row[j];
+            k++;
+        }
+    } 
+    
+    // Execute FFT
+    fftwf_execute( plan_f );
+    
+    // Get output data to right format
+    for(int  x = 0, k = 0,l=0 ; x < height; ++x ) {
+        for(int  j = 0 ; j < width2 ; j++ ) {
+            if(j<=width2/2-1){
+            outdata[x* width2 + j] = (float)fft[k][0];
+            outdata[x * width2 + j+1] = (float)fft[k][1];
+            j++;
+            k++;
+            l++;
+            }else{
+                l--;
+            outdata[x * width2 + j] = (float)fft[l][0];
+            outdata[x * width2 + j+1] = (float)fft[l][1];
+            j++;
+            }
+        }
+    }
+   cv::Mat tmp(height,width,CV_32FC2,outdata);
+   complex_result = tmp;
+   
 #else
 	cv::dft(input[i].mul(cos_window), complex_result, cv::DFT_COMPLEX_OUTPUT);
 #endif //OPENCV_CUFFT
 	
         result.set_channel(i, complex_result);
     }
+#ifdef FFTW
+    // Destroy FFT plans and variables
+    fftwf_destroy_plan(plan_f);
+    fftwf_free(fft); fftwf_free(data_in);
+#endif //FFTW
     return result;
 }
 
 cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
 {
-
-    cv::Mat real_result,tmp1,tmp2;
+#ifdef FFTW
+    // Prepare variables and FFTW plan for float precision IFFT
+    fftwf_complex *data_in;
+    float    *ifft;       
+    fftwf_plan       plan_if;        
+    int  width, height; 
+#endif //FFTW
+    cv::Mat real_result;
+    
     if (inputf.n_channels == 1){
-// 	src.upload(inputf.to_cv_mat());
-        cv::dft(/*src, dst, src.size()*/inputf.to_cv_mat(),real_result, cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
-//  	dst.download(real_result);
+#ifdef FFTW
+        cv::Mat input=inputf.to_cv_mat()  ;
+        
+        width  	  = input.cols;
+        height 	  = input.rows;
+
+        float* outdata = new float[width * height];
+     
+        data_in =  fftwf_alloc_complex(2*(width/2+1) * height);
+        ifft = fftwf_alloc_real(width * height);
+            
+        plan_if=fftwf_plan_dft_c2r_2d( height , width , data_in , ifft ,  FFTW_MEASURE );
+        //Prepare input data
+        for(int x = 0,k=0; x< height; ++x) {
+            const float* row = input.ptr<float>(x);
+            for(int j = 0; j < width; j++) {
+                data_in[k][0]=(float)row[j];
+                data_in[k][1]=(float)row[j+1];
+
+                k++;
+                j++;
+            }
+        } 
+        
+        // Execute IFFT
+        fftwf_execute( plan_if );
+        
+        // Get output data to right format
+        for(int x = 0,k=0; x< height; ++x) {
+            for(int j = 0; j < width; j++) {
+                outdata[k]=(float)ifft[x*width+j]/(float)(width*height);
+
+                k++;
+            }
+        } 
+    
+        cv::Mat  tmp(height,width,CV_32FC1,outdata);
+        real_result = tmp;
+        // Destroy FFTW plans and variables
+        fftwf_destroy_plan(plan_if);
+        fftwf_free(ifft); fftwf_free(data_in);
+#else
+        cv::dft(inputf.to_cv_mat(),real_result, cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
+#endif //FFTW
+        
     } else {
-        cv::Mat tmp;
         std::vector<cv::Mat> mat_channels = inputf.to_cv_mat_vector();
         std::vector<cv::Mat> ifft_mats(inputf.n_channels);
+#ifdef FFTW
+        width    = mat_channels[0].cols;
+        height 	  = mat_channels[0].rows;
+
+        float* outdata = new float[width * height];
+     
+        data_in =  fftwf_alloc_complex(2*(width/2+1) * height);
+        ifft = fftwf_alloc_real(width * height);
+            
+        plan_if=fftwf_plan_dft_c2r_2d( height , width , data_in , ifft ,  FFTW_MEASURE );
+#endif //FFTW
         for (int i = 0; i < inputf.n_channels; ++i) {
-//     	   src.upload(mat_channels[i]);
-//   	   dst.upload(ifft_mats[i]);
+#ifdef FFTW
+         //Prepare input data
+        for(int x = 0,k=0; x< height; ++x) {
+            const float* row = mat_channels[i].ptr<float>(x);
+            for(int j = 0; j < width; j++) {
+                data_in[k][0]=(float)row[j];
+                data_in[k][1]=(float)row[j+1];
+
+                k++;
+                j++;
+            }
+        } 
+        
+         // Execute IFFT
+        fftwf_execute( plan_if );
+        
+        // Get output data to right format
+        for(int x = 0,k=0; x< height; ++x) {
+            for(int j = 0; j < width; j++) {
+                outdata[k]=(float)ifft[x*width+j]/(float)(width*height);
+
+                k++;
+            }
+        } 
+        
+        cv::Mat  tmp(height,width,CV_32FC1,outdata);
+        
+        ifft_mats[i]=tmp;
+            
+#else
 	    cv::dft(mat_channels[i], ifft_mats[i], cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
-//  	   cv::cuda::dft(src, dst, src.size(),  cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
-//  	   dst.download(ifft_mats[i]);
-        }
-    
+#endif //FFTW
+        } 
+#ifdef FFTW
+        // Destroy FFTW plans and variables
+        fftwf_destroy_plan(plan_if);
+        fftwf_free(ifft); fftwf_free(data_in);
+#endif //FFTW
         cv::merge(ifft_mats, real_result);
     }
     return real_result;

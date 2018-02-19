@@ -5,21 +5,38 @@ project(kcf_tracker)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra -pedantic -O3 -Wno-long-long -fno-omit-frame-pointer")
 
 option(OPENCV_CUFFT "If OFF CPU implementation using OpenCV implementation of fft will be used. If ON Nvidia CUFFT implemented in OpenCV will be used. Together with Hostmem from OpenCV." OFF)
+option(FFTW "Use FFTW implementation of DFT." OFF)
+option(FFTW_PARALLEL "Use FFTW implementation of DFT." OFF)
+option(ASYNC "Default setting is on. Works only if OPENCV_CUFFT is not ON. Will enable C++ async directive." OFF)
 option(VISULIZE_RESULT "Check if you want to visulize the result." OFF)
-option(ASYNC "Default setting is on. Works only if OPENCV_CUFFT is not ON. Will enable C++ async directive." ON)
-if(VISULIZE_RESULT)
+option(DEBUG_MODE "Additional debug output." OFF)
+
+IF(VISULIZE_RESULT)
   add_definitions(-DVISULIZE_RESULT)
   MESSAGE(STATUS "Visulize result")
-endif()
-if(OPENCV_CUFFT)
+ENDIF() #VISULIZE_RESULT
+
+IF(DEBUG_MODE )
+  add_definitions(-DDEBUG_MODE )
+  MESSAGE(STATUS "Debug mode")
+ENDIF() #DEBUG_MODE 
+
+IF(OPENCV_CUFFT)
   add_definitions(-DOPENCV_CUFFT)
   MESSAGE(STATUS "OPENCV+CUFFT version")
-elseif(ASYNC)
+ELSEIF(FFTW)
+  add_definitions(-DFFTW)
+  MESSAGE(STATUS "FFTW")
+  IF(FFTW_PARALLEL)
+  add_definitions(-DFFTW_PARALLEL)
+  MESSAGE(STATUS "FFTW_PARALLEL")
+  ENDIF() #FFTW_PARALLEL
+ENDIF() #OPENCV_CUFFT
+
+IF(ASYNC AND NOT OPENCV_CUFFT AND NOT FFTW)
   add_definitions(-DASYNC)
-  MESSAGE(STATUS "CPU+ASYNC version")
-else()
-  MESSAGE(STATUS "CPU+SERIAL version")
-endif() #OPENCV_CUFFT
+  MESSAGE(STATUS "ASYNC")
+ENDIF() #ASYNC
 
 FIND_PACKAGE( OpenCV REQUIRED )
 link_directories ( ${OpenCV_LIB_DIR} )
@@ -39,7 +56,7 @@ include_directories(${CMAKE_SOURCE_DIR}/sse2neon)
 
 add_subdirectory(src)
 
-if(OPENCV_CUFFT)
+IF(OPENCV_CUFFT)
 find_package(CUDA REQUIRED)
 link_directories ( ${CUDA_LIB_DIR} )
 MESSAGE(STATUS "CUDA_LIB_DIR: ${CUDA_LIB_DIR} ")
@@ -54,7 +71,13 @@ list( APPEND CUDA_NVCC_FLAGS "-O3 --gpu-architecture compute_62 -std=c++11")
 cuda_add_executable( kcf_vot main_vot.cpp vot.hpp )
 
 target_link_libraries(kcf_vot ${CUDA_LIBRARIES} ${OpenCV_LIBS}  kcf)
-else()
+ELSE()
 add_executable(kcf_vot main_vot.cpp vot.hpp)
 target_link_libraries(kcf_vot ${OpenCV_LIBS} kcf)
-endif() #OPENCV_CUFFT
+    IF(FFTW)
+        target_link_libraries(kcf_vot fftw3f)
+        IF(FFTW_PARALLEL)
+            target_link_libraries(kcf_vot fftw3_threads)
+        ENDIF() #ASYNC
+    ENDIF() #FFTW
+ENDIF() #OPENCV_CUFFT
