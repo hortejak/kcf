@@ -32,8 +32,8 @@ Where "option" is one of the options from this table:
 | Option| Description |
 | --- | --- |
 | `OPENCV_CUFFT`**WIP** | If OFF CPU implementation using OpenCV implementation of FFT will be used. If ON Nvidia CUFFT implemented in OpenCV will be used. Together with Hostmem from OpenCV. Default value is OFF.|
-| `FFTW` | Use FFTW implementation of FFT. If selected together with `OPENCV_CUFFT` then this option will not be used. Default value is OFF.|
-| `ASYNC` | Works only if OPENCV_CUFFT is not ON. Will enable C++ async directive. Default value is OFF.|
+| `FFTW`**WIP** | Use FFTW implementation of FFT. If selected together with `OPENCV_CUFFT` then this option will not be used. Default value is OFF.|
+| `ASYNC` | Works only if OPENCV_CUFFT and FFTW are not ON. Will enable C++ async directive. Default value is OFF.|
 | `VISULIZE_RESULT` | Check if you want to visulize the result. Default value is OFF. |
 | `DEBUG_MODE` | Debug terminal output. Default value is OFF.)|
 | `DEBUG_MODE_DETAILED` |Additional terminal outputs and screens. Default value is OFF.|
