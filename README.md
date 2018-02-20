@@ -41,7 +41,7 @@ To all of these you can also add these additional options:
 | Option| Description |
 | --- | --- |
 | `-DVISULIZE_RESULT=ON` | Check if you want to visulize the result. Default value is OFF. |
-| `-DDEBUG_MODE=ON` | Debug terminal output and debug screens. Default value is OFF.)=|
+| `-DDEBUG_MODE=ON` | Debug terminal output and debug screens. Default value is OFF.|
 | `-DDEBUG_MODE_DETAILED=ON` |Additional terminal outputs and debug screens. Default value is OFF.|
 
 Finally call make:
@@ -52,7 +52,8 @@ $ make
 This code compiles into binary **kcf_vot**
 
 ./kcf_vot
-- using VOT 2014 methodology (http://www.votchallenge.net/)
+- using [VOT 2014 methodology](http://www.votchallenge.net/)
+- to get dataset used in VOT go [here](http://www.votchallenge.net/vot2016/dataset.html)
  - INPUT : expecting two files, images.txt (list of sequence images with absolute path) and
            region.txt with initial bounding box in the first frame in format "top_left_x, top_left_y, width, height" or
            four corner points listed clockwise starting from bottom left corner.
