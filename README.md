@@ -14,30 +14,40 @@ Using cmake gui:
 ________________
 ```
 $ mkdir build
-$ cmake-gui
+$ cmake-gui //Select the directory path and build directory. After which you can choose desired build option. 
+            //Each option has comment explaining briefly what it does.
+$ make
 ```
-Then select the directory path and build directory. After which you can choose desired build option. Each option has comment explaining briefly what it does.
-
 Without cmake gui:
 ___________________
 ```
 $ mkdir build
 $ cd build
-$ cmake -D"option",-D"option" ..
-$ make
 ```
 
-Where "option" is one of the options from this table:
+Following table show multiple options how to configure cmake default option is single thread OpenCV FFT:
 
 | Option| Description |
 | --- | --- |
-| `OPENCV_CUFFT`**WIP** | If OFF CPU implementation using OpenCV implementation of FFT will be used. If ON Nvidia CUFFT implemented in OpenCV will be used. Together with Hostmem from OpenCV. Default value is OFF.|
-| `FFTW`**WIP** | Use FFTW implementation of FFT. If selected together with `OPENCV_CUFFT` then this option will not be used. Default value is OFF.|
-| `FFTW_PARALLEL`**WIP** | Use parrallel implementation of FFTW without OpenMP. Default value is OFF.|
-| `ASYNC` | Works only if OPENCV_CUFFT and FFTW are not ON. Will enable C++ async directive. Default value is OFF.|
-| `VISULIZE_RESULT` | Check if you want to visulize the result. Default value is OFF. |
-| `DEBUG_MODE` | Debug terminal output. Default value is OFF.)|
-| `DEBUG_MODE_DETAILED` |Additional terminal outputs and screens. Default value is OFF.|
+| `cmake ..` | Single thread version of original project with OpenCV FFT.|
+| `cmake -DASYNC=ON ..` | Multi thread version of original project with OpenCV FFT together with C++ async directive.|
+| `cmake -DOPENCV_CUFFT=ON ..`**WIP** | Nvidia CUFFT implemented in OpenCV will be used. Together with Hostmem from OpenCV.|
+| `cmake -DFFTW=ON ..`**WIP** | Use FFTW implementation of FFT.|
+| `cmake -DFFTW=ON,-DFFTW_PARALLEL=ON ..`**WIP** | Use parrallel implementation of FFTW without OpenMP.|
+| `cmake -DFFTW=ON,-DFFTW_OPENMP=ON ..`**WIP** | Use parrallel implementation of FFTW with OpenMP. |
+
+To all of these you can also add these additional options:
+
+| Option| Description |
+| --- | --- |
+| `-DVISULIZE_RESULT=ON` | Check if you want to visulize the result. Default value is OFF. |
+| `-DDEBUG_MODE=ON` | Debug terminal output and debug screens. Default value is OFF.)=|
+| `-DDEBUG_MODE_DETAILED=ON` |Additional terminal outputs and debug screens. Default value is OFF.|
+
+Finally call make:
+```
+$ make
+```
 
 This code compiles into binary **kcf_vot**
 
