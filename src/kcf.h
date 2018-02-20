@@ -16,6 +16,10 @@
 #include <fftw3.h>
 #endif
 
+#ifdef FFTW_OPENMP
+#include <omp.h>
+#endif
+
 struct BBox_c
 {
     double cx, cy, w, h;

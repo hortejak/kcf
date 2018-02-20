@@ -85,7 +85,10 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
 #ifdef FFTW_PARALLEL
         fftw_init_threads();
         fftw_plan_with_nthreads(2);
-# endif
+# elif FFTW_OPENMP
+        fftw_init_threads();
+        fftw_plan_with_nthreads(omp_get_max_threads());
+#endif
     
     //window weights, i.e. labels
     p_yf = fft2(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
