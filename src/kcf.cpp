@@ -83,11 +83,11 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     p_output_sigma = std::sqrt(p_pose.w*p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
 
 #ifdef FFTW_PARALLEL
-        fftw_init_threads();
-        fftw_plan_with_nthreads(2);
+    fftw_init_threads();
+    fftw_plan_with_nthreads(2);
 # elif FFTW_OPENMP
-        fftw_init_threads();
-        fftw_plan_with_nthreads(omp_get_max_threads());
+    fftw_init_threads();
+    fftw_plan_with_nthreads(omp_get_max_threads());
 #endif
 
     //window weights, i.e. labels
@@ -169,18 +169,18 @@ void KCF_Tracker::track(cv::Mat &img)
         std::vector<std::future<cv::Mat>> async_res(p_scales.size());
         for (size_t i = 0; i < p_scales.size(); ++i) {
             async_res[i] = std::async(std::launch::async,
-                    [this, &input_gray, &input_rgb, i]() -> cv::Mat
-                    {
-                        std::vector<cv::Mat> patch_feat_async = get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size[0],
-                                                  this->p_windows_size[1], this->p_current_scale * this->p_scales[i]);
-                        ComplexMat zf = fft2(patch_feat_async, this->p_cos_window);
-                        if (m_use_linearkernel)
-                            return ifft2((p_model_alphaf * zf).sum_over_channels());
-                        else {
-                            ComplexMat kzf = gaussian_correlation(zf, this->p_model_xf, this->p_kernel_sigma);
-                            return ifft2(this->p_model_alphaf * kzf);
-                        }
-                    });
+                                      [this, &input_gray, &input_rgb, i]() -> cv::Mat
+                                      {
+                                          std::vector<cv::Mat> patch_feat_async = get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size[0],
+                                                                                               this->p_windows_size[1], this->p_current_scale * this->p_scales[i]);
+                                          ComplexMat zf = fft2(patch_feat_async, this->p_cos_window);
+                                          if (m_use_linearkernel)
+                                              return ifft2((p_model_alphaf * zf).sum_over_channels());
+                                          else {
+                                              ComplexMat kzf = gaussian_correlation(zf, this->p_model_xf, this->p_kernel_sigma);
+                                              return ifft2(this->p_model_alphaf * kzf);
+                                          }
+                                      });
         }
 
         for (size_t i = 0; i < p_scales.size(); ++i) {
@@ -204,7 +204,7 @@ void KCF_Tracker::track(cv::Mat &img)
     } else {
         for (size_t i = 0; i < p_scales.size(); ++i) {
             patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i]);
-	    ComplexMat zf = fft2(patch_feat, p_cos_window);
+            ComplexMat zf = fft2(patch_feat, p_cos_window);
             cv::Mat response;
             if (m_use_linearkernel)
                 response = ifft2((p_model_alphaf * zf).sum_over_channels());
@@ -214,9 +214,9 @@ void KCF_Tracker::track(cv::Mat &img)
             }
 
             /* target location is at the maximum response. we must take into
-            account the fact that, if the target doesn't move, the peak
-            will appear at the top-left corner, not at the center (this is
-            discussed in the paper). the responses wrap around cyclically. */
+               account the fact that, if the target doesn't move, the peak
+               will appear at the top-left corner, not at the center (this is
+               discussed in the paper). the responses wrap around cyclically. */
             double min_val, max_val;
             cv::Point2i min_loc, max_loc;
             cv::minMaxLoc(response, &min_val, &max_val, &min_loc, &max_loc);
@@ -461,8 +461,8 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
 
     int  width, height;
 
-    width  	  = input.cols;
-    height 	  = input.rows;
+    width         = input.cols;
+    height        = input.rows;
 
     float* outdata = new float[2*width * height];
 
@@ -487,23 +487,23 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
     for(int  i = 0, k = 0,l=0 ; i < height; i++ ) {
         for(int  j = 0 ; j < width2 ; j++ ) {
             if(j<=width2/2-1){
-            outdata[i * width2 + j] = (float)fft[k][0];
-            outdata[i * width2 + j+1] = (float)fft[k][1];
+                outdata[i * width2 + j] = (float)fft[k][0];
+                outdata[i * width2 + j+1] = (float)fft[k][1];
 
-            j++;
-            k++;
-            l++;
+                j++;
+                k++;
+                l++;
             }else{
                 l--;
-            outdata[i * width2 + j] = (float)fft[l][0];
-            outdata[i * width2 + j+1] = (float)fft[l][1];
+                outdata[i * width2 + j] = (float)fft[l][0];
+                outdata[i * width2 + j+1] = (float)fft[l][1];
 
-            j++;
+                j++;
             }
         }
     }
-   cv::Mat tmp(height,width,CV_32FC2,outdata);
-   complex_result=tmp;
+    cv::Mat tmp(height,width,CV_32FC2,outdata);
+    complex_result=tmp;
     // Destroy FFTW plan and variables
     fftwf_destroy_plan(plan_f);
     fftwf_free(fft); fftwf_free(data_in);
@@ -560,8 +560,8 @@ ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &c
 
     int  width, height, width2;
 
-    width  	  = input[0].cols;
-    height 	  = input[0].rows;
+    width         = input[0].cols;
+    height        = input[0].rows;
     width2=2*width;
 
     float* outdata = new float[2*width * height];
@@ -575,56 +575,56 @@ ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &c
     ComplexMat result(input[0].rows, input[0].cols, n_channels);
     for (int i = 0; i < n_channels; ++i){
 #ifdef OPENCV_CUFFT
-	cv::cuda::HostMem hostmem_input(input[i], cv::cuda::HostMem::SHARED);
-	cv::cuda::multiply(hostmem_input,p_cos_window_d,src_gpu);
-	cv::cuda::dft(src_gpu,hostmem_real,src_gpu.size(),0,stream);
-	stream.waitForCompletion();
+        cv::cuda::HostMem hostmem_input(input[i], cv::cuda::HostMem::SHARED);
+        cv::cuda::multiply(hostmem_input,p_cos_window_d,src_gpu);
+        cv::cuda::dft(src_gpu,hostmem_real,src_gpu.size(),0,stream);
+        stream.waitForCompletion();
 
-	cv::Mat real_h = hostmem_real.createMatHeader();
+        cv::Mat real_h = hostmem_real.createMatHeader();
 
-	//create reversed copy of result and merge them
-	cv::flip(hostmem_real,flip_h,1);
-	flip_h(cv::Range(0, flip_h.rows), cv::Range(1, flip_h.cols)).copyTo(imag_h);
+        //create reversed copy of result and merge them
+        cv::flip(hostmem_real,flip_h,1);
+        flip_h(cv::Range(0, flip_h.rows), cv::Range(1, flip_h.cols)).copyTo(imag_h);
 
-	std::vector<cv::Mat> matarray = {real_h,imag_h};
+        std::vector<cv::Mat> matarray = {real_h,imag_h};
 
-	cv::hconcat(matarray,complex_result);
+        cv::hconcat(matarray,complex_result);
 #elif FFTW
-    // Prepare input data
-    cv::Mat in_img = input[i].mul(cos_window);
-    for(int x = 0,k=0; x< height; ++x) {
-        const float* row = in_img.ptr<float>(x);
-        for(int j = 0; j < width; j++) {
-            data_in[k]=(float)row[j];
-            k++;
-        }
-    }
-
-    // Execute FFT
-    fftwf_execute( plan_f );
-
-    // Get output data to right format
-    for(int  x = 0, k = 0,l=0 ; x < height; ++x ) {
-        for(int  j = 0 ; j < width2 ; j++ ) {
-            if(j<=width2/2-1){
-            outdata[x* width2 + j] = (float)fft[k][0];
-            outdata[x * width2 + j+1] = (float)fft[k][1];
-            j++;
-            k++;
-            l++;
-            }else{
-                l--;
-            outdata[x * width2 + j] = (float)fft[l][0];
-            outdata[x * width2 + j+1] = (float)fft[l][1];
-            j++;
+        // Prepare input data
+        cv::Mat in_img = input[i].mul(cos_window);
+        for(int x = 0,k=0; x< height; ++x) {
+            const float* row = in_img.ptr<float>(x);
+            for(int j = 0; j < width; j++) {
+                data_in[k]=(float)row[j];
+                k++;
             }
         }
-    }
-   cv::Mat tmp(height,width,CV_32FC2,outdata);
-   complex_result = tmp;
+
+        // Execute FFT
+        fftwf_execute( plan_f );
+
+        // Get output data to right format
+        for(int  x = 0, k = 0,l=0 ; x < height; ++x ) {
+            for(int  j = 0 ; j < width2 ; j++ ) {
+                if(j<=width2/2-1){
+                    outdata[x* width2 + j] = (float)fft[k][0];
+                    outdata[x * width2 + j+1] = (float)fft[k][1];
+                    j++;
+                    k++;
+                    l++;
+                }else{
+                    l--;
+                    outdata[x * width2 + j] = (float)fft[l][0];
+                    outdata[x * width2 + j+1] = (float)fft[l][1];
+                    j++;
+                }
+            }
+        }
+        cv::Mat tmp(height,width,CV_32FC2,outdata);
+        complex_result = tmp;
 
 #else
-	cv::dft(input[i].mul(cos_window), complex_result, cv::DFT_COMPLEX_OUTPUT);
+        cv::dft(input[i].mul(cos_window), complex_result, cv::DFT_COMPLEX_OUTPUT);
 #endif //OPENCV_CUFFT
 
         result.set_channel(i, complex_result);
@@ -652,8 +652,8 @@ cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
 #ifdef FFTW
         cv::Mat input=inputf.to_cv_mat()  ;
 
-        width  	  = input.cols;
-        height 	  = input.rows;
+        width     = input.cols;
+        height    = input.rows;
 
         float* outdata = new float[width * height];
 
@@ -699,7 +699,7 @@ cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
         std::vector<cv::Mat> ifft_mats(inputf.n_channels);
 #ifdef FFTW
         width    = mat_channels[0].cols;
-        height 	  = mat_channels[0].rows;
+        height    = mat_channels[0].rows;
 
         float* outdata = new float[width * height];
 
@@ -710,36 +710,36 @@ cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
 #endif //FFTW
         for (int i = 0; i < inputf.n_channels; ++i) {
 #ifdef FFTW
-         //Prepare input data
-        for(int x = 0,k=0; x< height; ++x) {
-            const float* row = mat_channels[i].ptr<float>(x);
-            for(int j = 0; j < width; j++) {
-                data_in[k][0]=(float)row[j];
-                data_in[k][1]=(float)row[j+1];
+            //Prepare input data
+            for(int x = 0,k=0; x< height; ++x) {
+                const float* row = mat_channels[i].ptr<float>(x);
+                for(int j = 0; j < width; j++) {
+                    data_in[k][0]=(float)row[j];
+                    data_in[k][1]=(float)row[j+1];
 
-                k++;
-                j++;
+                    k++;
+                    j++;
+                }
             }
-        }
 
-         // Execute IFFT
-        fftwf_execute( plan_if );
+            // Execute IFFT
+            fftwf_execute( plan_if );
 
-        // Get output data to right format
-        for(int x = 0,k=0; x< height; ++x) {
-            for(int j = 0; j < width; j++) {
-                outdata[k]=(float)ifft[x*width+j]/(float)(width*height);
+            // Get output data to right format
+            for(int x = 0,k=0; x< height; ++x) {
+                for(int j = 0; j < width; j++) {
+                    outdata[k]=(float)ifft[x*width+j]/(float)(width*height);
 
-                k++;
+                    k++;
+                }
             }
-        }
 
-        cv::Mat  tmp(height,width,CV_32FC1,outdata);
+            cv::Mat  tmp(height,width,CV_32FC1,outdata);
 
-        ifft_mats[i]=tmp;
+            ifft_mats[i]=tmp;
 
 #else
-	    cv::dft(mat_channels[i], ifft_mats[i], cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
+            cv::dft(mat_channels[i], ifft_mats[i], cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
 #endif //FFTW
         }
 #ifdef FFTW
@@ -815,11 +815,11 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     if (x2 - x1 == 0 || y2 - y1 == 0)
         patch = cv::Mat::zeros(height, width, CV_32FC1);
     else
-    {
-        cv::copyMakeBorder(input(cv::Range(y1, y2), cv::Range(x1, x2)), patch, top, bottom, left, right, cv::BORDER_REPLICATE);
-// 	imshow( "copyMakeBorder", patch);
-// 	cv::waitKey();
-    }
+        {
+            cv::copyMakeBorder(input(cv::Range(y1, y2), cv::Range(x1, x2)), patch, top, bottom, left, right, cv::BORDER_REPLICATE);
+//      imshow( "copyMakeBorder", patch);
+//      cv::waitKey();
+        }
 
     //sanity check
     assert(patch.cols == width && patch.rows == height);
@@ -881,15 +881,15 @@ cv::Point2f KCF_Tracker::sub_pixel_peak(cv::Point & max_loc, cv::Mat & response)
 
     // fit 2d quadratic function f(x, y) = a*x^2 + b*x*y + c*y^2 + d*x + e*y + f
     cv::Mat A = (cv::Mat_<float>(9, 6) <<
-                    p1.x*p1.x, p1.x*p1.y, p1.y*p1.y, p1.x, p1.y, 1.f,
-                    p2.x*p2.x, p2.x*p2.y, p2.y*p2.y, p2.x, p2.y, 1.f,
-                    p3.x*p3.x, p3.x*p3.y, p3.y*p3.y, p3.x, p3.y, 1.f,
-                    p4.x*p4.x, p4.x*p4.y, p4.y*p4.y, p4.x, p4.y, 1.f,
-                    p5.x*p5.x, p5.x*p5.y, p5.y*p5.y, p5.x, p5.y, 1.f,
-                    p6.x*p6.x, p6.x*p6.y, p6.y*p6.y, p6.x, p6.y, 1.f,
-                    p7.x*p7.x, p7.x*p7.y, p7.y*p7.y, p7.x, p7.y, 1.f,
-                    p8.x*p8.x, p8.x*p8.y, p8.y*p8.y, p8.x, p8.y, 1.f,
-                    max_loc.x*max_loc.x, max_loc.x*max_loc.y, max_loc.y*max_loc.y, max_loc.x, max_loc.y, 1.f);
+                 p1.x*p1.x, p1.x*p1.y, p1.y*p1.y, p1.x, p1.y, 1.f,
+                 p2.x*p2.x, p2.x*p2.y, p2.y*p2.y, p2.x, p2.y, 1.f,
+                 p3.x*p3.x, p3.x*p3.y, p3.y*p3.y, p3.x, p3.y, 1.f,
+                 p4.x*p4.x, p4.x*p4.y, p4.y*p4.y, p4.x, p4.y, 1.f,
+                 p5.x*p5.x, p5.x*p5.y, p5.y*p5.y, p5.x, p5.y, 1.f,
+                 p6.x*p6.x, p6.x*p6.y, p6.y*p6.y, p6.x, p6.y, 1.f,
+                 p7.x*p7.x, p7.x*p7.y, p7.y*p7.y, p7.x, p7.y, 1.f,
+                 p8.x*p8.x, p8.x*p8.y, p8.y*p8.y, p8.x, p8.y, 1.f,
+                 max_loc.x*max_loc.x, max_loc.x*max_loc.y, max_loc.y*max_loc.y, max_loc.x, max_loc.y, 1.f);
     cv::Mat fval = (cv::Mat_<float>(9, 1) <<
                     get_response_circular(p1, response),
                     get_response_circular(p2, response),
@@ -935,9 +935,9 @@ double KCF_Tracker::sub_grid_scale(std::vector<double> & responses, int index)
             return p_scales[index];
 
         A = (cv::Mat_<float>(3, 3) <<
-                       p_scales[index-1] * p_scales[index-1], p_scales[index-1], 1,
-                       p_scales[index] * p_scales[index], p_scales[index], 1,
-                       p_scales[index+1] * p_scales[index+1], p_scales[index+1], 1);
+             p_scales[index-1] * p_scales[index-1], p_scales[index-1], 1,
+             p_scales[index] * p_scales[index], p_scales[index], 1,
+             p_scales[index+1] * p_scales[index+1], p_scales[index+1], 1);
         fval = (cv::Mat_<float>(3, 1) << responses[index-1], responses[index], responses[index+1]);
     }
 

@@ -29,11 +29,11 @@ ELSEIF(FFTW)
   add_definitions(-DFFTW)
   MESSAGE(STATUS "FFTW")
   IF(FFTW_PARALLEL)
-  add_definitions(-DFFTW_PARALLEL)
-  MESSAGE(STATUS "FFTW_PARALLEL")
+    add_definitions(-DFFTW_PARALLEL)
+    MESSAGE(STATUS "FFTW_PARALLEL")
   ELSEIF (FFTW_OPENMP)
-  add_definitions(-DFFTW_OPENMP)
-  MESSAGE(STATUS "FFTW_OPENMP")
+    add_definitions(-DFFTW_OPENMP)
+    MESSAGE(STATUS "FFTW_OPENMP")
   ENDIF()#FFTW_PARALLEL
 ENDIF() #OPENCV_CUFFT
 
@@ -47,11 +47,11 @@ link_directories ( ${OpenCV_LIB_DIR} )
 MESSAGE(STATUS "OpenCV_LIB_DIR: ${OpenCV_LIB_DIR} ")
 
 IF ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    IF(NOT FFTW_OPENMP)
+  IF(NOT FFTW_OPENMP)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
-    ELSE()
+  ELSE()
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
-    ENDIF() #FFTW_OPENMP
+  ENDIF() #FFTW_OPENMP
 ENDIF ()
 
 include_directories ( ${OpenCV_INCLUDE_DIRS} )
@@ -65,29 +65,29 @@ include_directories(${CMAKE_SOURCE_DIR}/sse2neon)
 add_subdirectory(src)
 
 IF(OPENCV_CUFFT)
-find_package(CUDA REQUIRED)
-link_directories ( ${CUDA_LIB_DIR} )
-MESSAGE(STATUS "CUDA_LIB_DIR: ${CUDA_LIB_DIR} ")
+  find_package(CUDA REQUIRED)
+  link_directories ( ${CUDA_LIB_DIR} )
+  MESSAGE(STATUS "CUDA_LIB_DIR: ${CUDA_LIB_DIR} ")
 
-include_directories ( ${CUDA_INCLUDE_DIRS} )
-MESSAGE(STATUS "CUDA_INCLUDE_DIRS: ${CUDA_INCLUDE_DIRS}")
-set(CUDA_SEPARABLE_COMPILATION ON)
-set(CUDA_PROPAGATE_HOST_FLAGS OFF)
-set(CUDA_HOST_COMPILER /usr/bin/g++)
-list( APPEND CUDA_NVCC_FLAGS "-O3 --gpu-architecture compute_62 -std=c++11")
+  include_directories ( ${CUDA_INCLUDE_DIRS} )
+  MESSAGE(STATUS "CUDA_INCLUDE_DIRS: ${CUDA_INCLUDE_DIRS}")
+  set(CUDA_SEPARABLE_COMPILATION ON)
+  set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+  set(CUDA_HOST_COMPILER /usr/bin/g++)
+  list( APPEND CUDA_NVCC_FLAGS "-O3 --gpu-architecture compute_62 -std=c++11")
 
-cuda_add_executable( kcf_vot main_vot.cpp vot.hpp )
+  cuda_add_executable( kcf_vot main_vot.cpp vot.hpp )
 
-target_link_libraries(kcf_vot ${CUDA_LIBRARIES} ${OpenCV_LIBS}  kcf)
+  target_link_libraries(kcf_vot ${CUDA_LIBRARIES} ${OpenCV_LIBS}  kcf)
 ELSE()
-add_executable(kcf_vot main_vot.cpp vot.hpp)
-target_link_libraries(kcf_vot ${OpenCV_LIBS} kcf)
-    IF(FFTW)
-        target_link_libraries(kcf_vot fftw3f)
-        IF(FFTW_PARALLEL)
-            target_link_libraries(kcf_vot fftw3_threads)
-        ELSEIF(FFTW_OPENMP)
-            target_link_libraries(kcf_vot fftw3_omp)
-        ENDIF() #FFTW_PARALLEL
-    ENDIF() #FFTW
+  add_executable(kcf_vot main_vot.cpp vot.hpp)
+  target_link_libraries(kcf_vot ${OpenCV_LIBS} kcf)
+  IF(FFTW)
+    target_link_libraries(kcf_vot fftw3f)
+    IF(FFTW_PARALLEL)
+      target_link_libraries(kcf_vot fftw3_threads)
+    ELSEIF(FFTW_OPENMP)
+      target_link_libraries(kcf_vot fftw3_omp)
+    ENDIF() #FFTW_PARALLEL
+  ENDIF() #FFTW
 ENDIF() #OPENCV_CUFFT

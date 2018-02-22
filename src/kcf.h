@@ -102,10 +102,10 @@ private:
     double p_min_max_scale[2];
     std::vector<double> p_scales;
 
-    #ifdef OPENCV_CUFFT
+#ifdef OPENCV_CUFFT
     cv::cuda::GpuMat src_gpu,dst_gpu,p_cos_window_d;
     cv::cuda::Stream stream;
-    #endif //OPENCV_CUFFT
+#endif //OPENCV_CUFFT
 
     //model
     ComplexMat p_yf;
