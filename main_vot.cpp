@@ -3,10 +3,38 @@
 #include "kcf.h"
 #include "vot.hpp"
 
-int main()
+int main(int argc, char *argv[])
 {
     //load region, images and prepare for output
-    VOT vot_io("region.txt", "images.txt", "output.txt");
+    std::string region, images, output;
+
+    if (argc > 1 && (argv[1] == std::string("-h") || argv[1] == std::string("--help")))
+        argc = -1;
+
+    switch (argc) {
+    case 1:
+        region = "region.txt";
+        images = "images.txt";
+        output = "output.txt";
+        break;
+    case 2:
+        region = std::string(argv[1]) + "/region.txt";
+        images = std::string(argv[1]) + "/images.txt";
+        output = std::string(argv[1]) + "/output.txt";
+        break;
+    case 4:
+        region = std::string(argv[1]);
+        images = std::string(argv[2]);
+        output = std::string(argv[3]);
+        break;
+    default:
+        std::cerr << "Usage: \n"
+                  << argv[0] << "\n"
+                  << argv[0] << " <directory>\n"
+                  << argv[0] << " <path/to/region.txt> <path/to/images.txt> <path/to/output.txt>\n";
+        return 1;
+    }
+    VOT vot_io(region, images, output);
 
     KCF_Tracker tracker;
     cv::Mat image;
