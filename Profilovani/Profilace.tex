@@ -8,8 +8,6 @@
 \usepackage{caption}
 \usepackage{subcaption}
 
-\graphicspath{ {/home/shanigen/Pictures/} }
-
 \setcounter{tocdepth}{4}
 \setcounter{secnumdepth}{4}
 
@@ -100,18 +98,18 @@ Jak již bylo už zmíněné v sekci Postup \ref{Perf}, v Perfu byl měřen poč
 \subsubsection{LLC References}
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=\linewidth]{/home/shanigen/Pictures/Perf/Bag/LLC-References-bag-whole-gimp.png}
+	\includegraphics[width=\linewidth]{Perf/Bag/LLC-References-bag-whole-gimp.png}
 	\caption{LLC-References-bag}
 	\label{LLC-References-bag-whole}
 	\vspace{0.3cm}
 	\centering
-	\includegraphics[width=\linewidth]{/home/shanigen/Pictures/Perf/car2/LLC-References-car2-whole.png}
+	\includegraphics[width=\linewidth]{Perf/car2/LLC-References-car2-whole.png}
 	\caption{LLC-References-car2}
 	\label{LLC-References-car2-whole}
 \end{figure}
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=\linewidth]{/home/shanigen/Pictures/Perf/ball1/LLC-References-ball1-whole.png}
+	\includegraphics[width=\linewidth]{Perf/ball1/LLC-References-ball1-whole.png}
 	\caption{LLC-References-ball1}
 	\label{LLC-References-ball1-whole}
 \end{figure}
@@ -137,7 +135,7 @@ Do detailů jsou vedlejší vlákna a hlavní vlákno zobrazena na dalších sn�
 Na obrázku \ref{LLC-References-main} je příbližení hlavního vlákna pro subset bag. Nejvíce LLC referencí se objevuje ve funkci track. Zde je hlavní hotspot gaussian\_correlation,která se používá i mimo async část, pak operátory z třídy ComplexMat, Fourierova transformace ve funkci fft2 a funkce get\_features. Většina zbylích LLC referencí je ve funkci getNextImage, která se stará o načítaní snímků. Zde patří z 1.08\%, 1.07\% LLC referencí knihovní funkci cv::imread.
 \begin{figure}[h]
 	\centering
-	\includegraphics[width=\linewidth]{/home/shanigen/Pictures/Perf/Bag/LLC-References-bag-closeup-main-gimp.png}
+	\includegraphics[width=\linewidth]{Perf/Bag/LLC-References-bag-closeup-main-gimp.png}
 	\caption{Hlavní vlákno-bag:LLC-Reference}
 	\label{LLC-References-main}
 \end{figure}
@@ -145,7 +143,7 @@ Na obrázku \ref{LLC-References-main} je příbližení hlavního vlákna pro su
 Stejně jako u hlavního vlákna lze vidět na obrázku \ref{LLC-References-threads} se většina LLC referencí u vedlejších vláken vyskytuje ve funkci gaussian\_correlation, kde je hotspot funkce ifft2. Další dva hotspoty jsou funkce get\_features a fft2. Na obrázku si lze všimnout, že oba výskyty knihovní funkce cv::dft v součtu dávají 25.9\% z celkového počtu LLC referencí pro celý program.
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=\linewidth]{/home/shanigen/Pictures/Perf/Bag/LLC-References-bag-closeup-threads-gimp.png}
+	\includegraphics[width=\linewidth]{Perf/Bag/LLC-References-bag-closeup-threads-gimp.png}
 	\caption{Vedlejší vlákna-bag:LLC-Rereference}
 	\label{LLC-References-threads}
 \end{figure}
@@ -153,19 +151,19 @@ Stejně jako u hlavního vlákna lze vidět na obrázku \ref{LLC-References-thre
 \subsubsection{LLC Miss}
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=\linewidth]{/home/shanigen/Pictures/Perf/Bag/LLC-Miss-bag-whole-gimp.png}
+	\includegraphics[width=\linewidth]{Perf/Bag/LLC-Miss-bag-whole-gimp.png}
 	\caption{LLC-Miss-bag}
 	\label{LLC-Miss-bag-whole}
 	\vspace{0.3cm}
 	\centering
-	\includegraphics[width=\linewidth]{/home/shanigen/Pictures/Perf/car2/LLC-Misses-car2-whole.png}
+	\includegraphics[width=\linewidth]{Perf/car2/LLC-Misses-car2-whole.png}
 	\caption{LLC-Miss-car2}
 	\label{LLC-Miss-car2-whole}
 \end{figure}
 \newpage
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=\linewidth]{/home/shanigen/Pictures/Perf/ball1/LLC-Misses-ball1-whole.png}
+	\includegraphics[width=\linewidth]{Perf/ball1/LLC-Misses-ball1-whole.png}
 	\caption{LLC-Miss-ball1}
 	\label{LLC-Miss-ball1-whole}
 \end{figure}
@@ -191,7 +189,7 @@ Přestože nejvíce LLC referencí má v hlavním vlákně ve funkci track funkc
 get\_subwindow(Def:line 491,kcf.cpp,dále jen get\_subwindow). Mimo funkci track se vyskytly LLC missy především při načítání snímků ve funkci getNextImage.
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=\linewidth]{/home/shanigen/Pictures/Perf/Bag/LLC-Miss-bag-closeup-main-gimp.png}
+	\includegraphics[width=\linewidth]{Perf/Bag/LLC-Miss-bag-closeup-main-gimp.png}
 	\caption{Hlavní vlákno-bag:LLC-Miss}
 	\label{LLC-Miss-main}
 \end{figure}
@@ -199,7 +197,7 @@ get\_subwindow(Def:line 491,kcf.cpp,dále jen get\_subwindow). Mimo funkci track
 U vedlejších vláken se 41.4\% všech LLC missů z celého programu vyskytuje ve funkci gaussian\_correlation, která je volaná v async cásti. V ní víc jak polovina všech LLC missů je ve funkci ifft2, kde se provádí Fourierova transformace. Vedle gaussian\_correlation je dalším hotspotem znovu funkce get\_features, stejně jako v hlavním vlákně. Funkce get\_features dohromady s funkcí ifft2 davají v součtu 45.1\% všech LLC missů.
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=\linewidth]{/home/shanigen/Pictures/Perf/Bag/LLC-Miss-bag-closeup-threads-gimp.png}
+	\includegraphics[width=\linewidth]{Perf/Bag/LLC-Miss-bag-closeup-threads-gimp.png}
 	\caption{Vedlejší vlákna-bag:LLC-Miss}
 	\label{LLC-Miss-threads}
 \end{figure}
@@ -208,7 +206,7 @@ U vedlejších vláken se 41.4\% všech LLC missů z celého programu vyskytuje 
 Analýza proběhla pouze na datasetu bag. Na obrázku \ref{Amp-summary} je vidět jaký druh Hardware eventů byl měřen i celkový počet zaznamenaných eventů. Amplifier oproti Perfu má mhohem menší počet záznamů, a proto i celkový počet LLC-missů a LLC-Hitů je mnohem menší.
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=\linewidth]{/home/shanigen/Pictures/Amplifier/Bag/Summary-bag.png}
+	\includegraphics[width=\linewidth]{Amplifier/Bag/Summary-bag.png}
 	\caption{Souhrn analýzy}
 	\label{Amp-summary}
 \end{figure}
@@ -216,7 +214,7 @@ Analýza proběhla pouze na datasetu bag. Na obrázku \ref{Amp-summary} je vidě
 Na obrázku \ref{Amp-detail} je detailnější výsledek analýzy seřazen sestupně podle LLC-Missů. Červeným puntíkem jsou označeny funkce z OpenCV a KCF trackeru, ke kterým se mi podařilo najít informace o užití a funkci. Vyjímkou je funkce cv::utils::trace::details::parallelForFinalize (Def:line 962,trace.cpp,dále jen parallelForFinalize). Ke které se mi nepodařilo najít zádne informace v dokumentaci ani fórech OpenCV.
 \begin{figure}[h!]
 	\centering
-	\includegraphics[width=\linewidth]{/home/shanigen/Pictures/Amplifier/Bag/Detail-bag-gimp.png}
+	\includegraphics[width=\linewidth]{Amplifier/Bag/Detail-bag-gimp.png}
 	\caption{Detailní výsledek analýzy}
 	\label{Amp-detail}
 \end{figure}
