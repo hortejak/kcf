@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 #ifdef VISULIZE_RESULT
        cv::rectangle(image, cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h), CV_RGB(0,255,0), 2);
        cv::imshow("output", image);
-       cv::waitKey();
+       cv::waitKey(10);
 #endif //VISULIZE
 
 //        std::stringstream s;
