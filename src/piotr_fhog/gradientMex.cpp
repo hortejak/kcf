@@ -73,7 +73,8 @@ void gradMag( float *I, float *M, float *O, int h, int w, int d, bool full ) {
       for( y=0; y<h4/4; y++ ) {
         y1=h4/4*c+y;
         _M2[y1]=ADD(MUL(_Gx[y1],_Gx[y1]),MUL(_Gy[y1],_Gy[y1]));
-        if( c==0 ) continue; _m = CMPGT( _M2[y1], _M2[y] );
+        if( c==0 ) continue;
+        _m = CMPGT( _M2[y1], _M2[y] );
         _M2[y] = OR( AND(_m,_M2[y1]), ANDNOT(_m,_M2[y]) );
         _Gx[y] = OR( AND(_m,_Gx[y1]), ANDNOT(_m,_Gx[y]) );
         _Gy[y] = OR( AND(_m,_Gy[y1]), ANDNOT(_m,_Gy[y]) );
@@ -105,8 +106,11 @@ void gradMagNorm( float *M, float *S, int h, int w, float norm ) {
   __m128 *_M, *_S, _norm; int i=0, n=h*w, n4=n/4;
   _S = (__m128*) S; _M = (__m128*) M; _norm = SET(norm);
   bool sse = !(size_t(M)&15) && !(size_t(S)&15);
-  if(sse) for(; i<n4; i++) { *_M=MUL(*_M,RCP(ADD(*_S++,_norm))); _M++; }
-  if(sse) i*=4; for(; i<n; i++) M[i] /= (S[i] + norm);
+  if(sse) {
+      for(; i<n4; i++) { *_M=MUL(*_M,RCP(ADD(*_S++,_norm))); _M++; }
+      i*=4;
+  }
+  for(; i<n; i++) M[i] /= (S[i] + norm);
 }
 
 // helper for gradHist, quantize O and M into O0, O1 and M0, M1 (uses sse)
