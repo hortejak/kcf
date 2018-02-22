@@ -1,12 +1,12 @@
 # KCF tracker parallel and PREM implementations
-This project aims to test multiple implementation of calculating Fast Fourier Transform(FFT) and Inverse Fourier Transform(IFFT) in KFC tracker and tosee how the performance changes depending on the implementation.
+This project aims to test multiple implementation of calculating Fast Fourier Transform(FFT) and Inverse Fourier Transform(IFFT) in KFC tracker and to see how the performance changes depending on the implementation.
 
 C++ implementation of KCF tracker was written by Tomas Vojir [here](https://github.com/vojirt/kcf/blob/master/README.md) and is reimplementation of algorithm presented in "High-Speed Tracking with Kernelized Correlation Filters" paper[1].
 
 ### Prerequisites
-The code depends on OpenCV 2.4+ library and is build via cmake toolchain. Depending on the implementation selected you have to have installed [FFTW](http://www.fftw.org/), [CUDA](https://developer.nvidia.com/cuda-downloads) or [OpenMP](http://www.openmp.org/).
+The code depends on OpenCV 2.4+ library and cmake is used for building it. Depending on the implementation selected you have to have installed [FFTW](http://www.fftw.org/), [CUDA](https://developer.nvidia.com/cuda-downloads) or [OpenMP](http://www.openmp.org/).
 
-SSE instructions are used in code which are supported only by x86 architectecture thanks to the [SSE2NEON](https://github.com/jratcliff63367/sse2neon) code now supports both ARM and x86 architecture. 
+SSE instructions were used in the original code and these are only supported on x86 architecture. Thanks to the [SSE2NEON](https://github.com/jratcliff63367/sse2neon) code, we now support both ARM and x86 architecture.
 
 ## Getting Started
 Open terminal in the directory with the code:
@@ -25,7 +25,7 @@ $ mkdir build
 $ cd build
 ```
 
-Following table show multiple options how to configure cmake default option is single thread OpenCV FFT:
+The following table shows multiple options how to run cmake to get different version of the tracker.
 
 | Option| Description |
 | --- | --- |
@@ -33,14 +33,14 @@ Following table show multiple options how to configure cmake default option is s
 | `cmake -DASYNC=ON ..` | Multi thread version of original project with OpenCV FFT together with C++ async directive.|
 | `cmake -DOPENCV_CUFFT=ON ..`**WIP** | Nvidia CUFFT implemented in OpenCV will be used. Together with Hostmem from OpenCV.|
 | `cmake -DFFTW=ON ..`**WIP** | Use FFTW implementation of FFT.|
-| `cmake -DFFTW=ON,-DFFTW_PARALLEL=ON ..`**WIP** | Use parrallel implementation of FFTW without OpenMP.|
-| `cmake -DFFTW=ON,-DFFTW_OPENMP=ON ..`**WIP** | Use parrallel implementation of FFTW with OpenMP. |
+| `cmake -DFFTW=ON,-DFFTW_PARALLEL=ON ..`**WIP** | Use parallel implementation of FFTW without OpenMP.|
+| `cmake -DFFTW=ON,-DFFTW_OPENMP=ON ..`**WIP** | Use parallel implementation of FFTW with OpenMP. |
 
 To all of these you can also add these additional options:
 
 | Option| Description |
 | --- | --- |
-| `-DVISULIZE_RESULT=ON` | Check if you want to visulize the result. Default value is OFF. |
+| `-DVISULIZE_RESULT=ON` | If you want to visualize the result. Default value is OFF. |
 | `-DDEBUG_MODE=ON` | Debug terminal output and debug screens. Default value is OFF.|
 | `-DDEBUG_MODE_DETAILED=ON` |Additional terminal outputs and debug screens. Default value is OFF.|
 
