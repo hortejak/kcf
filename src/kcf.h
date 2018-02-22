@@ -84,7 +84,7 @@ public:
 private:
     BBox_c p_pose;
     bool p_resize_image = false;
-    
+
     bool first = true;
 
     double p_padding = 1.5;
@@ -101,12 +101,12 @@ private:
     double p_current_scale = 1.;
     double p_min_max_scale[2];
     std::vector<double> p_scales;
-    
+
     #ifdef OPENCV_CUFFT
     cv::cuda::GpuMat src_gpu,dst_gpu,p_cos_window_d;
     cv::cuda::Stream stream;
     #endif //OPENCV_CUFFT
-    
+
     //model
     ComplexMat p_yf;
     ComplexMat p_model_alphaf;
