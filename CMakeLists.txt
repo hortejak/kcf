@@ -4,13 +4,16 @@ project(kcf_tracker)
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra -pedantic -O3 -Wno-long-long -fno-omit-frame-pointer")
 
-option(OPENCV_CUFFT "If OFF CPU implementation using OpenCV implementation of fft will be used. If ON Nvidia CUFFT implemented in OpenCV will be used. Together with Hostmem from OpenCV." OFF)
+option(OPENCV_CUFFT " Use Nvidia CUFFT implemented in OpenCV. Together with Hostmem from OpenCV." OFF)
 option(FFTW "Use FFTW implementation of FFT. If selected together with OPENCV_CUFFT then this option will not be used." OFF)
-option(FFTW_PARALLEL "Use parrallel implementation of FFTW without OpenMP." OFF)
-option(FFTW_OPENMP "Use parrallel implementation of FFTW with OpenMP." OFF)
+option(OPENMP "Use OpenMP library. Works with FFTW and OpenCV implementation." OFF)
 option(ASYNC "Works only if OPENCV_CUFFT is not ON. Will enable C++ async directive." OFF)
 option(VISULIZE_RESULT "Check if you want to visulize the result." OFF)
 option(DEBUG_MODE "Additional terminal outputs and screens. " OFF)
+
+IF((FFTW AND OPENCV_CUFFT) OR (OPENCV_CUFFT AND ASYNC) OR (ASYNC AND FFTW) OR (ASYNC AND OPENMP))
+  MESSAGE(FATAL_ERROR "You can't do that")
+ENDIF() #WRONG_COMBINATION
 
 IF(VISULIZE_RESULT)
   add_definitions(-DVISULIZE_RESULT)
@@ -25,19 +28,14 @@ ENDIF() #DEBUG_MODE
 IF(OPENCV_CUFFT)
   add_definitions(-DOPENCV_CUFFT)
   MESSAGE(STATUS "OPENCV+CUFFT version")
-ELSEIF(FFTW)
-  add_definitions(-DFFTW)
-  MESSAGE(STATUS "FFTW")
-  IF(FFTW_PARALLEL)
-    add_definitions(-DFFTW_PARALLEL)
-    MESSAGE(STATUS "FFTW_PARALLEL")
-  ELSEIF (FFTW_OPENMP)
-    add_definitions(-DFFTW_OPENMP)
-    MESSAGE(STATUS "FFTW_OPENMP")
-  ENDIF()#FFTW_PARALLEL
 ENDIF() #OPENCV_CUFFT
 
-IF(ASYNC AND NOT OPENCV_CUFFT AND NOT FFTW)
+IF(FFTW)
+  add_definitions(-DFFTW)
+  MESSAGE(STATUS "FFTW")
+ENDIF() #FFTW
+
+IF(ASYNC)
   add_definitions(-DASYNC)
   MESSAGE(STATUS "ASYNC")
 ENDIF() #ASYNC
@@ -47,11 +45,12 @@ link_directories ( ${OpenCV_LIB_DIR} )
 MESSAGE(STATUS "OpenCV_LIB_DIR: ${OpenCV_LIB_DIR} ")
 
 IF ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-  IF(NOT FFTW_OPENMP)
+  IF(NOT OPENMP)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
   ELSE()
+    MESSAGE(STATUS "OpenMP")
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
-  ENDIF() #FFTW_OPENMP
+  ENDIF() #ASYNC
 ENDIF ()
 
 include_directories ( ${OpenCV_INCLUDE_DIRS} )
@@ -84,10 +83,8 @@ ELSE()
   target_link_libraries(kcf_vot ${OpenCV_LIBS} kcf)
   IF(FFTW)
     target_link_libraries(kcf_vot fftw3f)
-    IF(FFTW_PARALLEL)
-      target_link_libraries(kcf_vot fftw3_threads)
-    ELSEIF(FFTW_OPENMP)
+    IF(FFTW AND OPENMP)
       target_link_libraries(kcf_vot fftw3_omp)
-    ENDIF() #FFTW_PARALLEL
+    ENDIF() #FFTW AND OPENMP
   ENDIF() #FFTW
 ENDIF() #OPENCV_CUFFT

@@ -16,7 +16,7 @@
 #include <fftw3.h>
 #endif
 
-#ifdef FFTW_OPENMP
+#ifdef OPENMP
 #include <omp.h>
 #endif
 

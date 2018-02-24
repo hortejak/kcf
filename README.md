@@ -31,18 +31,17 @@ The following table shows multiple options how to run cmake to get different ver
 | --- | --- |
 | `cmake ..` | Single thread version of original project with OpenCV FFT.|
 | `cmake -DASYNC=ON ..` | Multi thread version of original project with OpenCV FFT together with C++ async directive.|
+| `cmake -DOPENMP=ON ..` | Use OpenMP with OpenCV implementation.|
 | `cmake -DOPENCV_CUFFT=ON ..`**WIP** | Nvidia CUFFT implemented in OpenCV will be used. Together with Hostmem from OpenCV.|
 | `cmake -DFFTW=ON ..`**WIP** | Use FFTW implementation of FFT.|
-| `cmake -DFFTW=ON,-DFFTW_PARALLEL=ON ..`**WIP** | Use parallel implementation of FFTW without OpenMP.|
-| `cmake -DFFTW=ON,-DFFTW_OPENMP=ON ..`**WIP** | Use parallel implementation of FFTW with OpenMP. |
+| `cmake -DFFTW=ON,-DOPENMP=ON ..`**WIP** | Use OpenMP library with FFTW.|
 
 To all of these you can also add these additional options:
 
 | Option| Description |
 | --- | --- |
-| `-DVISULIZE_RESULT=ON` | If you want to visualize the result. Default value is OFF. |
+| `-DVISULIZE_RESULT=OFF` | If you want to turn off visualization of  the result. Default value is ON. |
 | `-DDEBUG_MODE=ON` | Debug terminal output and debug screens. Default value is OFF.|
-| `-DDEBUG_MODE_DETAILED=ON` |Additional terminal outputs and debug screens. Default value is OFF.|
 
 Finally call make:
 ```
