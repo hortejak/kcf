@@ -199,7 +199,9 @@ void KCF_Tracker::track(cv::Mat &img)
             scale_responses.push_back(max_val*weight);
         }
     } else {
+#ifdef _OPENMP
 #pragma omp parallel for ordered  private(patch_feat) firstprivate(input_rgb,input_gray) shared(scale_responses,scale_index,max_response_pt,max_response_map,max_response) schedule(dynamic)
+#endif
         for (size_t i = 0; i < p_scales.size(); ++i) {
             patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i]);
             ComplexMat zf = fft2(patch_feat, p_cos_window);
@@ -221,13 +223,17 @@ void KCF_Tracker::track(cv::Mat &img)
 
             double weight = p_scales[i] < 1. ? p_scales[i] : 1./p_scales[i];
             if (max_val*weight > max_response) {
+#ifdef _OPENMP
 #pragma omp critical
+#endif
                 max_response = max_val*weight;
                 max_response_map = response;
                 max_response_pt = max_loc;
                 scale_index = i;
             }
+#ifdef _OPENMP
 #pragma omp ordered
+#endif
             scale_responses.push_back(max_val*weight);
         }
     }
