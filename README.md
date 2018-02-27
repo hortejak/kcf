@@ -49,7 +49,7 @@ $ make
 
 This code compiles into binary **kcf_vot**
 
-./kcf_vot
+./kcf_vot [-v[delay\_ms]]
 - using [VOT 2014 methodology](http://www.votchallenge.net/)
 - to get dataset used in VOT go [here](http://www.votchallenge.net/vot2016/dataset.html)
  - INPUT : expecting two files, images.txt (list of sequence images with absolute path) and
