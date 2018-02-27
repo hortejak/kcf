@@ -4,6 +4,7 @@ BUILDS = opencvfft-st opencvfft-async fftw fftw-parallel fftw_openmp opencv-cuff
 
 all: $(foreach build,$(BUILDS),build-$(build)/kcf_vot)
 
+#CMAKE_OPTS = -DOpenCV_DIR=~/opt/opencv-2.4/share/OpenCV
 
 CMAKE_OTPS_opencvfft-st    =
 CMAKE_OTPS_opencvfft-async = -DASYNC=ON
