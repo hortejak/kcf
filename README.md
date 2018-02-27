@@ -32,9 +32,9 @@ The following table shows multiple options how to run cmake to get different ver
 | `cmake ..` | Single thread version of original project with OpenCV FFT.|
 | `cmake -DASYNC=ON ..` | Multi thread version of original project with OpenCV FFT together with C++ async directive.|
 | `cmake -DOPENMP=ON ..` | Use OpenMP with OpenCV implementation.|
-| `cmake -DOPENCV_CUFFT=ON ..`**WIP** | Nvidia CUFFT implemented in OpenCV will be used. Together with Hostmem from OpenCV.|
-| `cmake -DFFTW=ON ..`**WIP** | Use FFTW implementation of FFT.|
-| `cmake -DFFTW=ON,-DOPENMP=ON ..`**WIP** | Use OpenMP library with FFTW.|
+| `cmake -DFFT=OpenCV_cuFFT ..`**WIP** | Nvidia CUFFT implemented in OpenCV will be used. Together with Hostmem from OpenCV.|
+| `cmake -DFFT=fftw ..`**WIP** | Use FFTW implementation of FFT.|
+| `cmake -DFFT=fftw -DOPENMP=ON ..`**WIP** | Use OpenMP library with FFTW.|
 
 To all of these you can also add these additional options:
 
