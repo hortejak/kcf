@@ -8,17 +8,11 @@ option(OPENCV_CUFFT " Use Nvidia CUFFT implemented in OpenCV. Together with Host
 option(FFTW "Use FFTW implementation of FFT. If selected together with OPENCV_CUFFT then this option will not be used." OFF)
 option(OPENMP "Use OpenMP library. Works with FFTW and OpenCV implementation." OFF)
 option(ASYNC "Works only if OPENCV_CUFFT is not ON. Will enable C++ async directive." OFF)
-option(VISULIZE_RESULT "Check if you want to visulize the result." OFF)
 option(DEBUG_MODE "Additional terminal outputs and screens. " OFF)
 
 IF((FFTW AND OPENCV_CUFFT) OR (OPENCV_CUFFT AND ASYNC) OR (ASYNC AND FFTW) OR (ASYNC AND OPENMP))
   MESSAGE(FATAL_ERROR "You can't do that")
 ENDIF() #WRONG_COMBINATION
-
-IF(VISULIZE_RESULT)
-  add_definitions(-DVISULIZE_RESULT)
-  MESSAGE(STATUS "Visulize result")
-ENDIF() #VISULIZE_RESULT
 
 IF(DEBUG_MODE )
   add_definitions(-DDEBUG_MODE )

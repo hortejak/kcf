@@ -40,7 +40,6 @@ To all of these you can also add these additional options:
 
 | Option| Description |
 | --- | --- |
-| `-DVISULIZE_RESULT=OFF` | If you want to turn off visualization of  the result. Default value is ON. |
 | `-DDEBUG_MODE=ON` | Debug terminal output and debug screens. Default value is OFF.|
 
 Finally call make:

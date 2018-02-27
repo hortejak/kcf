@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <getopt.h>
+#include <libgen.h>
 
 #include "kcf.h"
 #include "vot.hpp"
@@ -7,31 +9,60 @@ int main(int argc, char *argv[])
 {
     //load region, images and prepare for output
     std::string region, images, output;
+    int visualize_delay = -1;
 
-    if (argc > 1 && (argv[1] == std::string("-h") || argv[1] == std::string("--help")))
-        argc = -1;
+    while (1) {
+        int option_index = 0;
+        static struct option long_options[] = {
+            {"help",      no_argument,       0,  'h' },
+            {"visualize", optional_argument, 0,  'v' },
+            {0,           0,                 0,  0 }
+        };
 
-    switch (argc) {
-    case 1:
+        int c = getopt_long(argc, argv, "hv::",
+                        long_options, &option_index);
+        if (c == -1)
+            break;
+
+        switch (c) {
+        case 'h':
+            std::cerr << "Usage: \n"
+                      << argv[0] << " [options]\n"
+                      << argv[0] << " [options] <directory>\n"
+                      << argv[0] << " [options] <path/to/region.txt> <path/to/images.txt> [path/to/output.txt]\n"
+                      << "Options:\n"
+                      << " --visualize | -v [delay_ms]\n";
+            exit(0);
+            break;
+        case 'v':
+            visualize_delay = optarg ? atol(optarg) : 1;
+            break;
+        }
+    }
+
+    switch (argc - optind) {
+    case 0:
         region = "region.txt";
         images = "images.txt";
         output = "output.txt";
         break;
-    case 2:
-        region = std::string(argv[1]) + "/region.txt";
-        images = std::string(argv[1]) + "/images.txt";
-        output = std::string(argv[1]) + "/output.txt";
+    case 1:
+        region = std::string(argv[optind]) + "/region.txt";
+        images = std::string(argv[optind]) + "/images.txt";
+        output = std::string(argv[optind]) + "/output.txt";
         break;
-    case 4:
-        region = std::string(argv[1]);
-        images = std::string(argv[2]);
-        output = std::string(argv[3]);
+    case 2:
+        // Fall through
+    case 3:
+        region = std::string(argv[optind + 0]);
+        images = std::string(argv[optind + 1]);
+        if ((argc - optind) == 3)
+            output = std::string(argv[optind + 2]);
+        else
+            output = std::string(dirname(argv[optind + 0])) + "/output.txt";
         break;
     default:
-        std::cerr << "Usage: \n"
-                  << argv[0] << "\n"
-                  << argv[0] << " <directory>\n"
-                  << argv[0] << " <path/to/region.txt> <path/to/images.txt> <path/to/output.txt>\n";
+        std::cerr << "Too many arguments\n";
         return 1;
     }
     VOT vot_io(region, images, output);
@@ -59,11 +90,14 @@ int main(int argc, char *argv[])
 
         bb = tracker.getBBox();
         vot_io.outputBoundingBox(cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h));
-#ifdef VISULIZE_RESULT
-       cv::rectangle(image, cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h), CV_RGB(0,255,0), 2);
-       cv::imshow("output", image);
-       cv::waitKey(10);
-#endif //VISULIZE
+
+        if (visualize_delay >= 0) {
+            cv::rectangle(image, cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h), CV_RGB(0,255,0), 2);
+            cv::imshow("output", image);
+            int ret = cv::waitKey(visualize_delay);
+            if (visualize_delay > 0 && ret != -1 && ret != 255)
+                break;
+        }
 
 //        std::stringstream s;
 //        std::string ss;
