@@ -220,12 +220,14 @@ void KCF_Tracker::track(cv::Mat &img)
             cv::minMaxLoc(response, &min_val, &max_val, &min_loc, &max_loc);
 
             double weight = p_scales[i] < 1. ? p_scales[i] : 1./p_scales[i];
-            if (max_val*weight > max_response) {
 #pragma omp critical
-                max_response = max_val*weight;
-                max_response_map = response;
-                max_response_pt = max_loc;
-                scale_index = i;
+            {
+                if (max_val*weight > max_response) {
+                    max_response = max_val*weight;
+                    max_response_map = response;
+                    max_response_pt = max_loc;
+                    scale_index = i;
+                }
             }
 #pragma omp ordered
             scale_responses.push_back(max_val*weight);
