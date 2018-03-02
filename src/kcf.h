@@ -7,6 +7,10 @@
 #include "complexmat.hpp"
 #include "cnfeat.hpp"
 
+#if defined(FFTW) && defined(ASYNC)
+#include <mutex>
+#endif
+
 struct BBox_c
 {
     double cx, cy, w, h;
@@ -100,6 +104,10 @@ private:
     ComplexMat p_model_alphaf_num;
     ComplexMat p_model_alphaf_den;
     ComplexMat p_model_xf;
+    
+#if defined(FFTW) && defined(ASYNC)
+    std::mutex fftw_init, fftw_destroy;
+#endif
 
     //helping functions
     cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y);
