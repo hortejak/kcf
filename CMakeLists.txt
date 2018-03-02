@@ -5,7 +5,7 @@ project(kcf_tracker)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra -pedantic -O3 -Wno-long-long -fno-omit-frame-pointer")
 
 SET(FFT "OpenCV" CACHE STRING "Select FFT implementation")
-SET_PROPERTY(CACHE FFT PROPERTY STRINGS OpenCV OpenCV_cuFFT fftw)
+SET_PROPERTY(CACHE FFT PROPERTY STRINGS OpenCV OpenCV_cuFFT fftw cuFFTW)
 MESSAGE(STATUS "FFT implementation: ${FFT}")
 
 option(OPENMP "Use OpenMP library. Works with FFTW and OpenCV implementation." OFF)
@@ -25,6 +25,9 @@ ELSEIF(FFT STREQUAL "OpenCV_cuFFT")
   set(use_cuda ON)
 ELSEIF(FFT STREQUAL "fftw")
   add_definitions(-DFFTW)
+ELSEIF(FFT STREQUAL "cuFFTW")
+  add_definitions(-DFFTW -DCUFFTW)
+  set(use_cuda ON)
 ELSE()
   MESSAGE(FATAL_ERROR "Invalid FFT implementation selected")
 ENDIF()
@@ -83,3 +86,7 @@ IF(FFT STREQUAL "fftw")
     target_link_libraries(kcf_vot fftw3_omp)
   ENDIF()
 ENDIF() #FFTW
+
+IF(FFT STREQUAL "cuFFTW")
+  target_link_libraries(kcf_vot cufft cufftw)
+ENDIF() #cuFFTW

@@ -7,19 +7,6 @@
 #include "complexmat.hpp"
 #include "cnfeat.hpp"
 
-#ifdef OPENCV_CUFFT
-#include <cuda.h>
-#include <cuda_runtime.h>
-#endif //OPENCV_CUFFT
-
-#ifdef FFTW
-#include <fftw3.h>
-#endif
-
-#ifdef OPENMP
-#include <omp.h>
-#endif
-
 struct BBox_c
 {
     double cx, cy, w, h;

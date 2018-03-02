@@ -4,6 +4,24 @@
 #include <future>
 #include <algorithm>
 
+
+#ifdef OPENCV_CUFFT
+#include <cuda.h>
+#include <cuda_runtime.h>
+#endif //OPENCV_CUFFT
+
+#ifdef FFTW
+  #ifndef CUFFTW
+    #include <fftw3.h>
+  #else
+    #include <cufftw.h>
+  #endif
+#endif
+
+#ifdef OPENMP
+#include <omp.h>
+#endif
+
 void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
 {
     //check boundary, enforce min size
