@@ -16,11 +16,12 @@ int main(int argc, char *argv[])
         int option_index = 0;
         static struct option long_options[] = {
             {"help",      no_argument,       0,  'h' },
+            {"output",    required_argument, 0,  'o' },
             {"visualize", optional_argument, 0,  'v' },
             {0,           0,                 0,  0 }
         };
 
-        int c = getopt_long(argc, argv, "hv::",
+        int c = getopt_long(argc, argv, "hv::o:",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -34,6 +35,9 @@ int main(int argc, char *argv[])
                       << "Options:\n"
                       << " --visualize | -v [delay_ms]\n";
             exit(0);
+            break;
+        case 'o':
+            output = optarg;
             break;
         case 'v':
             visualize_delay = optarg ? atol(optarg) : 1;
@@ -49,20 +53,22 @@ int main(int argc, char *argv[])
         }
         // Fall through
     case 0:
-
         region = access("groundtruth.txt", F_OK) == 0 ? "groundtruth.txt" : "region.txt";
         images = "images.txt";
-        output = "output.txt";
+        if (output.empty())
+            output = "output.txt";
         break;
     case 2:
         // Fall through
     case 3:
         region = std::string(argv[optind + 0]);
         images = std::string(argv[optind + 1]);
-        if ((argc - optind) == 3)
-            output = std::string(argv[optind + 2]);
-        else
-            output = std::string(dirname(argv[optind + 0])) + "/output.txt";
+        if (output.empty()) {
+            if ((argc - optind) == 3)
+                output = std::string(argv[optind + 2]);
+            else
+                output = std::string(dirname(argv[optind + 0])) + "/output.txt";
+        }
         break;
     default:
         std::cerr << "Too many arguments\n";
