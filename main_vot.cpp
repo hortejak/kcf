@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <libgen.h>
+#include <unistd.h>
 
 #include "kcf.h"
 #include "vot.hpp"
@@ -29,7 +30,7 @@ int main(int argc, char *argv[])
             std::cerr << "Usage: \n"
                       << argv[0] << " [options]\n"
                       << argv[0] << " [options] <directory>\n"
-                      << argv[0] << " [options] <path/to/region.txt> <path/to/images.txt> [path/to/output.txt]\n"
+                      << argv[0] << " [options] <path/to/region.txt or groundtruth.txt> <path/to/images.txt> [path/to/output.txt]\n"
                       << "Options:\n"
                       << " --visualize | -v [delay_ms]\n";
             exit(0);
@@ -41,15 +42,17 @@ int main(int argc, char *argv[])
     }
 
     switch (argc - optind) {
+    case 1:
+        if (chdir(argv[optind]) == -1) {
+            perror(argv[optind]);
+            exit(1);
+        }
+        // Fall through
     case 0:
-        region = "region.txt";
+
+        region = access("groundtruth.txt", F_OK) == 0 ? "groundtruth.txt" : "region.txt";
         images = "images.txt";
         output = "output.txt";
-        break;
-    case 1:
-        region = std::string(argv[optind]) + "/region.txt";
-        images = std::string(argv[optind]) + "/images.txt";
-        output = std::string(argv[optind]) + "/output.txt";
         break;
     case 2:
         // Fall through
