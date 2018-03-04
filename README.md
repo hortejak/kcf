@@ -4,7 +4,7 @@ This project aims to test multiple implementation of calculating Fast Fourier Tr
 C++ implementation of KCF tracker was written by Tomas Vojir [here](https://github.com/vojirt/kcf/blob/master/README.md) and is reimplementation of algorithm presented in "High-Speed Tracking with Kernelized Correlation Filters" paper[1].
 
 ### Prerequisites
-The code depends on OpenCV 2.4+ library and cmake is used for building it. Depending on the implementation selected you have to have installed [FFTW](http://www.fftw.org/), [CUDA](https://developer.nvidia.com/cuda-downloads) or [OpenMP](http://www.openmp.org/).
+The code depends on OpenCV 3.0+ library and cmake is used for building it. Depending on the implementation selected you have to have installed [FFTW](http://www.fftw.org/), [CUDA](https://developer.nvidia.com/cuda-downloads) or [OpenMP](http://www.openmp.org/).
 
 SSE instructions were used in the original code and these are only supported on x86 architecture. Thanks to the [SSE2NEON](https://github.com/jratcliff63367/sse2neon) code, we now support both ARM and x86 architecture.
 
@@ -35,12 +35,19 @@ The following table shows multiple options how to run cmake to get different ver
 | `cmake -DFFT=OpenCV_cuFFT ..`**WIP** | Nvidia CUFFT implemented in OpenCV will be used. Together with Hostmem from OpenCV.|
 | `cmake -DFFT=fftw ..`**WIP** | Use FFTW implementation of FFT.|
 | `cmake -DFFT=fftw -DOPENMP=ON ..`**WIP** | Use OpenMP library with FFTW.|
+| `cmake -DFFT=fftw -DASYNC=ON ..`**WIP** | Use C++ async directive with FFTW.|
 
 To all of these you can also add these additional options:
 
 | Option| Description |
 | --- | --- |
-| `-DDEBUG_MODE=ON` | Debug terminal output and debug screens. Default value is OFF.|
+| `-DDEBUG_MODE=ON` | Debug terminal output and debug screens.|
+
+There is also option for profiling. Currently only profiles *get_features* function for which it calculates average number of CPU cycles. Works with default single threaded version using OpenCV. The code was taken from [libpfm4](https://sourceforge.net/p/perfmon2/libpfm4/ci/master/tree/) perf_examples self_basic.c:
+
+| Option| Description |
+| --- | --- |
+| `-DPROFILING=ON` | Enable profiling using perf_event together with libpfm4.|
 
 Finally call make:
 ```

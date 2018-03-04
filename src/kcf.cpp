@@ -4,6 +4,11 @@
 #include <future>
 #include <algorithm>
 
+#ifdef PROFILING
+#include <perfmon/pfmlib_perf_event.h>
+#include <errno.h>
+#include <err.h>
+#endif
 
 #ifdef OPENCV_CUFFT
 #include <cuda.h>
@@ -179,7 +184,23 @@ void KCF_Tracker::track(cv::Mat &img)
     cv::Point2i max_response_pt;
     int scale_index = 0;
     std::vector<double> scale_responses;
-
+#ifdef PROFILING
+    struct perf_event_attr attr;
+    int fd, ret;
+    uint64_t count = 0, values[3];
+    ret = pfm_initialize();
+    if (ret != PFM_SUCCESS)
+      errx(1, "cannot initialize library: %s", pfm_strerror(ret));
+    memset(&attr, 0, sizeof(attr));
+    ret = pfm_get_perf_event_encoding("cycles", PFM_PLM0|PFM_PLM3, &attr, NULL, NULL);
+    if (ret != PFM_SUCCESS)
+      errx(1, "cannot find encoding: %s", pfm_strerror(ret));
+    attr.read_format = PERF_FORMAT_TOTAL_TIME_ENABLED|PERF_FORMAT_TOTAL_TIME_RUNNING;
+    attr.disabled = 1;
+    fd = perf_event_open(&attr, getpid(), -1, -1, 0);
+    if (fd < 0) 
+      err(1, "cannot create event");
+#endif
     if (m_use_multithreading){
         std::vector<std::future<cv::Mat>> async_res(p_scales.size());
         for (size_t i = 0; i < p_scales.size(); ++i) {
@@ -219,7 +240,25 @@ void KCF_Tracker::track(cv::Mat &img)
     } else {
 #pragma omp parallel for ordered  private(patch_feat) schedule(dynamic)
         for (size_t i = 0; i < p_scales.size(); ++i) {
+#ifdef PROFILING
+            ret = ioctl(fd, PERF_EVENT_IOC_RESET, 0);
+            if (ret)
+              err(1, "ioctl(reset) failed");
+            ret = ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
+            if (ret)
+              err(1, "ioctl(enable) failed");
+#endif
             patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i]);
+#ifdef PROFILING
+            ret = ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
+            if (ret)
+              err(1, "ioctl(disable) failed");
+            ret = read(fd, values, sizeof(values));
+            if (ret != sizeof(values))
+              err(1, "cannot read results: %s", strerror(errno));
+            if (values[2])
+              count += (uint64_t)((double)values[0] * values[1]/values[2]);
+#endif
             ComplexMat zf = fft2(patch_feat, p_cos_window);
             cv::Mat response;
             if (m_use_linearkernel)
@@ -251,7 +290,6 @@ void KCF_Tracker::track(cv::Mat &img)
             scale_responses.push_back(max_val*weight);
         }
     }
-
     //sub pixel quadratic interpolation from neighbours
     if (max_response_pt.y > max_response_map.rows / 2) //wrap around to negative half-space of vertical axis
         max_response_pt.y = max_response_pt.y - max_response_map.rows;
@@ -281,9 +319,29 @@ void KCF_Tracker::track(cv::Mat &img)
         p_current_scale = p_min_max_scale[0];
     if (p_current_scale > p_min_max_scale[1])
         p_current_scale = p_min_max_scale[1];
-
+#ifdef PROFILING
+    ret = ioctl(fd, PERF_EVENT_IOC_RESET, 0);
+    if (ret)
+        err(1, "ioctl(reset) failed");
+    ret = ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
+    if (ret)
+        err(1, "ioctl(enable) failed");
+#endif
     //obtain a subwindow for training at newly estimated target position
     patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_current_scale);
+#ifdef PROFILING
+    ret = ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
+    if (ret)
+      err(1, "ioctl(disable) failed");
+    ret = read(fd, values, sizeof(values));
+    if (ret != sizeof(values))
+      err(1, "cannot read results: %s", strerror(errno));
+    if (values[2])
+      count += (uint64_t)((double)values[0] * values[1]/values[2]);
+    printf("count=%'"PRIu64"\n", count/p_scales.size()+1);
+    close(fd);
+    pfm_terminate();
+#endif
     ComplexMat xf = fft2(patch_feat, p_cos_window);
 
     //subsequent frames, interpolate model
@@ -491,7 +549,7 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
 #pragma omp critical
     {
 #if defined(FFTW) && defined(ASYNC)
-      std::unique_lock<std::mutex> lock_i(fftw_init);
+      std::unique_lock<std::mutex> lock_i(fftw_mut);
 #endif
     fft = fftwf_alloc_complex((width/2+1) * height);
     plan_f=fftwf_plan_dft_r2c_2d( height , width , (float*)input.data , fft ,  FFTW_ESTIMATE );
@@ -537,7 +595,7 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
 #pragma omp critical
     {
 #if defined(FFTW) && defined(ASYNC)
-      std::unique_lock<std::mutex> lock_d(fftw_destroy);
+      std::unique_lock<std::mutex> lock_d(fftw_mut);
 #endif
     fftwf_destroy_plan(plan_f);
     fftwf_free(fft); /*fftwf_free(data_in);*/
@@ -609,7 +667,7 @@ ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &c
 #pragma omp critical 
     {
 #if defined(FFTW) && defined(ASYNC)
-      std::unique_lock<std::mutex> lock_i(fftw_init);
+      std::unique_lock<std::mutex> lock_i(fftw_mut);
 #endif
     fft = fftwf_alloc_complex((width/2+1) * height);
     plan_f=fftwf_plan_dft_r2c_2d( height , width , (float*) in_img.data , fft ,  FFTW_ESTIMATE );
@@ -683,7 +741,7 @@ ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &c
 #pragma omp critical
 {
 #if defined(FFTW) && defined(ASYNC)
-      std::unique_lock<std::mutex> lock_d(fftw_destroy);
+      std::unique_lock<std::mutex> lock_d(fftw_mut);
 #endif
     fftwf_destroy_plan(plan_f);
     fftwf_free(fft); /*fftwf_free(data_in);*/
@@ -717,7 +775,7 @@ cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
 #pragma omp critical
         {
 #if defined(FFTW) && defined(ASYNC)
-      std::unique_lock<std::mutex> lock_i(fftw_init);
+      std::unique_lock<std::mutex> lock_i(fftw_mut);
 #endif
         data_in =  fftwf_alloc_complex(2*(width/2+1) * height);
         ifft = fftwf_alloc_real(width * height);
@@ -756,7 +814,7 @@ cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
 #pragma omp critical
         {
 #if defined(FFTW) && defined(ASYNC)
-      std::unique_lock<std::mutex> lock_d(fftw_destroy);
+      std::unique_lock<std::mutex> lock_d(fftw_mut);
 #endif
         fftwf_destroy_plan(plan_if);
         fftwf_free(ifft); fftwf_free(data_in);
@@ -779,7 +837,7 @@ cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
 #pragma omp critical
         {
 #if defined(FFTW) && defined(ASYNC)
-      std::unique_lock<std::mutex> lock_i(fftw_init);
+      std::unique_lock<std::mutex> lock_i(fftw_mut);
 #endif
         data_in =  fftwf_alloc_complex(2*(width/2+1) * height);
         ifft = fftwf_alloc_real(width * height);
@@ -828,7 +886,7 @@ cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
 #pragma omp critical
 {
 #if defined(FFTW) && defined(ASYNC)
-      std::unique_lock<std::mutex> lock_d(fftw_destroy);
+      std::unique_lock<std::mutex> lock_d(fftw_mut);
 #endif
         fftwf_destroy_plan(plan_if);
         fftwf_free(ifft); fftwf_free(data_in);

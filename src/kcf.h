@@ -106,7 +106,7 @@ private:
     ComplexMat p_model_xf;
     
 #if defined(FFTW) && defined(ASYNC)
-    std::mutex fftw_init, fftw_destroy;
+    std::mutex fftw_mut;
 #endif
 
     //helping functions

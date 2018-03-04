@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.0.2)
 
 project(kcf_tracker)
 
@@ -11,10 +11,16 @@ MESSAGE(STATUS "FFT implementation: ${FFT}")
 option(OPENMP "Use OpenMP library. Works with FFTW and OpenCV implementation." OFF)
 option(ASYNC "Works only if OPENCV_CUFFT is not ON. Will enable C++ async directive." OFF)
 option(DEBUG_MODE "Additional terminal outputs and screens. " OFF)
+option(PROFILING "Enable profiling using perf_event_open together with libpfm4. " OFF)
 
 IF(DEBUG_MODE )
   add_definitions(-DDEBUG_MODE )
   MESSAGE(STATUS "Debug mode")
+ENDIF() #DEBUG_MODE 
+
+IF(PROFILING)
+  add_definitions(-DPROFILING )
+  MESSAGE(STATUS "Profiling mode")
 ENDIF() #DEBUG_MODE 
 
 SET(use_cuda OFF)
@@ -32,7 +38,7 @@ ELSE()
   MESSAGE(FATAL_ERROR "Invalid FFT implementation selected")
 ENDIF()
 
-IF(ASYNC)
+IF(ASYNC AND NOT OPENMP)
   add_definitions(-DASYNC)
   MESSAGE(STATUS "ASYNC")
 ENDIF() #ASYNC
@@ -90,3 +96,21 @@ ENDIF() #FFTW
 IF(FFT STREQUAL "cuFFTW")
   target_link_libraries(kcf_vot cufft cufftw)
 ENDIF() #cuFFTW
+
+IF(PROFILING)
+  include(ExternalProject)
+  find_program(MAKE_EXE NAMES gmake nmake make)
+  ExternalProject_Add(project_libpfm4
+    URL https://sourceforge.net/projects/perfmon2/files/libpfm4/libpfm-4.9.0.tar.gz/download
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external
+    CONFIGURE_COMMAND ""
+    BUILD_IN_SOURCE TRUE
+    BUILD_COMMAND ${MAKE_EXE}
+    INSTALL_COMMAND ${MAKE_EXE} PREFIX=${CMAKE_CURRENT_BINARY_DIR}/external/libpfm4-4.9.0 install
+  )
+
+  add_library(libpfm4 STATIC IMPORTED )
+  set_property(TARGET libpfm4 PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/external/libpfm4-4.9.0/lib/libpfm.a)
+  include_directories(${CMAKE_CURRENT_BINARY_DIR}/external/libpfm4-4.9.0/include/perfmon)
+  target_link_libraries(kcf_vot libpfm4)
+ENDIF()
