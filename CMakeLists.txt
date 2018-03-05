@@ -70,8 +70,6 @@ IF(NOT use_cuda)
   add_executable(kcf_vot main_vot.cpp vot.hpp)
 ELSE()
   find_package(CUDA REQUIRED)
-  link_directories ( ${CUDA_LIB_DIR} )
-  MESSAGE(STATUS "CUDA_LIB_DIR: ${CUDA_LIB_DIR} ")
 
   include_directories ( ${CUDA_INCLUDE_DIRS} )
   MESSAGE(STATUS "CUDA_INCLUDE_DIRS: ${CUDA_INCLUDE_DIRS}")
@@ -79,6 +77,7 @@ ELSE()
   set(CUDA_PROPAGATE_HOST_FLAGS OFF)
   set(CUDA_HOST_COMPILER /usr/bin/g++)
   list( APPEND CUDA_NVCC_FLAGS "-O3 --gpu-architecture compute_62 -std=c++11")
+  find_cuda_helper_libs(cufftw)
 
   cuda_add_executable( kcf_vot main_vot.cpp vot.hpp )
   target_link_libraries(kcf_vot ${CUDA_LIBRARIES})
@@ -94,7 +93,7 @@ IF(FFT STREQUAL "fftw")
 ENDIF() #FFTW
 
 IF(FFT STREQUAL "cuFFTW")
-  target_link_libraries(kcf_vot cufft cufftw)
+  target_link_libraries(kcf_vot ${CUDA_cufft_LIBRARY} ${CUDA_cufftw_LIBRARY})
 ENDIF() #cuFFTW
 
 IF(PROFILING)
