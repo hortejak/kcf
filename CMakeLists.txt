@@ -98,19 +98,5 @@ IF(FFT STREQUAL "cuFFTW")
 ENDIF() #cuFFTW
 
 IF(PROFILING)
-  include(ExternalProject)
-  find_program(MAKE_EXE NAMES gmake nmake make)
-  ExternalProject_Add(project_libpfm4
-    URL https://sourceforge.net/projects/perfmon2/files/libpfm4/libpfm-4.9.0.tar.gz/download
-    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/external
-    CONFIGURE_COMMAND ""
-    BUILD_IN_SOURCE TRUE
-    BUILD_COMMAND ${MAKE_EXE}
-    INSTALL_COMMAND ${MAKE_EXE} PREFIX=${CMAKE_CURRENT_BINARY_DIR}/external/libpfm4-4.9.0 install
-  )
-
-  add_library(libpfm4 STATIC IMPORTED )
-  set_property(TARGET libpfm4 PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/external/libpfm4-4.9.0/lib/libpfm.a)
-  include_directories(${CMAKE_CURRENT_BINARY_DIR}/external/libpfm4-4.9.0/include/perfmon)
-  target_link_libraries(kcf_vot libpfm4)
+  target_link_libraries(kcf_vot pfm)
 ENDIF()
