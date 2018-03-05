@@ -9,7 +9,7 @@
 
 #if defined(FFTW) && defined(ASYNC)
 #include <mutex>
-#endif
+#endif //defined(FFTW) && defined(ASYNC)
 
 struct BBox_c
 {
@@ -107,7 +107,7 @@ private:
     
 #if defined(FFTW) && defined(ASYNC)
     std::mutex fftw_mut;
-#endif
+#endif //defined(FFTW) && defined(ASYNC)
 
     //helping functions
     cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y);
