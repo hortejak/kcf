@@ -574,14 +574,15 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
 
     // Exectue fft
     fftwf_execute( plan_f );
-
+    cv::dft(input, complex_result, cv::DFT_COMPLEX_OUTPUT);
     // Get output data to right format
     int width2=2*width;
     for(int  i = 0, k = 0,l=0 ; i < height; i++ ) {
         for(int  j = 0 ; j < width2 ; j++ ) {
-            if(j<=width2/2-1){
+            if(j<=width2/2+1){
                 outdata[i * width2 + j] = (float)fft[k][0];
                 outdata[i * width2 + j+1] = (float)fft[k][1];
+
 
                 j++;
                 k++;
@@ -589,7 +590,7 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
             }else{
                 l--;
                 outdata[i * width2 + j] = (float)fft[l][0];
-                outdata[i * width2 + j+1] = (float)fft[l][1];
+                outdata[i * width2 + j+1] = -(float)fft[l][1];
 
                 j++;
             }
@@ -643,7 +644,7 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
     cv::cvtColor(hsv, bgr, cv::COLOR_HSV2BGR);
     cv::resize(bgr, bgr, cv::Size(600,600));
     cv::imshow("DFT", bgr);
-    cv::waitKey(0);
+    cv::waitKey(10);
 #endif //DEBUG_MODE
     return ComplexMat(complex_result);
 }
@@ -729,7 +730,7 @@ ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &c
         // Get output data to right format
         for(int  x = 0, k = 0,l=0 ; x < height; ++x ) {
             for(int  j = 0 ; j < width2 ; j++ ) {
-                if(j<=width2/2-1){
+                if(j<=width2/2+1){
                     outdata[x* width2 + j] = (float)fft[k][0];
                     outdata[x * width2 + j+1] = (float)fft[k][1];
                     j++;
@@ -738,7 +739,7 @@ ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &c
                 }else{
                     l--;
                     outdata[x * width2 + j] = (float)fft[l][0];
-                    outdata[x * width2 + j+1] = (float)fft[l][1];
+                    outdata[x * width2 + j+1] = -(float)fft[l][1];
                     j++;
                 }
             }
@@ -831,7 +832,7 @@ cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
         // Get output data to right format
         for(int x = 0,k=0; x< height; ++x) {
             for(int j = 0; j < width; j++) {
-                outdata[k]=(float)ifft[x*width+j]/(float)(width*height);
+                outdata[k]=(float)ifft[x*width+j]/(float)(width*height)*sizeof(float);
 
                 k++;
             }
