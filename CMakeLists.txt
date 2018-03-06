@@ -43,6 +43,17 @@ IF(ASYNC AND NOT OPENMP)
   MESSAGE(STATUS "ASYNC")
 ENDIF() #ASYNC
 
+IF(use_cuda)
+  find_package(CUDA REQUIRED)
+
+  include_directories ( ${CUDA_INCLUDE_DIRS} )
+  set(CUDA_SEPARABLE_COMPILATION ON)
+  set(CUDA_PROPAGATE_HOST_FLAGS OFF)
+  set(CUDA_HOST_COMPILER /usr/bin/g++)
+  list( APPEND CUDA_NVCC_FLAGS "-O3 --gpu-architecture compute_62 -std=c++11")
+  find_cuda_helper_libs(cufftw)
+ENDIF()
+
 FIND_PACKAGE( OpenCV REQUIRED )
 link_directories ( ${OpenCV_LIB_DIR} )
 MESSAGE(STATUS "OpenCV_LIB_DIR: ${OpenCV_LIB_DIR} ")
@@ -63,18 +74,6 @@ INCLUDE_DIRECTORIES( ${CMAKE_BINARY_DIR}/)
 include_directories(${CMAKE_SOURCE_DIR}/src/ ${CMAKE_SOURCE_DIR}/src/piotr_fhog ${CMAKE_SOURCE_DIR}/src/cn)
 
 include_directories(${CMAKE_SOURCE_DIR}/sse2neon)
-
-IF(use_cuda)
-  find_package(CUDA REQUIRED)
-
-  include_directories ( ${CUDA_INCLUDE_DIRS} )
-  MESSAGE(STATUS "CUDA_INCLUDE_DIRS: ${CUDA_INCLUDE_DIRS}")
-  set(CUDA_SEPARABLE_COMPILATION ON)
-  set(CUDA_PROPAGATE_HOST_FLAGS OFF)
-  set(CUDA_HOST_COMPILER /usr/bin/g++)
-  list( APPEND CUDA_NVCC_FLAGS "-O3 --gpu-architecture compute_62 -std=c++11")
-  find_cuda_helper_libs(cufftw)
-ENDIF()
 
 add_subdirectory(src)
 
