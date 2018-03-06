@@ -531,85 +531,40 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
     cv::hconcat(matarray,complex_result);
 #endif
 #ifdef FFTW
-    // Prepare variables and FFTW plan for float precision FFT
-//     float *data_in;
-    fftwf_complex    *fft;
+    if(input.type()!=CV_32FC2){
+      cv::Mat planes[]={cv::Mat_<float>(input),cv::Mat::zeros(input.size(),CV_32F)};
+      merge(planes,2,complex_result);
+    }
 
-    fftwf_plan       plan_f;
+    fftwf_plan plan_f;
 
-    int  width, height;
-
-    width         = input.cols;
-    height        = input.rows;
-
-    float* outdata = new float[2*width * height];
-
-//     data_in =  fftwf_alloc_real(width * height);
+    int width = input.cols;
+    int height = input.rows;
 #pragma omp critical
     {
 #ifdef ASYNC
       std::unique_lock<std::mutex> lock_i(fftw_mut);
 #endif //ASYNC
-#ifndef CUFFTW
-    fft = fftwf_alloc_complex((width/2+1) * height);
-#else
-    fft = (fftwf_complex*) calloc((width/2+1) * height,sizeof(fftw_complex));
-#endif //CUFFTW
+
 #ifdef OPENMP
     fftw_plan_with_nthreads(omp_get_max_threads());
 #endif //OPENMP
-    plan_f=fftwf_plan_dft_r2c_2d( height , width , (float*)input.data , fft ,  FFTW_ESTIMATE );  
+    plan_f=fftwf_plan_dft_2d(height,width,(fftwf_complex*)complex_result.data,(fftwf_complex*)complex_result.data,FFTW_FORWARD,FFTW_ESTIMATE);
 #ifdef ASYNC
     lock_i.unlock();
 #endif // ASYNC
     }
-    // Prepare input data
-//     for(int i = 0,k=0; i < height; ++i) {
-//         const float* row = input.ptr<float>(i);
-//         for(int j = 0; j < width; j++) {
-//             data_in[k]=(float)row[j];
-//             k++;
-//         }
-//     }
 
     // Exectue fft
     fftwf_execute( plan_f );
-    cv::dft(input, complex_result, cv::DFT_COMPLEX_OUTPUT);
-    // Get output data to right format
-    int width2=2*width;
-    for(int  i = 0, k = 0,l=0 ; i < height; i++ ) {
-        for(int  j = 0 ; j < width2 ; j++ ) {
-            if(j<=width2/2+1){
-                outdata[i * width2 + j] = (float)fft[k][0];
-                outdata[i * width2 + j+1] = (float)fft[k][1];
 
-
-                j++;
-                k++;
-                l++;
-            }else{
-                l--;
-                outdata[i * width2 + j] = (float)fft[l][0];
-                outdata[i * width2 + j+1] = -(float)fft[l][1];
-
-                j++;
-            }
-        }
-    }
-    cv::Mat tmp(height,width,CV_32FC2,outdata);
-    complex_result=tmp;
-    // Destroy FFTW plan and variables
+    // Destroy FFTW plan
 #pragma omp critical
     {
 #ifdef ASYNC
       std::unique_lock<std::mutex> lock_d(fftw_mut);
 #endif //ASYNC
     fftwf_destroy_plan(plan_f);
-#ifndef CUFFTW
-    fftwf_free(fft); /*fftwf_free(data_in);*/
-#else
-    free(fft);
-#endif //CUFFTW
 #ifdef ASYNC
       lock_d.unlock();
 #endif //ASYNC
@@ -644,7 +599,7 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
     cv::cvtColor(hsv, bgr, cv::COLOR_HSV2BGR);
     cv::resize(bgr, bgr, cv::Size(600,600));
     cv::imshow("DFT", bgr);
-    cv::waitKey(10);
+    cv::waitKey(0);
 #endif //DEBUG_MODE
     return ComplexMat(complex_result);
 }
@@ -661,34 +616,22 @@ ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &c
 #endif //OPENCV_CUFFT
 #ifdef FFTW
     // Prepare variables and FFTW plan for float precision FFT
-//     float *data_in;
-    fftwf_complex    *fft;
 
     fftwf_plan       plan_f;
 
-    int  width, height, width2;
+    int width = input[0].cols;
+    int height = input[0].rows;
 
-    width         = input[0].cols;
-    height        = input[0].rows;
-    width2=2*width;
-
-    float* outdata = new float[2*width * height];
-    cv::Mat in_img  = cv::Mat::zeros(height, width, CV_32FC1);
-//     data_in =  fftwf_alloc_real(width * height);
+    complex_result  = cv::Mat::zeros(height, width, CV_32FC2);
 #pragma omp critical 
     {
 #ifdef ASYNC
       std::unique_lock<std::mutex> lock_i(fftw_mut);
 #endif //ASYNC
-#ifndef CUFFTW
-    fft = fftwf_alloc_complex((width/2+1) * height);
-#else
-    fft = (fftwf_complex*) calloc((width/2+1) * height,sizeof(fftw_complex));
-#endif //CUFFTW
 #ifdef OPENMP
     fftw_plan_with_nthreads(omp_get_max_threads());
 #endif //OPENMP
-    plan_f=fftwf_plan_dft_r2c_2d( height , width , (float*) in_img.data , fft ,  FFTW_ESTIMATE );
+    plan_f=fftwf_plan_dft_2d( height , width , (fftwf_complex*) complex_result.data ,(fftwf_complex*) complex_result.data ,FFTW_FORWARD,FFTW_MEASURE);
 #ifdef ASYNC
       lock_i.unlock();
 #endif //ASYNC
@@ -714,59 +657,26 @@ ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &c
         cv::hconcat(matarray,complex_result);
 #endif //OPENCV_CUFFT
 #ifdef FFTW
-        // Prepare input data
-        cv::Mat in_img = input[i].mul(cos_window);
-//         for(int x = 0,k=0; x< height; ++x) {
-//             const float* row = in_img.ptr<float>(x);
-//             for(int j = 0; j < width; j++) {
-//                 data_in[k]=(float)row[j];
-//                 k++;
-//             }
-//         }
+	cv::Mat tmp = input[i].mul(cos_window);
+	cv::Mat planes[]={cv::Mat_<float>(tmp),cv::Mat::zeros(tmp.size(),CV_32F)};
+	merge(planes,2,complex_result);
 
         // Execute FFT
         fftwf_execute( plan_f );
-
-        // Get output data to right format
-        for(int  x = 0, k = 0,l=0 ; x < height; ++x ) {
-            for(int  j = 0 ; j < width2 ; j++ ) {
-                if(j<=width2/2+1){
-                    outdata[x* width2 + j] = (float)fft[k][0];
-                    outdata[x * width2 + j+1] = (float)fft[k][1];
-                    j++;
-                    k++;
-                    l++;
-                }else{
-                    l--;
-                    outdata[x * width2 + j] = (float)fft[l][0];
-                    outdata[x * width2 + j+1] = -(float)fft[l][1];
-                    j++;
-                }
-            }
-        }
-        cv::Mat tmp(height,width,CV_32FC2,outdata);
-        complex_result = tmp;
-
 #endif //FFTW
 #if !defined OPENCV_CUFFT || !defined FFTW
         cv::dft(input[i].mul(cos_window), complex_result, cv::DFT_COMPLEX_OUTPUT);
 #endif //!defined OPENCV_CUFFT || !defined FFTW
-
         result.set_channel(i, complex_result);
     }
 #ifdef FFTW
-    // Destroy FFT plans and variables
+    // Destroy FFT plan
 #pragma omp critical
 {
 #if defined(FFTW) && defined(ASYNC)
       std::unique_lock<std::mutex> lock_d(fftw_mut);
 #endif
     fftwf_destroy_plan(plan_f);
-#ifndef CUFFTW
-    fftwf_free(fft); /*fftwf_free(data_in);*/
-#else
-    free(fft);
-#endif //CUFFTW
 #ifdef ASYNC
       lock_d.unlock();
 #endif //ASYNC
@@ -779,84 +689,50 @@ cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
 {
 #ifdef FFTW
     // Prepare variables and FFTW plan for float precision IFFT
-    fftwf_complex *data_in;
-    float    *ifft;
-    fftwf_plan       plan_if;
+    fftwf_plan plan_if;
     int  width, height;
 #endif //FFTW
     cv::Mat real_result;
 
     if (inputf.n_channels == 1){
 #ifdef FFTW
-        cv::Mat input=inputf.to_cv_mat()  ;
+        real_result=inputf.to_cv_mat();
 
-        width     = input.cols;
-        height    = input.rows;
+        width=real_result.cols;
+        height=real_result.rows;
 
-        float* outdata = new float[width * height];
 #pragma omp critical
         {
 #ifdef ASYNC
       std::unique_lock<std::mutex> lock_i(fftw_mut);
 #endif //ASYNC
-#ifndef CUFFTW
-        data_in =  fftwf_alloc_complex(2*(width/2+1) * height);
-        ifft = fftwf_alloc_real(width * height);
-#else
-	data_in = (fftwf_complex*) calloc(2*(width/2+1) * height,sizeof(fftw_complex));
-	ifft = (float*) calloc(width*height,sizeof(float));
-#endif //CUFFTW
 #ifdef OPENMP
 	fftw_plan_with_nthreads(omp_get_max_threads());
 #endif //OPENMP
-        plan_if=fftwf_plan_dft_c2r_2d( height , width , data_in , ifft ,  FFTW_MEASURE );
+        plan_if=fftwf_plan_dft_2d( height , width , (fftwf_complex*) real_result.data , (fftwf_complex*) real_result.data ,FFTW_BACKWARD,FFTW_ESTIMATE);
 #ifdef ASYNC
       lock_i.unlock();
 #endif //ASYNC
         }
-        //Prepare input data
-        for(int x = 0,k=0; x< height; ++x) {
-            const float* row = input.ptr<float>(x);
-            for(int j = 0; j < width; j++) {
-                data_in[k][0]=(float)row[j];
-                data_in[k][1]=(float)row[j+1];
-
-                k++;
-                j++;
-            }
-        }
-
         // Execute IFFT
         fftwf_execute( plan_if );
-
-        // Get output data to right format
-        for(int x = 0,k=0; x< height; ++x) {
-            for(int j = 0; j < width; j++) {
-                outdata[k]=(float)ifft[x*width+j]/(float)(width*height)*sizeof(float);
-
-                k++;
-            }
-        }
-
-        cv::Mat  tmp(height,width,CV_32FC1,outdata);
-        real_result = tmp;
-        // Destroy FFTW plans and variables
+	cv::Mat planes[2];
+	cv::split(real_result,planes);
+	real_result=planes[0].clone();
+	real_result=real_result/(height*width);
+        // Destroy FFTW plan
 #pragma omp critical
         {
 #ifdef ASYNC
       std::unique_lock<std::mutex> lock_d(fftw_mut);
 #endif //ASYNC
         fftwf_destroy_plan(plan_if);
-#ifndef CUFFTW
-        fftwf_free(ifft); fftwf_free(data_in);
-#else
-	free(ifft); free(data_in);
-#endif //CUFFTW
 #ifdef ASYNC
       lock_d.unlock();
 #endif //ASYNC
         }
-#else
+#endif //FFTW
+#ifndef FFTW
         cv::dft(inputf.to_cv_mat(),real_result, cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
 #endif //FFTW
 
@@ -864,26 +740,19 @@ cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
         std::vector<cv::Mat> mat_channels = inputf.to_cv_mat_vector();
         std::vector<cv::Mat> ifft_mats(inputf.n_channels);
 #ifdef FFTW
-        width    = mat_channels[0].cols;
-        height    = mat_channels[0].rows;
+        width=mat_channels[0].cols;
+        height=mat_channels[0].rows;
 
-        float* outdata = new float[width * height];
+	real_result=cv::Mat::zeros(height,width,CV_32FC2);
 #pragma omp critical
         {
 #ifdef ASYNC
       std::unique_lock<std::mutex> lock_i(fftw_mut);
 #endif //ASYNC
-#ifndef CUFFTW
-        data_in =  fftwf_alloc_complex(2*(width/2+1) * height);
-        ifft = fftwf_alloc_real(width * height);
-#else
-	data_in = (fftwf_complex*) calloc(2*(width/2+1) * height,sizeof(fftw_complex));
-	ifft = (float*) calloc(width*height,sizeof(float));
-#endif //CUFFTW
 #ifdef OPENMP
 	fftw_plan_with_nthreads(omp_get_max_threads());
 #endif //OPENMP
-        plan_if=fftwf_plan_dft_c2r_2d( height , width , data_in , ifft ,  FFTW_MEASURE );
+        plan_if=fftwf_plan_dft_2d( height , width , (fftwf_complex*) real_result.data , (fftwf_complex*) real_result.data ,FFTW_BACKWARD,FFTW_MEASURE);
 #ifdef ASYNC
       lock_i.unlock();
 #endif //ASYNC
@@ -891,51 +760,27 @@ cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
 #endif //FFTW
         for (int i = 0; i < inputf.n_channels; ++i) {
 #ifdef FFTW
-            //Prepare input data
-            for(int x = 0,k=0; x< height; ++x) {
-                const float* row = mat_channels[i].ptr<float>(x);
-                for(int j = 0; j < width; j++) {
-                    data_in[k][0]=(float)row[j];
-                    data_in[k][1]=(float)row[j+1];
-
-                    k++;
-                    j++;
-                }
-            }
-
+	  mat_channels[i].copyTo(real_result);
             // Execute IFFT
-            fftwf_execute( plan_if );
+          fftwf_execute( plan_if );
 
-            // Get output data to right format
-            for(int x = 0,k=0; x< height; ++x) {
-                for(int j = 0; j < width; j++) {
-                    outdata[k]=(float)ifft[x*width+j]/(float)(width*height);
-
-                    k++;
-                }
-            }
-
-            cv::Mat  tmp(height,width,CV_32FC1,outdata);
-
-            ifft_mats[i]=tmp;
+	  cv::Mat planes[2];
+	  cv::split(real_result,planes);
+	  ifft_mats[i]=planes[0].clone();
+	  ifft_mats[i]=ifft_mats[i]/(height*width);
 
 #else
             cv::dft(mat_channels[i], ifft_mats[i], cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
 #endif //FFTW
         }
 #ifdef FFTW
-        // Destroy FFTW plans and variables
+        // Destroy FFTW plan
 #pragma omp critical
 {
 #ifdef ASYNC
       std::unique_lock<std::mutex> lock_d(fftw_mut);
 #endif //ASYNC
-        fftwf_destroy_plan(plan_if);
-#ifndef CUFFTW
-        fftwf_free(ifft); fftwf_free(data_in);
-#else
-	free(ifft); free(data_in);
-#endif //CUFFTW
+      fftwf_destroy_plan(plan_if);
 #ifdef ASYNC
       lock_d.unlock();
 #endif //ASYNC
