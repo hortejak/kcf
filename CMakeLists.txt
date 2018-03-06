@@ -64,11 +64,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src/ ${CMAKE_SOURCE_DIR}/src/piotr_fhog 
 
 include_directories(${CMAKE_SOURCE_DIR}/sse2neon)
 
-add_subdirectory(src)
-
-IF(NOT use_cuda)
-  add_executable(kcf_vot main_vot.cpp vot.hpp)
-ELSE()
+IF(use_cuda)
   find_package(CUDA REQUIRED)
 
   include_directories ( ${CUDA_INCLUDE_DIRS} )
@@ -78,7 +74,13 @@ ELSE()
   set(CUDA_HOST_COMPILER /usr/bin/g++)
   list( APPEND CUDA_NVCC_FLAGS "-O3 --gpu-architecture compute_62 -std=c++11")
   find_cuda_helper_libs(cufftw)
+ENDIF()
 
+add_subdirectory(src)
+
+IF(NOT use_cuda)
+  add_executable(kcf_vot main_vot.cpp vot.hpp)
+ELSE()
   cuda_add_executable( kcf_vot main_vot.cpp vot.hpp )
   target_link_libraries(kcf_vot ${CUDA_LIBRARIES})
 ENDIF() #OPENCV_CUFFT
