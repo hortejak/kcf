@@ -33,6 +33,7 @@ struct BBox_c
 class KCF_Tracker
 {
 public:
+    bool m_debug     {false};
 #ifdef OPENCV_CUFFT
     bool m_use_scale {false};
     bool m_use_color {false};
