@@ -19,5 +19,7 @@ build-%/kcf_vot: $(shell git ls-files)
 	cd $(@D) && cmake $(CMAKE_OPTS) $(CMAKE_OTPS_$*) ..
 	cmake --build $(@D)
 
+$(BUILDS): %: build-%/kcf_vot
+
 clean:
 	rm -rf $(BUILDS:%=build-%)
