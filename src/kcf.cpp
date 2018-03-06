@@ -574,7 +574,6 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
 
     // Exectue fft
     fftwf_execute( plan_f );
-    cv::dft(input, complex_result, cv::DFT_COMPLEX_OUTPUT);
     // Get output data to right format
     int width2=2*width;
     for(int  i = 0, k = 0,l=0 ; i < height; i++ ) {
