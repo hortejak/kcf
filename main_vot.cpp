@@ -11,29 +11,36 @@ int main(int argc, char *argv[])
     //load region, images and prepare for output
     std::string region, images, output;
     int visualize_delay = -1;
+    KCF_Tracker tracker;
 
     while (1) {
         int option_index = 0;
         static struct option long_options[] = {
+            {"debug",     no_argument,       0,  'd' },
             {"help",      no_argument,       0,  'h' },
             {"output",    required_argument, 0,  'o' },
             {"visualize", optional_argument, 0,  'v' },
             {0,           0,                 0,  0 }
         };
 
-        int c = getopt_long(argc, argv, "hv::o:",
+        int c = getopt_long(argc, argv, "dhv::o:",
                         long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'd':
+            tracker.m_debug = true;
+            break;
         case 'h':
             std::cerr << "Usage: \n"
                       << argv[0] << " [options]\n"
                       << argv[0] << " [options] <directory>\n"
                       << argv[0] << " [options] <path/to/region.txt or groundtruth.txt> <path/to/images.txt> [path/to/output.txt]\n"
                       << "Options:\n"
-                      << " --visualize | -v [delay_ms]\n";
+                      << " --visualize | -v [delay_ms]\n"
+                      << " --output    | -o <outout.txt>\n"
+                      << " --debug     | -d\n";
             exit(0);
             break;
         case 'o':
@@ -76,7 +83,6 @@ int main(int argc, char *argv[])
     }
     VOT vot_io(region, images, output);
 
-    KCF_Tracker tracker;
     cv::Mat image;
 
     //img = firts frame, initPos = initial position in the first frame

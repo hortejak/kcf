@@ -618,34 +618,34 @@ ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
 #if !defined OPENCV_CUFFT || !defined FFTW
     cv::dft(input, complex_result, cv::DFT_COMPLEX_OUTPUT);
 #endif //!defined OPENCV_CUFFT || !defined FFTW
-#ifdef DEBUG_MODE
-    //extraxt x and y channels
-    cv::Mat xy[2]; //X,Y
-    cv::split(complex_result, xy);
+    if (m_debug) {
+        //extraxt x and y channels
+        cv::Mat xy[2]; //X,Y
+        cv::split(complex_result, xy);
 
-    //calculate angle and magnitude
-    cv::Mat magnitude, angle;
-    cv::cartToPolar(xy[0], xy[1], magnitude, angle, true);
+        //calculate angle and magnitude
+        cv::Mat magnitude, angle;
+        cv::cartToPolar(xy[0], xy[1], magnitude, angle, true);
 
-    //translate magnitude to range [0;1]
-    double mag_max;
-    cv::minMaxLoc(magnitude, 0, &mag_max);
-    magnitude.convertTo(magnitude, -1, 1.0 / mag_max);
+        //translate magnitude to range [0;1]
+        double mag_max;
+        cv::minMaxLoc(magnitude, 0, &mag_max);
+        magnitude.convertTo(magnitude, -1, 1.0 / mag_max);
 
-    //build hsv image
-    cv::Mat _hsv[3], hsv;
-    _hsv[0] = angle;
-    _hsv[1] = cv::Mat::ones(angle.size(), CV_32F);
-    _hsv[2] = magnitude;
-    cv::merge(_hsv, 3, hsv);
+        //build hsv image
+        cv::Mat _hsv[3], hsv;
+        _hsv[0] = angle;
+        _hsv[1] = cv::Mat::ones(angle.size(), CV_32F);
+        _hsv[2] = magnitude;
+        cv::merge(_hsv, 3, hsv);
 
-    //convert to BGR and show
-    cv::Mat bgr;//CV_32FC3 matrix
-    cv::cvtColor(hsv, bgr, cv::COLOR_HSV2BGR);
-    cv::resize(bgr, bgr, cv::Size(600,600));
-    cv::imshow("DFT", bgr);
-    cv::waitKey(10);
-#endif //DEBUG_MODE
+        //convert to BGR and show
+        cv::Mat bgr;//CV_32FC3 matrix
+        cv::cvtColor(hsv, bgr, cv::COLOR_HSV2BGR);
+        cv::resize(bgr, bgr, cv::Size(600,600));
+        cv::imshow("DFT", bgr);
+        cv::waitKey(10);
+    }
     return ComplexMat(complex_result);
 }
 

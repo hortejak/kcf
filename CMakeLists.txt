@@ -10,18 +10,12 @@ MESSAGE(STATUS "FFT implementation: ${FFT}")
 
 option(OPENMP "Use OpenMP library. Works with FFTW and OpenCV implementation." OFF)
 option(ASYNC "Works only if OPENCV_CUFFT is not ON. Will enable C++ async directive." OFF)
-option(DEBUG_MODE "Additional terminal outputs and screens. " OFF)
 option(PROFILING "Enable profiling using perf_event_open together with libpfm4. " OFF)
-
-IF(DEBUG_MODE )
-  add_definitions(-DDEBUG_MODE )
-  MESSAGE(STATUS "Debug mode")
-ENDIF() #DEBUG_MODE 
 
 IF(PROFILING)
   add_definitions(-DPROFILING )
   MESSAGE(STATUS "Profiling mode")
-ENDIF() #DEBUG_MODE 
+ENDIF()
 
 SET(use_cuda OFF)
 

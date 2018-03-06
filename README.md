@@ -39,10 +39,6 @@ The following table shows multiple options how to run cmake to get different ver
 
 To all of these you can also add these additional options:
 
-| Option| Description |
-| --- | --- |
-| `-DDEBUG_MODE=ON` | Debug terminal output and debug screens.|
-
 There is also option for profiling. Currently only profiles *get_features* function for which it calculates average number of CPU cycles. Works with default single threaded version using OpenCV. The code was taken from [libpfm4](https://sourceforge.net/p/perfmon2/libpfm4/ci/master/tree/) perf_examples self_basic.c:
 
 | Option| Description |
