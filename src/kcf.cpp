@@ -16,6 +16,9 @@
 #include <omp.h>
 #endif //OPENMP
 
+#define DEBUG_PRINT(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;}
+#define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << std::endl << (obj) << std::endl;}
+
 KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor, double output_sigma_factor, int cell_size) :
     fft(*new FFT()),
     p_padding(padding), p_output_sigma_factor(output_sigma_factor), p_kernel_sigma(kernel_sigma),
@@ -115,6 +118,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     //obtain a sub-window for training initial model
     std::vector<cv::Mat> path_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1]);
     p_model_xf = fft.forward_window(path_feat);
+    DEBUG_PRINTM(p_model_xf);
 
     if (m_use_linearkernel) {
         ComplexMat xfconj = p_model_xf.conj();
@@ -123,6 +127,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     } else {
         //Kernel Ridge Regression, calculate alphas (in Fourier domain)
         ComplexMat kf = gaussian_correlation(p_model_xf, p_model_xf, p_kernel_sigma, true);
+        DEBUG_PRINTM(kf);
         p_model_alphaf_num = p_yf * kf;
         p_model_alphaf_den = kf * (kf + p_lambda);
     }
@@ -225,13 +230,17 @@ void KCF_Tracker::track(cv::Mat &img)
         for (size_t i = 0; i < p_scales.size(); ++i) {
             patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i]);
             ComplexMat zf = fft.forward_window(patch_feat);
+            DEBUG_PRINTM(zf);
             cv::Mat response;
             if (m_use_linearkernel)
                 response = fft.inverse((p_model_alphaf * zf).sum_over_channels());
             else {
                 ComplexMat kzf = gaussian_correlation(zf, p_model_xf, p_kernel_sigma);
+                DEBUG_PRINTM(p_model_alphaf);
+                DEBUG_PRINTM(kzf);
                 response = fft.inverse(p_model_alphaf * kzf);
             }
+            DEBUG_PRINTM(response);
 
             /* target location is at the maximum response. we must take into
                account the fact that, if the target doesn't move, the peak
@@ -240,6 +249,7 @@ void KCF_Tracker::track(cv::Mat &img)
             double min_val, max_val;
             cv::Point2i min_loc, max_loc;
             cv::minMaxLoc(response, &min_val, &max_val, &min_loc, &max_loc);
+            DEBUG_PRINT(max_loc);
 
             double weight = p_scales[i] < 1. ? p_scales[i] : 1./p_scales[i];
 #pragma omp critical
@@ -255,6 +265,8 @@ void KCF_Tracker::track(cv::Mat &img)
             scale_responses.push_back(max_val*weight);
         }
     }
+    DEBUG_PRINTM(max_response_map);
+    DEBUG_PRINT(max_response_pt);
     //sub pixel quadratic interpolation from neighbours
     if (max_response_pt.y > max_response_map.rows / 2) //wrap around to negative half-space of vertical axis
         max_response_pt.y = max_response_pt.y - max_response_map.rows;
@@ -262,9 +274,11 @@ void KCF_Tracker::track(cv::Mat &img)
         max_response_pt.x = max_response_pt.x - max_response_map.cols;
 
     cv::Point2f new_location(max_response_pt.x, max_response_pt.y);
+    DEBUG_PRINT(new_location);
 
     if (m_use_subpixel_localization)
         new_location = sub_pixel_peak(max_response_pt, max_response_map);
+    DEBUG_PRINT(new_location);
 
     p_pose.cx += p_current_scale*p_cell_size*new_location.x;
     p_pose.cy += p_current_scale*p_cell_size*new_location.y;
@@ -530,6 +544,7 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     float yf_sqr_norm = auto_correlation ? xf_sqr_norm : yf.sqr_norm();
 
     ComplexMat xyf = auto_correlation ? xf.sqr_mag() : xf * yf.conj();
+    DEBUG_PRINTM(xyf);
 
     //ifft2 and sum over 3rd dimension, we dont care about individual channels
     cv::Mat ifft2_res = fft.inverse(xyf);
@@ -542,6 +557,8 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
             row_ptr_sum[x] = std::accumulate((row_ptr + x*ifft2_res.channels()), (row_ptr + x*ifft2_res.channels() + ifft2_res.channels()), 0.f);
         }
     }
+    DEBUG_PRINTM(ifft2_res);
+    DEBUG_PRINTM(xy_sum);
 
     float numel_xf_inv = 1.f/(xf.cols * xf.rows * xf.n_channels);
     cv::Mat tmp;

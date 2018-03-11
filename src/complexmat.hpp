@@ -25,6 +25,10 @@ public:
         p_data.push_back(convert(mat));
     }
 
+    // cv::Mat API compatibility
+    cv::Size size() { return cv::Size(cols, rows); }
+    int channels() { return n_channels; }
+
     //assuming that mat has 2 channels (real, imag)
     void set_channel(int idx, const cv::Mat & mat)
     {
