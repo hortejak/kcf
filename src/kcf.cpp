@@ -4,8 +4,13 @@
 #include <future>
 #include <algorithm>
 
-#include "fft_opencv.h"
-#define FFT FftOpencv
+#ifdef FFTW
+  #include "fft_fftw.h"
+  #define FFT Fftw
+#else
+  #include "fft_opencv.h"
+  #define FFT FftOpencv
+#endif
 
 #ifdef OPENMP
 #include <omp.h>
