@@ -532,13 +532,13 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     ComplexMat xyf = auto_correlation ? xf.sqr_mag() : xf * yf.conj();
 
     //ifft2 and sum over 3rd dimension, we dont care about individual channels
-    cv::Mat xy_sum(xf.rows, xf.cols, CV_32FC1);
-    xy_sum.setTo(0);
     cv::Mat ifft2_res = fft.inverse(xyf);
-    for (int y = 0; y < xf.rows; ++y) {
+    cv::Mat xy_sum(ifft2_res.size(), CV_32FC1);
+    xy_sum.setTo(0);
+    for (int y = 0; y < ifft2_res.rows; ++y) {
         float * row_ptr = ifft2_res.ptr<float>(y);
         float * row_ptr_sum = xy_sum.ptr<float>(y);
-        for (int x = 0; x < xf.cols; ++x){
+        for (int x = 0; x < ifft2_res.cols; ++x){
             row_ptr_sum[x] = std::accumulate((row_ptr + x*ifft2_res.channels()), (row_ptr + x*ifft2_res.channels() + ifft2_res.channels()), 0.f);
         }
     }
