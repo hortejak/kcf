@@ -85,6 +85,23 @@ public:
         return result;
     }
 
+    cv::Mat to_vconcat_mat() const
+    {
+        cv::Mat mat(n_channels*rows, cols, CV_32FC2);
+        for (int ch = 0; ch < n_channels; ++ch) {
+            cv::Mat result(mat, cv::Rect(0, ch*rows, cols, cols));
+            int data_id = 0;
+            for (int y = 0; y < rows; ++y) {
+                T * row_ptr = result.ptr<T>(y);
+                for (int x = 0; x < 2*cols; x += 2){
+                    row_ptr[x] = p_data[ch][data_id].real();
+                    row_ptr[x+1] = p_data[ch][data_id++].imag();
+                }
+            }
+        }
+        return mat;
+    }
+
     //element-wise per channel multiplication, division and addition
     ComplexMat_<T> operator*(const ComplexMat_<T> & rhs) const
     {

@@ -84,20 +84,25 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
 
 cv::Mat Fftw::inverse(const ComplexMat &inputf)
 {
-    cv::Mat real_result;
+    int n_channels = inputf.n_channels;
+    cv::Mat real_result(m_height, m_width, CV_32FC(n_channels));
+    cv::Mat complex_vconcat = inputf.to_vconcat_mat();
 
-    std::vector<cv::Mat> mat_channels = inputf.to_cv_mat_vector();
-    std::vector<cv::Mat> ifft_mats(inputf.n_channels);
-    for (int i = 0; i < inputf.n_channels; ++i) {
-        ifft_mats[i].create(m_height, m_width, CV_32F);
-        fftwf_plan plan = fftwf_plan_dft_c2r_2d(m_height, m_width,
-                                                reinterpret_cast<fftwf_complex*>(mat_channels[i].data),
-                                                reinterpret_cast<float*>(ifft_mats[i].data),
-                                                FFTW_ESTIMATE);
-        fftwf_execute(plan);
-        fftwf_destroy_plan(plan);
-    }
-    cv::merge(ifft_mats, real_result);
+    int rank = 2;
+    int n[] = {(int)m_height, (int)m_width};
+    int howmany = n_channels;
+    int idist = m_height*(m_width/2+1), odist = 1;
+    int istride = 1, ostride = n_channels;
+    int *inembed = NULL, *onembed = NULL;
+    fftwf_complex *in = reinterpret_cast<fftwf_complex*>(complex_vconcat.data);
+    float *out = reinterpret_cast<float*>(real_result.data);
+
+    fftwf_plan plan = fftwf_plan_many_dft_c2r(rank, n, howmany,
+                                              in,  inembed, istride, idist,
+                                              out, onembed, ostride, odist,
+                                              FFTW_ESTIMATE);
+    fftwf_execute(plan);
+    fftwf_destroy_plan(plan);
 
     return real_result/(m_width*m_height);
 }
