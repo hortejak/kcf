@@ -44,18 +44,3 @@ ELSE()
 ENDIF() #OPENCV_CUFFT
 
 target_link_libraries(kcf_vot ${OpenCV_LIBS} kcf)
-
-IF(FFT STREQUAL "fftw")
-  target_link_libraries(kcf_vot fftw3f)
-  IF(OPENMP)
-    target_link_libraries(kcf_vot fftw3_omp)
-  ENDIF()
-ENDIF() #FFTW
-
-IF(FFT STREQUAL "cuFFTW")
-  target_link_libraries(kcf_vot ${CUDA_cufft_LIBRARY} ${CUDA_cufftw_LIBRARY})
-ENDIF() #cuFFTW
-
-IF(PROFILING)
-  target_link_libraries(kcf_vot pfm)
-ENDIF()

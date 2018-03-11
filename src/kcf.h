@@ -6,10 +6,7 @@
 #include "fhog.hpp"
 #include "complexmat.hpp"
 #include "cnfeat.hpp"
-
-#if defined(FFTW) && defined(ASYNC)
-#include <mutex>
-#endif //defined(FFTW) && defined(ASYNC)
+#include "fft.h"
 
 struct BBox_c
 {
@@ -59,10 +56,9 @@ public:
     output_sigma_factor ... spatial bandwidth (proportional to target)  (0.1)
     cell_size           ... hog cell size                               (4)
     */
-    KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor, double output_sigma_factor, int cell_size) :
-        p_padding(padding), p_output_sigma_factor(output_sigma_factor), p_kernel_sigma(kernel_sigma),
-        p_lambda(lambda), p_interp_factor(interp_factor), p_cell_size(cell_size) {}
-    KCF_Tracker() {}
+    KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor, double output_sigma_factor, int cell_size);
+    KCF_Tracker();
+    ~KCF_Tracker();
 
     // Init/re-init methods
     void init(cv::Mat & img, const cv::Rect & bbox);
@@ -74,6 +70,8 @@ public:
     BBox_c getBBox();
 
 private:
+    Fft &fft;
+
     BBox_c p_pose;
     bool p_resize_image = false;
 
@@ -89,17 +87,11 @@ private:
     double p_interp_factor = 0.02;  //def = 0.02, linear interpolation factor for adaptation
     int p_cell_size = 4;            //4 for hog (= bin_size)
     int p_windows_size[2];
-    cv::Mat p_cos_window;
     int p_num_scales {7};
     double p_scale_step = 1.02;
     double p_current_scale = 1.;
     double p_min_max_scale[2];
     std::vector<double> p_scales;
-
-#ifdef OPENCV_CUFFT
-    cv::cuda::GpuMat src_gpu,dst_gpu,p_cos_window_d;
-    cv::cuda::Stream stream;
-#endif //OPENCV_CUFFT
 
     //model
     ComplexMat p_yf;
@@ -108,20 +100,12 @@ private:
     ComplexMat p_model_alphaf_den;
     ComplexMat p_model_xf;
     
-#if defined(FFTW) && defined(ASYNC)
-    std::mutex fftw_mut;
-#endif //defined(FFTW) && defined(ASYNC)
-
     //helping functions
     cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y);
     cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);
     ComplexMat gaussian_correlation(const ComplexMat & xf, const ComplexMat & yf, double sigma, bool auto_correlation = false);
     cv::Mat circshift(const cv::Mat & patch, int x_rot, int y_rot);
     cv::Mat cosine_window_function(int dim1, int dim2);
-    ComplexMat fft2(const cv::Mat & input);
-    ComplexMat fft2(const std::vector<cv::Mat> & input, const cv::Mat & cos_window);
-
-    cv::Mat ifft2(const ComplexMat & inputf);
     std::vector<cv::Mat> get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx, int cy, int size_x, int size_y, double scale = 1.);
     cv::Point2f sub_pixel_peak(cv::Point & max_loc, cv::Mat & response);
     double sub_grid_scale(std::vector<double> & responses, int index = -1);

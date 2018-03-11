@@ -4,22 +4,25 @@
 #include <future>
 #include <algorithm>
 
-#ifdef OPENCV_CUFFT
-#include <cuda.h>
-#include <cuda_runtime.h>
-#endif //OPENCV_CUFFT
-
-#ifdef FFTW
-  #ifndef CUFFTW
-    #include <fftw3.h>
-  #else
-    #include <cufftw.h>
-  #endif //CUFFTW
-#endif //FFTW
+#include "fft_opencv.h"
+#define FFT FftOpencv
 
 #ifdef OPENMP
 #include <omp.h>
 #endif //OPENMP
+
+KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor, double output_sigma_factor, int cell_size) :
+    fft(*new FFT()),
+    p_padding(padding), p_output_sigma_factor(output_sigma_factor), p_kernel_sigma(kernel_sigma),
+    p_lambda(lambda), p_interp_factor(interp_factor), p_cell_size(cell_size) {}
+
+KCF_Tracker::KCF_Tracker()
+    : fft(*new FFT()) {}
+
+KCF_Tracker::~KCF_Tracker()
+{
+    delete &fft;
+}
 
 void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
 {
@@ -99,16 +102,14 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
 
     p_output_sigma = std::sqrt(p_pose.w*p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
 
-#if defined(FFTW) && defined(OPENMP)
-    fftw_init_threads();
-#endif //defined(FFTW) && defined(OPENMP)
-
     //window weights, i.e. labels
-    p_yf = fft2(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
-    p_cos_window = cosine_window_function(p_yf.cols, p_yf.rows);
+    fft.init(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size);
+    p_yf = fft.forward(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
+    fft.set_window(cosine_window_function(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
+
     //obtain a sub-window for training initial model
     std::vector<cv::Mat> path_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1]);
-    p_model_xf = fft2(path_feat, p_cos_window);
+    p_model_xf = fft.forward_window(path_feat);
 
     if (m_use_linearkernel) {
         ComplexMat xfconj = p_model_xf.conj();
@@ -186,12 +187,12 @@ void KCF_Tracker::track(cv::Mat &img)
                                       {
                                           std::vector<cv::Mat> patch_feat_async = get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size[0],
                                                                                                this->p_windows_size[1], this->p_current_scale * this->p_scales[i]);
-                                          ComplexMat zf = fft2(patch_feat_async, this->p_cos_window);
+                                          ComplexMat zf = fft.forward_window(patch_feat_async);
                                           if (m_use_linearkernel)
-                                              return ifft2((p_model_alphaf * zf).sum_over_channels());
+                                              return fft.inverse((p_model_alphaf * zf).sum_over_channels());
                                           else {
                                               ComplexMat kzf = gaussian_correlation(zf, this->p_model_xf, this->p_kernel_sigma);
-                                              return ifft2(this->p_model_alphaf * kzf);
+                                              return fft.inverse(this->p_model_alphaf * kzf);
                                           }
                                       });
         }
@@ -218,13 +219,13 @@ void KCF_Tracker::track(cv::Mat &img)
 #pragma omp parallel for ordered  private(patch_feat) schedule(dynamic)
         for (size_t i = 0; i < p_scales.size(); ++i) {
             patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i]);
-            ComplexMat zf = fft2(patch_feat, p_cos_window);
+            ComplexMat zf = fft.forward_window(patch_feat);
             cv::Mat response;
             if (m_use_linearkernel)
-                response = ifft2((p_model_alphaf * zf).sum_over_channels());
+                response = fft.inverse((p_model_alphaf * zf).sum_over_channels());
             else {
                 ComplexMat kzf = gaussian_correlation(zf, p_model_xf, p_kernel_sigma);
-                response = ifft2(p_model_alphaf * kzf);
+                response = fft.inverse(p_model_alphaf * kzf);
             }
 
             /* target location is at the maximum response. we must take into
@@ -280,7 +281,7 @@ void KCF_Tracker::track(cv::Mat &img)
         p_current_scale = p_min_max_scale[1];
     //obtain a subwindow for training at newly estimated target position
     patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_current_scale);
-    ComplexMat xf = fft2(patch_feat, p_cos_window);
+    ComplexMat xf = fft.forward_window(patch_feat);
 
     //subsequent frames, interpolate model
     p_model_xf = p_model_xf * (1. - p_interp_factor) + xf * p_interp_factor;
@@ -447,291 +448,6 @@ cv::Mat KCF_Tracker::circshift(const cv::Mat &patch, int x_rot, int y_rot)
     return rot_patch;
 }
 
-ComplexMat KCF_Tracker::fft2(const cv::Mat &input)
-{
-    cv::Mat complex_result;
-#ifdef OPENCV_CUFFT
-    cv::Mat flip_h,imag_h;
-
-    cv::cuda::HostMem hostmem_input(input, cv::cuda::HostMem::SHARED);
-    cv::cuda::HostMem hostmem_real(cv::Size(input.cols,input.rows/2+1), CV_32FC2, cv::cuda::HostMem::SHARED);
-
-    cv::cuda::dft(hostmem_input,hostmem_real,hostmem_input.size(),0,stream);
-    stream.waitForCompletion();
-
-    cv::Mat real_h = hostmem_real.createMatHeader();
-
-    //create reversed copy of result and merge them
-    cv::flip(hostmem_real,flip_h,1);
-    flip_h(cv::Range(0, flip_h.rows), cv::Range(1, flip_h.cols)).copyTo(imag_h);
-
-    std::vector<cv::Mat> matarray = {real_h,imag_h};
-
-    cv::hconcat(matarray,complex_result);
-#endif
-#ifdef FFTW
-    if(input.type()!=CV_32FC2){
-      cv::Mat planes[]={cv::Mat_<float>(input),cv::Mat::zeros(input.size(),CV_32F)};
-      merge(planes,2,complex_result);
-    }
-
-    fftwf_plan plan_f;
-
-    int width = input.cols;
-    int height = input.rows;
-#pragma omp critical
-    {
-#ifdef ASYNC
-      std::unique_lock<std::mutex> lock_i(fftw_mut);
-#endif //ASYNC
-
-#ifdef OPENMP
-    fftw_plan_with_nthreads(omp_get_max_threads());
-#endif //OPENMP
-    plan_f=fftwf_plan_dft_2d(height,width,(fftwf_complex*)complex_result.data,(fftwf_complex*)complex_result.data,FFTW_FORWARD,FFTW_ESTIMATE);
-#ifdef ASYNC
-    lock_i.unlock();
-#endif // ASYNC
-    }
-
-    // Exectue fft
-    fftwf_execute( plan_f );
-
-    // Destroy FFTW plan
-#pragma omp critical
-    {
-#ifdef ASYNC
-      std::unique_lock<std::mutex> lock_d(fftw_mut);
-#endif //ASYNC
-    fftwf_destroy_plan(plan_f);
-#ifdef ASYNC
-      lock_d.unlock();
-#endif //ASYNC
-    }
-#endif //FFTW
-#if !defined OPENCV_CUFFT || !defined FFTW
-    cv::dft(input, complex_result, cv::DFT_COMPLEX_OUTPUT);
-#endif //!defined OPENCV_CUFFT || !defined FFTW
-    
-    if (m_debug) {
-        //extraxt x and y channels
-        cv::Mat xy[2]; //X,Y
-        cv::split(complex_result, xy);
-
-        //calculate angle and magnitude
-        cv::Mat magnitude, angle;
-        cv::cartToPolar(xy[0], xy[1], magnitude, angle, true);
-
-        //translate magnitude to range [0;1]
-        double mag_max;
-        cv::minMaxLoc(magnitude, 0, &mag_max);
-        magnitude.convertTo(magnitude, -1, 1.0 / mag_max);
-
-        //build hsv image
-        cv::Mat _hsv[3], hsv;
-        _hsv[0] = angle;
-        _hsv[1] = cv::Mat::ones(angle.size(), CV_32F);
-        _hsv[2] = magnitude;
-        cv::merge(_hsv, 3, hsv);
-
-        //convert to BGR and show
-        cv::Mat bgr;//CV_32FC3 matrix
-        cv::cvtColor(hsv, bgr, cv::COLOR_HSV2BGR);
-        cv::resize(bgr, bgr, cv::Size(600,600));
-        cv::imshow("DFT", bgr);
-        cv::waitKey(10);
-    }
-    
-    return ComplexMat(complex_result);
-}
-
-ComplexMat KCF_Tracker::fft2(const std::vector<cv::Mat> &input, const cv::Mat &cos_window)
-{
-    int n_channels = input.size();
-    cv::Mat complex_result;
-
-#ifdef OPENCV_CUFFT
-    cv::Mat flip_h,imag_h;
-    cv::cuda::GpuMat src_gpu;
-    cv::cuda::HostMem hostmem_real(cv::Size(input[0].cols,input[0].rows/2+1), CV_32FC2, cv::cuda::HostMem::SHARED);
-#endif //OPENCV_CUFFT
-#ifdef FFTW
-    // Prepare variables and FFTW plan for float precision FFT
-
-    fftwf_plan       plan_f;
-
-    int width = input[0].cols;
-    int height = input[0].rows;
-
-    complex_result  = cv::Mat::zeros(height, width, CV_32FC2);
-#pragma omp critical 
-    {
-#ifdef ASYNC
-      std::unique_lock<std::mutex> lock_i(fftw_mut);
-#endif //ASYNC
-#ifdef OPENMP
-    fftw_plan_with_nthreads(omp_get_max_threads());
-#endif //OPENMP
-    plan_f=fftwf_plan_dft_2d( height , width , (fftwf_complex*) complex_result.data ,(fftwf_complex*) complex_result.data ,FFTW_FORWARD,FFTW_MEASURE);
-#ifdef ASYNC
-      lock_i.unlock();
-#endif //ASYNC
-    }
-#endif //FFTW
-
-    ComplexMat result(input[0].rows, input[0].cols, n_channels);
-    for (int i = 0; i < n_channels; ++i){
-#ifdef OPENCV_CUFFT
-        cv::cuda::HostMem hostmem_input(input[i], cv::cuda::HostMem::SHARED);
-        cv::cuda::multiply(hostmem_input,p_cos_window_d,src_gpu);
-        cv::cuda::dft(src_gpu,hostmem_real,src_gpu.size(),0,stream);
-        stream.waitForCompletion();
-
-        cv::Mat real_h = hostmem_real.createMatHeader();
-
-        //create reversed copy of result and merge them
-        cv::flip(hostmem_real,flip_h,1);
-        flip_h(cv::Range(0, flip_h.rows), cv::Range(1, flip_h.cols)).copyTo(imag_h);
-
-        std::vector<cv::Mat> matarray = {real_h,imag_h};
-
-        cv::hconcat(matarray,complex_result);
-#endif //OPENCV_CUFFT
-#ifdef FFTW
-	cv::Mat tmp = input[i].mul(cos_window);
-	cv::Mat planes[]={cv::Mat_<float>(tmp),cv::Mat::zeros(tmp.size(),CV_32F)};
-	merge(planes,2,complex_result);
-
-        // Execute FFT
-        fftwf_execute( plan_f );
-#endif //FFTW
-#if !defined OPENCV_CUFFT || !defined FFTW
-        cv::dft(input[i].mul(cos_window), complex_result, cv::DFT_COMPLEX_OUTPUT);
-#endif //!defined OPENCV_CUFFT || !defined FFTW
-        result.set_channel(i, complex_result);
-    }
-#ifdef FFTW
-    // Destroy FFT plan
-#pragma omp critical
-{
-#if defined(FFTW) && defined(ASYNC)
-      std::unique_lock<std::mutex> lock_d(fftw_mut);
-#endif
-    fftwf_destroy_plan(plan_f);
-#ifdef ASYNC
-      lock_d.unlock();
-#endif //ASYNC
-}
-#endif //FFTW
-    return result;
-}
-
-cv::Mat KCF_Tracker::ifft2(const ComplexMat &inputf)
-{
-#ifdef FFTW
-    // Prepare variables and FFTW plan for float precision IFFT
-    fftwf_plan plan_if;
-    int  width, height;
-#endif //FFTW
-    cv::Mat real_result;
-
-    if (inputf.n_channels == 1){
-#ifdef FFTW
-        real_result=inputf.to_cv_mat();
-
-        width=real_result.cols;
-        height=real_result.rows;
-
-#pragma omp critical
-        {
-#ifdef ASYNC
-      std::unique_lock<std::mutex> lock_i(fftw_mut);
-#endif //ASYNC
-#ifdef OPENMP
-	fftw_plan_with_nthreads(omp_get_max_threads());
-#endif //OPENMP
-        plan_if=fftwf_plan_dft_2d( height , width , (fftwf_complex*) real_result.data , (fftwf_complex*) real_result.data ,FFTW_BACKWARD,FFTW_ESTIMATE);
-#ifdef ASYNC
-      lock_i.unlock();
-#endif //ASYNC
-        }
-        // Execute IFFT
-        fftwf_execute( plan_if );
-	cv::Mat planes[2];
-	cv::split(real_result,planes);
-	real_result=planes[0].clone();
-	real_result=real_result/(height*width);
-        // Destroy FFTW plan
-#pragma omp critical
-        {
-#ifdef ASYNC
-      std::unique_lock<std::mutex> lock_d(fftw_mut);
-#endif //ASYNC
-        fftwf_destroy_plan(plan_if);
-#ifdef ASYNC
-      lock_d.unlock();
-#endif //ASYNC
-        }
-#endif //FFTW
-#ifndef FFTW
-        cv::dft(inputf.to_cv_mat(),real_result, cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
-#endif //FFTW
-
-    } else {
-        std::vector<cv::Mat> mat_channels = inputf.to_cv_mat_vector();
-        std::vector<cv::Mat> ifft_mats(inputf.n_channels);
-#ifdef FFTW
-        width=mat_channels[0].cols;
-        height=mat_channels[0].rows;
-
-	real_result=cv::Mat::zeros(height,width,CV_32FC2);
-#pragma omp critical
-        {
-#ifdef ASYNC
-      std::unique_lock<std::mutex> lock_i(fftw_mut);
-#endif //ASYNC
-#ifdef OPENMP
-	fftw_plan_with_nthreads(omp_get_max_threads());
-#endif //OPENMP
-        plan_if=fftwf_plan_dft_2d( height , width , (fftwf_complex*) real_result.data , (fftwf_complex*) real_result.data ,FFTW_BACKWARD,FFTW_MEASURE);
-#ifdef ASYNC
-      lock_i.unlock();
-#endif //ASYNC
-        }
-#endif //FFTW
-        for (int i = 0; i < inputf.n_channels; ++i) {
-#ifdef FFTW
-	  mat_channels[i].copyTo(real_result);
-            // Execute IFFT
-          fftwf_execute( plan_if );
-
-	  cv::Mat planes[2];
-	  cv::split(real_result,planes);
-	  ifft_mats[i]=planes[0].clone();
-	  ifft_mats[i]=ifft_mats[i]/(height*width);
-
-#else
-            cv::dft(mat_channels[i], ifft_mats[i], cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
-#endif //FFTW
-        }
-#ifdef FFTW
-        // Destroy FFTW plan
-#pragma omp critical
-{
-#ifdef ASYNC
-      std::unique_lock<std::mutex> lock_d(fftw_mut);
-#endif //ASYNC
-      fftwf_destroy_plan(plan_if);
-#ifdef ASYNC
-      lock_d.unlock();
-#endif //ASYNC
-}
-#endif //FFTW
-        cv::merge(ifft_mats, real_result);
-    }
-    return real_result;
-}
-
 //hann window actually (Power-of-cosine windows)
 cv::Mat KCF_Tracker::cosine_window_function(int dim1, int dim2)
 {
@@ -743,10 +459,6 @@ cv::Mat KCF_Tracker::cosine_window_function(int dim1, int dim2)
     for (int i = 0; i < dim2; ++i)
         m2.at<float>(i) = 0.5*(1. - std::cos(2. * CV_PI * static_cast<double>(i) * N_inv));
     cv::Mat ret = m2*m1;
-#ifdef OPENCV_CUFFT
-    cv::cuda::createContinuous(cv::Size(ret.cols,ret.rows),CV_32FC1,p_cos_window_d);
-    p_cos_window_d.upload(ret);
-#endif
     return ret;
 }
 
@@ -817,7 +529,7 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     //ifft2 and sum over 3rd dimension, we dont care about individual channels
     cv::Mat xy_sum(xf.rows, xf.cols, CV_32FC1);
     xy_sum.setTo(0);
-    cv::Mat ifft2_res = ifft2(xyf);
+    cv::Mat ifft2_res = fft.inverse(xyf);
     for (int y = 0; y < xf.rows; ++y) {
         float * row_ptr = ifft2_res.ptr<float>(y);
         float * row_ptr_sum = xy_sum.ptr<float>(y);
@@ -830,7 +542,7 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     cv::Mat tmp;
     cv::exp(- 1.f / (sigma * sigma) * cv::max((xf_sqr_norm + yf_sqr_norm - 2 * xy_sum) * numel_xf_inv, 0), tmp);
 
-    return fft2(tmp);
+    return fft.forward(tmp);
 }
 
 float get_response_circular(cv::Point2i & pt, cv::Mat & response)
