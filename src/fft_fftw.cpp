@@ -52,20 +52,33 @@ ComplexMat Fftw::forward(const cv::Mat &input)
 ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
 {
     int n_channels = input.size();
-    ComplexMat result(input[0].rows, input[0].cols/2 + 1, n_channels);
-
+    cv::Mat in_all(m_height * n_channels, m_width, CV_32F);
     for (int i = 0; i < n_channels; ++i) {
-        cv::Mat in = input[i].mul(m_window);
-        cv::Mat complex_result(result.rows, result.cols, CV_32FC2);
-        fftwf_plan plan = fftwf_plan_dft_r2c_2d(m_height, m_width,
-                                                reinterpret_cast<float*>(in.data),
-                                                reinterpret_cast<fftwf_complex*>(complex_result.data),
-                                                FFTW_ESTIMATE);
-        fftwf_execute(plan);
-        fftwf_destroy_plan(plan);
-
-        result.set_channel(i, complex_result);
+        cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
+        in_roi = input[i].mul(m_window);
     }
+    cv::Mat complex_result(n_channels*m_height, m_width/2+1, CV_32FC2);
+
+    int rank = 2;
+    int n[] = {(int)m_height, (int)m_width};
+    int howmany = n_channels;
+    int idist = m_height*m_width, odist = m_height*(m_width/2+1);
+    int istride = 1, ostride = 1;
+    int *inembed = NULL, *onembed = NULL;
+    float *in = reinterpret_cast<float*>(in_all.data);
+    fftwf_complex *out = reinterpret_cast<fftwf_complex*>(complex_result.data);
+
+    fftwf_plan plan = fftwf_plan_many_dft_r2c(rank, n, howmany,
+                                              in,  inembed, istride, idist,
+                                              out, onembed, ostride, odist,
+                                              FFTW_ESTIMATE);
+    fftwf_execute(plan);
+    fftwf_destroy_plan(plan);
+
+    ComplexMat result(m_height, m_width/2 + 1, n_channels);
+    for (int i = 0; i < n_channels; ++i)
+        result.set_channel(i, complex_result(cv::Rect(0, i*m_height, m_width/2+1, m_height)));
+
     return result;
 }
 
