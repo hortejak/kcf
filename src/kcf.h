@@ -79,6 +79,8 @@ private:
 
     bool first = true;
 
+    const double p_downscale_factor = 0.5;
+
     double p_padding = 1.5;
     double p_output_sigma_factor = 0.1;
     double p_output_sigma;

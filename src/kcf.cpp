@@ -68,11 +68,11 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
 
     // don't need too large image
     if (p_pose.w * p_pose.h > 100.*100.) {
-        std::cout << "resizing image by factor of 2" << std::endl;
+        std::cout << "resizing image by factor of " << 1/p_downscale_factor << std::endl;
         p_resize_image = true;
-        p_pose.scale(0.5);
-        cv::resize(input_gray, input_gray, cv::Size(0,0), 0.5, 0.5, cv::INTER_AREA);
-        cv::resize(input_rgb, input_rgb, cv::Size(0,0), 0.5, 0.5, cv::INTER_AREA);
+        p_pose.scale(p_downscale_factor);
+        cv::resize(input_gray, input_gray, cv::Size(0,0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
+        cv::resize(input_rgb, input_rgb, cv::Size(0,0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
     }
 
     //compute win size + fit to fhog cell size
@@ -133,7 +133,7 @@ void KCF_Tracker::updateTrackerPosition(BBox_c &bbox)
 {
     if (p_resize_image) {
         BBox_c tmp = bbox;
-        tmp.scale(0.5);
+        tmp.scale(p_downscale_factor);
         p_pose.cx = tmp.cx;
         p_pose.cy = tmp.cy;
     } else {
@@ -149,7 +149,7 @@ BBox_c KCF_Tracker::getBBox()
     tmp.h *= p_current_scale;
 
     if (p_resize_image)
-        tmp.scale(2);
+        tmp.scale(1/p_downscale_factor);
 
     return tmp;
 }
@@ -166,8 +166,8 @@ void KCF_Tracker::track(cv::Mat &img)
 
     // don't need too large image
     if (p_resize_image) {
-        cv::resize(input_gray, input_gray, cv::Size(0, 0), 0.5, 0.5, cv::INTER_AREA);
-        cv::resize(input_rgb, input_rgb, cv::Size(0, 0), 0.5, 0.5, cv::INTER_AREA);
+        cv::resize(input_gray, input_gray, cv::Size(0, 0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
+        cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
     }
 
 
