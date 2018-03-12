@@ -67,6 +67,8 @@ IF(FFT STREQUAL "fftw")
   target_link_libraries(kcf fftw3f)
   IF(OPENMP)
     target_link_libraries(kcf fftw3_omp)
+  ELSEIF(ASYNC)
+    target_link_libraries(kcf fftw3_threads)
   ENDIF()
 ENDIF() #FFTW
 
