@@ -20,9 +20,8 @@ void Fftw::init(unsigned width, unsigned height)
     m_width = width;
     m_height = height;
 
-#if defined(OPENMP)
+#if defined(ASYNC) || defined(OPENMP)
     fftw_init_threads();
-    fftw_plan_with_nthreads(omp_get_max_threads());
 #endif //OPENMP
 
 #ifndef CUFFTW
@@ -40,12 +39,25 @@ void Fftw::set_window(const cv::Mat &window)
 ComplexMat Fftw::forward(const cv::Mat &input)
 {
     cv::Mat complex_result(m_height, m_width / 2 + 1, CV_32FC2);
+#ifdef ASYNC
+    std::unique_lock<std::mutex> lock(fftw_mut);
+    fftw_plan_with_nthreads(2);
+#endif
     fftwf_plan plan = fftwf_plan_dft_r2c_2d(m_height, m_width,
                                             reinterpret_cast<float*>(input.data),
                                             reinterpret_cast<fftwf_complex*>(complex_result.data),
                                             FFTW_ESTIMATE);
+#ifdef ASYNC
+    lock.unlock();
+#endif
     fftwf_execute(plan);
+#ifdef ASYNC
+    lock.lock();
+#endif
     fftwf_destroy_plan(plan);
+#ifdef ASYNC
+    lock.unlock();
+#endif
     return ComplexMat(complex_result);
 }
 
@@ -67,13 +79,25 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
     int *inembed = NULL, *onembed = NULL;
     float *in = reinterpret_cast<float*>(in_all.data);
     fftwf_complex *out = reinterpret_cast<fftwf_complex*>(complex_result.data);
-
+#ifdef ASYNC
+    std::unique_lock<std::mutex> lock(fftw_mut);
+    fftw_plan_with_nthreads(2);
+#endif
     fftwf_plan plan = fftwf_plan_many_dft_r2c(rank, n, howmany,
                                               in,  inembed, istride, idist,
                                               out, onembed, ostride, odist,
                                               FFTW_ESTIMATE);
+#ifdef ASYNC
+    lock.unlock();
+#endif
     fftwf_execute(plan);
+#ifdef ASYNC
+    lock.lock();
+#endif
     fftwf_destroy_plan(plan);
+#ifdef ASYNC
+    lock.unlock();
+#endif
 
     ComplexMat result(m_height, m_width/2 + 1, n_channels);
     for (int i = 0; i < n_channels; ++i)
@@ -102,14 +126,25 @@ cv::Mat Fftw::inverse(const ComplexMat &inputf)
 #endif
     fftwf_complex *in = reinterpret_cast<fftwf_complex*>(complex_vconcat.data);
     float *out = reinterpret_cast<float*>(real_result.data);
-
+#if defined(ASYNC) || defined(OPENMP)
+    std::unique_lock<std::mutex> lock(fftw_mut);
+    fftw_plan_with_nthreads(2);
+#endif
     fftwf_plan plan = fftwf_plan_many_dft_c2r(rank, n, howmany,
                                               in,  inembed, istride, idist,
                                               out, onembed, ostride, odist,
                                               FFTW_ESTIMATE);
+#ifdef ASYNC
+    lock.unlock();
+#endif
     fftwf_execute(plan);
+#ifdef ASYNC
+    lock.lock();
+#endif
     fftwf_destroy_plan(plan);
-
+#ifdef ASYNC
+    lock.unlock();
+#endif
     return real_result/(m_width*m_height);
 }
 
