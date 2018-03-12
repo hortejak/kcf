@@ -117,13 +117,7 @@ cv::Mat Fftw::inverse(const ComplexMat &inputf)
     int howmany = n_channels;
     int idist = m_height*(m_width/2+1), odist = 1;
     int istride = 1, ostride = n_channels;
-#ifndef CUFFTW
-    int *inembed = NULL, *onembed = NULL;
-#else
-    int inembed[2];
-    int onembed[2];
-    inembed[1] = m_width/2+1, onembed[1] = m_width;
-#endif
+    int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
     fftwf_complex *in = reinterpret_cast<fftwf_complex*>(complex_vconcat.data);
     float *out = reinterpret_cast<float*>(real_result.data);
 #if defined(ASYNC) || defined(OPENMP)
