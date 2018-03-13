@@ -7,7 +7,7 @@
   #include <cufftw.h>
 #endif //CUFFTW
 
-#if defined(OPENMP)
+#ifdef OPENMP
   #include <omp.h>
 #endif
 
@@ -42,8 +42,13 @@ ComplexMat Fftw::forward(const cv::Mat &input)
 #ifdef ASYNC
     std::unique_lock<std::mutex> lock(fftw_mut);
     fftw_plan_with_nthreads(2);
+#elif OPENMP
+#pragma omp critical
+    fftw_plan_with_nthreads(omp_get_max_threads());
 #endif
-    fftwf_plan plan = fftwf_plan_dft_r2c_2d(m_height, m_width,
+fftwf_plan plan;
+#pragma omp critical
+    plan = fftwf_plan_dft_r2c_2d(m_height, m_width,
                                             reinterpret_cast<float*>(input.data),
                                             reinterpret_cast<fftwf_complex*>(complex_result.data),
                                             FFTW_ESTIMATE);
@@ -54,6 +59,7 @@ ComplexMat Fftw::forward(const cv::Mat &input)
 #ifdef ASYNC
     lock.lock();
 #endif
+#pragma omp critical
     fftwf_destroy_plan(plan);
 #ifdef ASYNC
     lock.unlock();
@@ -82,8 +88,13 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
 #ifdef ASYNC
     std::unique_lock<std::mutex> lock(fftw_mut);
     fftw_plan_with_nthreads(2);
+#elif OPENMP
+#pragma omp critical
+    fftw_plan_with_nthreads(omp_get_max_threads());
 #endif
-    fftwf_plan plan = fftwf_plan_many_dft_r2c(rank, n, howmany,
+fftwf_plan plan;
+#pragma omp critical
+    plan = fftwf_plan_many_dft_r2c(rank, n, howmany,
                                               in,  inembed, istride, idist,
                                               out, onembed, ostride, odist,
                                               FFTW_ESTIMATE);
@@ -94,6 +105,7 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
 #ifdef ASYNC
     lock.lock();
 #endif
+#pragma omp critical
     fftwf_destroy_plan(plan);
 #ifdef ASYNC
     lock.unlock();
@@ -126,11 +138,16 @@ cv::Mat Fftw::inverse(const ComplexMat &inputf)
 #endif
     fftwf_complex *in = reinterpret_cast<fftwf_complex*>(complex_vconcat.data);
     float *out = reinterpret_cast<float*>(real_result.data);
-#if defined(ASYNC) || defined(OPENMP)
+#ifdef ASYNC
     std::unique_lock<std::mutex> lock(fftw_mut);
     fftw_plan_with_nthreads(2);
+#elif OPENMP
+#pragma omp critical
+    fftw_plan_with_nthreads(omp_get_max_threads());
 #endif
-    fftwf_plan plan = fftwf_plan_many_dft_c2r(rank, n, howmany,
+fftwf_plan plan;
+#pragma omp critical
+    plan = fftwf_plan_many_dft_c2r(rank, n, howmany,
                                               in,  inembed, istride, idist,
                                               out, onembed, ostride, odist,
                                               FFTW_ESTIMATE);
@@ -141,6 +158,7 @@ cv::Mat Fftw::inverse(const ComplexMat &inputf)
 #ifdef ASYNC
     lock.lock();
 #endif
+#pragma omp critical
     fftwf_destroy_plan(plan);
 #ifdef ASYNC
     lock.unlock();
