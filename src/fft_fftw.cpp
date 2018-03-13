@@ -19,7 +19,7 @@ void Fftw::init(unsigned width, unsigned height)
     plan_if = NULL;
     plan_ir = NULL;
 
--#if defined(ASYNC) || defined(OPENMP)
+#if defined(ASYNC) || defined(OPENMP)
     fftw_init_threads();
 #endif //OPENMP
 
