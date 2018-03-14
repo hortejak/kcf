@@ -1,13 +1,8 @@
 #include "fft_fftw.h"
 
 #include "fft.h"
-#ifndef CUFFTW
-  #include <fftw3.h>
-#else
-  #include <cufftw.h>
-#endif //CUFFTW
 
-#if defined(OPENMP)
+#ifdef OPENMP
   #include <omp.h>
 #endif
 
@@ -19,6 +14,10 @@ void Fftw::init(unsigned width, unsigned height)
 {
     m_width = width;
     m_height = height;
+    plan_f = NULL;
+    plan_fw = NULL;
+    plan_if = NULL;
+    plan_ir = NULL;
 
 #if defined(ASYNC) || defined(OPENMP)
     fftw_init_threads();
@@ -39,25 +38,23 @@ void Fftw::set_window(const cv::Mat &window)
 ComplexMat Fftw::forward(const cv::Mat &input)
 {
     cv::Mat complex_result(m_height, m_width / 2 + 1, CV_32FC2);
+
+    if(!plan_f){
 #ifdef ASYNC
-    std::unique_lock<std::mutex> lock(fftw_mut);
-    fftw_plan_with_nthreads(2);
+        std::unique_lock<std::mutex> lock(fftw_mut);
+        fftw_plan_with_nthreads(2);
+#elif OPENMP
+#pragma omp critical
+        fftw_plan_with_nthreads(omp_get_max_threads());
 #endif
-    fftwf_plan plan = fftwf_plan_dft_r2c_2d(m_height, m_width,
-                                            reinterpret_cast<float*>(input.data),
-                                            reinterpret_cast<fftwf_complex*>(complex_result.data),
-                                            FFTW_ESTIMATE);
-#ifdef ASYNC
-    lock.unlock();
-#endif
-    fftwf_execute(plan);
-#ifdef ASYNC
-    lock.lock();
-#endif
-    fftwf_destroy_plan(plan);
-#ifdef ASYNC
-    lock.unlock();
-#endif
+#pragma omp critical
+        plan_f = fftwf_plan_dft_r2c_2d(m_height, m_width,
+                                                  reinterpret_cast<float*>(input.data),
+                                                  reinterpret_cast<fftwf_complex*>(complex_result.data),
+                                                  FFTW_ESTIMATE);
+        fftwf_execute(plan_f);
+    }else{fftwf_execute_dft_r2c(plan_f,reinterpret_cast<float*>(input.data),reinterpret_cast<fftwf_complex*>(complex_result.data));}
+
     return ComplexMat(complex_result);
 }
 
@@ -71,33 +68,29 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
     }
     cv::Mat complex_result(n_channels*m_height, m_width/2+1, CV_32FC2);
 
-    int rank = 2;
-    int n[] = {(int)m_height, (int)m_width};
-    int howmany = n_channels;
-    int idist = m_height*m_width, odist = m_height*(m_width/2+1);
-    int istride = 1, ostride = 1;
-    int *inembed = NULL, *onembed = NULL;
     float *in = reinterpret_cast<float*>(in_all.data);
     fftwf_complex *out = reinterpret_cast<fftwf_complex*>(complex_result.data);
+    if(!plan_fw){
+        int rank = 2;
+        int n[] = {(int)m_height, (int)m_width};
+        int howmany = n_channels;
+        int idist = m_height*m_width, odist = m_height*(m_width/2+1);
+        int istride = 1, ostride = 1;
+        int *inembed = NULL, *onembed = NULL;
+#pragma omp critical
 #ifdef ASYNC
-    std::unique_lock<std::mutex> lock(fftw_mut);
-    fftw_plan_with_nthreads(2);
+        std::unique_lock<std::mutex> lock(fftw_mut);
+        fftw_plan_with_nthreads(2);
+#elif OPENMP
+#pragma omp critical
+        fftw_plan_with_nthreads(omp_get_max_threads());
 #endif
-    fftwf_plan plan = fftwf_plan_many_dft_r2c(rank, n, howmany,
-                                              in,  inembed, istride, idist,
-                                              out, onembed, ostride, odist,
-                                              FFTW_ESTIMATE);
-#ifdef ASYNC
-    lock.unlock();
-#endif
-    fftwf_execute(plan);
-#ifdef ASYNC
-    lock.lock();
-#endif
-    fftwf_destroy_plan(plan);
-#ifdef ASYNC
-    lock.unlock();
-#endif
+        plan_fw = fftwf_plan_many_dft_r2c(rank, n, howmany,
+                                                     in,  inembed, istride, idist,
+                                                     out, onembed, ostride, odist,
+                                                     FFTW_ESTIMATE);
+        fftwf_execute(plan_fw);
+    }else{fftwf_execute_dft_r2c(plan_fw,in,out);}
 
     ComplexMat result(m_height, m_width/2 + 1, n_channels);
     for (int i = 0; i < n_channels; ++i)
@@ -112,36 +105,70 @@ cv::Mat Fftw::inverse(const ComplexMat &inputf)
     cv::Mat real_result(m_height, m_width, CV_32FC(n_channels));
     cv::Mat complex_vconcat = inputf.to_vconcat_mat();
 
-    int rank = 2;
-    int n[] = {(int)m_height, (int)m_width};
-    int howmany = n_channels;
-    int idist = m_height*(m_width/2+1), odist = 1;
-    int istride = 1, ostride = n_channels;
-    int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
     fftwf_complex *in = reinterpret_cast<fftwf_complex*>(complex_vconcat.data);
     float *out = reinterpret_cast<float*>(real_result.data);
-#if defined(ASYNC) || defined(OPENMP)
-    std::unique_lock<std::mutex> lock(fftw_mut);
-    fftw_plan_with_nthreads(2);
-#endif
-    fftwf_plan plan = fftwf_plan_many_dft_c2r(rank, n, howmany,
-                                              in,  inembed, istride, idist,
-                                              out, onembed, ostride, odist,
-                                              FFTW_ESTIMATE);
+
+    if(n_channels != 1){
+        if(!plan_if){
+            int rank = 2;
+            int n[] = {(int)m_height, (int)m_width};
+            int howmany = n_channels;
+            int idist = m_height*(m_width/2+1), odist = 1;
+            int istride = 1, ostride = n_channels;
+            int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
+
 #ifdef ASYNC
-    lock.unlock();
+            std::unique_lock<std::mutex> lock(fftw_mut);
+            fftw_plan_with_nthreads(2);
+#elif OPENMP
+#pragma omp critical
+            fftw_plan_with_nthreads(omp_get_max_threads());
 #endif
-    fftwf_execute(plan);
+#pragma omp critical
+            plan_if = fftwf_plan_many_dft_c2r(rank, n, howmany,
+                                                         in,  inembed, istride, idist,
+                                                         out, onembed, ostride, odist,
+                                                         FFTW_ESTIMATE);
+            fftwf_execute(plan_if);
+        }else{fftwf_execute_dft_c2r(plan_if,in,out);}
+    }else{
+        if(!plan_ir){
+            int rank = 2;
+            int n[] = {(int)m_height, (int)m_width};
+            int howmany = n_channels;
+            int idist = m_height*(m_width/2+1), odist = 1;
+            int istride = 1, ostride = n_channels;
+#ifndef CUFFTW
+            int *inembed = NULL, *onembed = NULL;
+#else
+            int inembed[2];
+            int onembed[2];
+            inembed[1] = m_width/2+1, onembed[1] = m_width;
+#endif
+
 #ifdef ASYNC
-    lock.lock();
+            std::unique_lock<std::mutex> lock(fftw_mut);
+            fftw_plan_with_nthreads(2);
+#elif OPENMP
+#pragma omp critical
+            fftw_plan_with_nthreads(omp_get_max_threads());
 #endif
-    fftwf_destroy_plan(plan);
-#ifdef ASYNC
-    lock.unlock();
-#endif
+#pragma omp critical
+            plan_ir = fftwf_plan_many_dft_c2r(rank, n, howmany,
+                                                         in,  inembed, istride, idist,
+                                                         out, onembed, ostride, odist,
+                                                         FFTW_ESTIMATE);
+            fftwf_execute(plan_ir);
+    }else{fftwf_execute_dft_c2r(plan_ir,in,out);}
+  }
+
     return real_result/(m_width*m_height);
 }
 
 Fftw::~Fftw()
 {
+  fftwf_destroy_plan(plan_f);
+  fftwf_destroy_plan(plan_fw);
+  fftwf_destroy_plan(plan_if);
+  fftwf_destroy_plan(plan_ir);
 }
