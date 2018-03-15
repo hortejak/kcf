@@ -16,13 +16,13 @@ public:
     ComplexMat_() : cols(0), rows(0), n_channels(0) {}
     ComplexMat_(int _rows, int _cols, int _n_channels) : cols(_cols), rows(_rows), n_channels(_n_channels)
     {
-        p_data.resize(n_channels);
+        p_data.resize(n_channels*cols*rows);
     }
 
     //assuming that mat has 2 channels (real, img)
     ComplexMat_(const cv::Mat & mat) : cols(mat.cols), rows(mat.rows), n_channels(1)
     {
-        p_data.push_back(convert(mat));
+        p_data = convert(mat);
     }
 
     // cv::Mat API compatibility
@@ -33,16 +33,20 @@ public:
     void set_channel(int idx, const cv::Mat & mat)
     {
         assert(idx >= 0 && idx < n_channels);
-        p_data[idx] = convert(mat);
+        for (int i = 0; i < rows; ++i){
+            const std::complex<T> *row = mat.ptr<std::complex<T>>(i);
+            for (int j = 0; j < cols; ++j)
+                p_data[idx*rows*cols+i*cols+j]=row[j];
+        }
     }
 
     T sqr_norm() const
     {
         T sum_sqr_norm = 0;
         for (int i = 0; i < n_channels; ++i)
-            for (auto lhs = p_data[i].begin(); lhs != p_data[i].end(); ++lhs)
+            for (auto lhs = p_data.begin()+i*rows*cols; lhs != p_data.begin()+(i+1)*rows*cols; ++lhs)
                 sum_sqr_norm += lhs->real()*lhs->real() + lhs->imag()*lhs->imag();
-            //std::for_each(p_data[i].begin(), p_data[i].end(), [&sum_sqr_norm](const std::complex<T> & c) { sum_sqr_norm += c.real()*c.real() + c.imag()*c.imag(); } );
+
         return sum_sqr_norm / static_cast<T>(cols*rows);
     }
 
@@ -60,9 +64,10 @@ public:
     {
         assert(p_data.size() > 1);
         ComplexMat_<T> result(this->rows, this->cols, 1);
-        result.p_data[0] = p_data[0];
+        std::copy(p_data.begin(),p_data.begin()+rows*cols, result.p_data.begin());
+        std::cout << "TEST\n"<< *this << std::endl;
         for (int i = 1; i < n_channels; ++i) {
-            std::transform(result.p_data[0].begin(), result.p_data[0].end(), p_data[i].begin(), result.p_data[0].begin(), std::plus<std::complex<T>>());
+            std::transform(result.p_data.begin(), result.p_data.end(), p_data.begin()+i*rows*cols, result.p_data.begin(), std::plus<std::complex<T>>());
         }
         return result;
     }
@@ -73,7 +78,7 @@ public:
         assert(p_data.size() >= 1);
         return channel_to_cv_mat(0);
     }
-    //return a vector of 2 channels (real, imag) per one complex channel
+    // return a vector of 2 channels (real, imag) per one complex channel
     std::vector<cv::Mat> to_cv_mat_vector() const
     {
         std::vector<cv::Mat> result;
@@ -85,21 +90,9 @@ public:
         return result;
     }
 
-    cv::Mat to_vconcat_mat() const
+    std::vector<std::complex<T>> get_p_data() const
     {
-        cv::Mat mat(n_channels*rows, cols, CV_32FC2);
-        for (int ch = 0; ch < n_channels; ++ch) {
-            cv::Mat result(mat, cv::Rect(0, ch*rows, cols, cols));
-            int data_id = 0;
-            for (int y = 0; y < rows; ++y) {
-                T * row_ptr = result.ptr<T>(y);
-                for (int x = 0; x < 2*cols; x += 2){
-                    row_ptr[x] = p_data[ch][data_id].real();
-                    row_ptr[x+1] = p_data[ch][data_id++].imag();
-                }
-            }
-        }
-        return mat;
+        return p_data;
     }
 
     //element-wise per channel multiplication, division and addition
@@ -140,8 +133,8 @@ public:
             os << "Channel " << i << std::endl;
             for (int j = 0; j < mat.rows; ++j) {
                 for (int k = 0; k < mat.cols-1; ++k)
-                    os << mat.p_data[i][j*mat.cols + k] << ", ";
-                os << mat.p_data[i][j*mat.cols + mat.cols-1] << std::endl;
+                    os << mat.p_data[j*mat.cols + k] << ", ";
+                os << mat.p_data[j*mat.cols + mat.cols-1] << std::endl;
             }
         }
         return os;
@@ -149,7 +142,7 @@ public:
 
 
 private:
-    std::vector<std::vector<std::complex<T>>> p_data;
+    std::vector<std::complex<T>> p_data;
 
     //convert 2 channel mat (real, imag) to vector row-by-row
     std::vector<std::complex<T>> convert(const cv::Mat & mat)
@@ -171,9 +164,9 @@ private:
 
         ComplexMat_<T> result = *this;
         for (int i = 0; i < n_channels; ++i) {
-            auto lhs = result.p_data[i].begin();
-            auto rhs = mat_rhs.p_data[i].begin();
-            for ( ; lhs != result.p_data[i].end(); ++lhs, ++rhs)
+            auto lhs = result.p_data.begin()+i*rows*cols;
+            auto rhs = mat_rhs.p_data.begin()+i*rows*cols;
+            for ( ; lhs != result.p_data.begin()+(i+1)*rows*cols; ++lhs, ++rhs)
                 op(*lhs, *rhs);
         }
 
@@ -185,9 +178,9 @@ private:
 
         ComplexMat_<T> result = *this;
         for (int i = 0; i < n_channels; ++i) {
-            auto lhs = result.p_data[i].begin();
-            auto rhs = mat_rhs.p_data[0].begin();
-            for ( ; lhs != result.p_data[i].end(); ++lhs, ++rhs)
+            auto lhs = result.p_data.begin()+i*rows*cols;
+            auto rhs = mat_rhs.p_data.begin();
+            for ( ; lhs != result.p_data.begin()+(i+1)*rows*cols; ++lhs, ++rhs)
                 op(*lhs, *rhs);
         }
 
@@ -197,7 +190,7 @@ private:
     {
         ComplexMat_<T> result = *this;
         for (int i = 0; i < n_channels; ++i)
-            for (auto lhs = result.p_data[i].begin(); lhs != result.p_data[i].end(); ++lhs)
+            for (auto lhs = result.p_data.begin()+i*rows*cols; lhs != result.p_data.begin()+(i+1)*rows*cols; ++lhs)
                 op(*lhs);
         return result;
     }
@@ -207,10 +200,9 @@ private:
         cv::Mat result(rows, cols, CV_32FC2);
         int data_id = 0;
         for (int y = 0; y < rows; ++y) {
-            T * row_ptr = result.ptr<T>(y);
-            for (int x = 0; x < 2*cols; x += 2){
-                row_ptr[x] = p_data[channel_id][data_id].real();
-                row_ptr[x+1] = p_data[channel_id][data_id++].imag();
+            std::complex<T> * row_ptr = result.ptr<std::complex<T>>(y);
+            for (int x = 0; x < cols; ++x){
+                row_ptr[x] = p_data[channel_id*rows*cols+y*cols+x];
             }
         }
         return result;
