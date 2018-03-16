@@ -25,6 +25,10 @@ public:
         p_data = convert(mat);
     }
 
+    ComplexMat_(int _rows, int _cols, int _n_channels,std::vector<std::complex<T>> data) : cols(_cols), rows(_rows), n_channels(_n_channels)
+    {
+        p_data = data;
+    }
     // cv::Mat API compatibility
     cv::Size size() { return cv::Size(cols, rows); }
     int channels() { return n_channels; }
@@ -39,6 +43,7 @@ public:
                 p_data[idx*rows*cols+i*cols+j]=row[j];
         }
     }
+
 
     T sqr_norm() const
     {
@@ -93,6 +98,14 @@ public:
     std::vector<std::complex<T>> get_p_data() const
     {
         return p_data;
+    }
+
+    ComplexMat_<T> get_part(int id, int n_of_feat)
+    {
+        std::vector<std::complex<T>> data(p_data.begin()+id*rows*cols*n_of_feat,
+                                      p_data.begin()+(id+1)*rows*cols*n_of_feat);
+        ComplexMat_<T> result(this->rows,this->cols,n_of_feat,data);
+        return result;
     }
 
     //element-wise per channel multiplication, division and addition

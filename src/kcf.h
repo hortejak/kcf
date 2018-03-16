@@ -47,6 +47,11 @@ public:
     bool m_use_subgrid_scale {true};
     bool m_use_cnfeat {true};
     bool m_use_linearkernel {false};
+#ifdef BIG_BATCH
+    bool m_use_big_batch {true};
+#else
+    bool m_use_big_batch {false};
+#endif
 
     /*
     padding             ... extra area surrounding the target           (1.5)
@@ -93,13 +98,15 @@ private:
     double p_min_max_scale[2];
     std::vector<double> p_scales;
 
+    //for big batch
+    int num_of_feats;
+
     //model
     ComplexMat p_yf;
     ComplexMat p_model_alphaf;
     ComplexMat p_model_alphaf_num;
     ComplexMat p_model_alphaf_den;
     ComplexMat p_model_xf;
-    
     //helping functions
     cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y);
     cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);

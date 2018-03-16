@@ -9,10 +9,16 @@ MESSAGE(STATUS "FFT implementation: ${FFT}")
 option(OPENMP "Use OpenMP library. Works with FFTW and OpenCV implementation." OFF)
 option(ASYNC "Works only if OPENCV_CUFFT is not ON. Will enable C++ async directive." OFF)
 option(PROFILING "Enable profiling using perf_event_open together with libpfm4. " OFF)
+option(BIG_BATCH "Enable transforming all features from all scales together." OFF)
 
 IF(PROFILING)
   add_definitions(-DPROFILING )
   MESSAGE(STATUS "Profiling mode")
+ENDIF()
+
+IF(BIG_BATCH)
+  add_definitions(-DBIG_BATCH )
+  MESSAGE(STATUS "Big_batch mode")
 ENDIF()
 
 SET(use_cuda OFF)

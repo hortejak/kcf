@@ -27,7 +27,7 @@ public:
 private:
     unsigned m_width, m_height;
     cv::Mat m_window;
-    fftwf_plan plan_f, plan_fw, plan_if, plan_ir;
+    fftwf_plan plan_f, plan_fw, plan_fwh, plan_if, plan_ir;
 #if defined(ASYNC)
     std::mutex fftw_mut;
 #endif
