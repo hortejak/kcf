@@ -95,9 +95,9 @@ public:
         return result;
     }
 
-    std::vector<std::complex<T>> get_p_data() const
+    std::complex<T>* get_p_data() const
     {
-        return p_data;
+        return p_data.data();
     }
 
     ComplexMat_<T> get_part(int id, int n_of_feat)
@@ -155,7 +155,7 @@ public:
 
 
 private:
-    std::vector<std::complex<T>> p_data;
+    mutable std::vector<std::complex<T>> p_data;
 
     //convert 2 channel mat (real, imag) to vector row-by-row
     std::vector<std::complex<T>> convert(const cv::Mat & mat)

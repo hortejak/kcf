@@ -126,8 +126,7 @@ cv::Mat Fftw::inverse(const ComplexMat &inputf)
 {
     int n_channels = inputf.n_channels;
     cv::Mat real_result(m_height, m_width, CV_32FC(n_channels));
-    std::vector<std::complex<float>> vec = inputf.get_p_data();
-    fftwf_complex *in = reinterpret_cast<fftwf_complex*>(vec.data());
+    fftwf_complex *in = reinterpret_cast<fftwf_complex*>(inputf.get_p_data());
     float *out = reinterpret_cast<float*>(real_result.data);
 
     if(n_channels != 1){
