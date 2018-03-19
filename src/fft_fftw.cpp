@@ -116,7 +116,7 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
             fftwf_execute(plan_fwh);
         }else{fftwf_execute_dft_r2c(plan_fwh,in,out);}
     }
-    
+
     return result;
 }
 
@@ -132,7 +132,6 @@ cv::Mat Fftw::inverse(const ComplexMat &inputf)
             int rank = 2;
             int n[] = {(int)m_height, (int)m_width};
             int howmany = n_channels;
-            std::cout << n_channels << '\n';
             int idist = m_height*(m_width/2+1), odist = 1;
             int istride = 1, ostride = n_channels;
             int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
@@ -156,7 +155,6 @@ cv::Mat Fftw::inverse(const ComplexMat &inputf)
             int rank = 2;
             int n[] = {(int)m_height, (int)m_width};
             int howmany = n_channels;
-            std::cout << n_channels << '\n';
             int idist = m_height*(m_width/2+1), odist = 1;
             int istride = 1, ostride = n_channels;
             int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
