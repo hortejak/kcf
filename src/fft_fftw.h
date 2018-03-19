@@ -25,9 +25,10 @@ public:
     cv::Mat inverse(const ComplexMat &input) override;
     ~Fftw() override;
 private:
+    unsigned m_num_threads = 6;
     unsigned m_width, m_height;
     cv::Mat m_window;
-    fftwf_plan plan_f, plan_fw, plan_fwh, plan_if, plan_ir;
+    fftwf_plan plan_f, plan_fw, plan_fw_all_scales, plan_i_features, plan_i_1ch;
 #if defined(ASYNC)
     std::mutex fftw_mut;
 #endif
