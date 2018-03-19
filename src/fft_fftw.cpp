@@ -67,10 +67,10 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
         cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
         in_roi = input[i].mul(m_window);
     }
-    cv::Mat complex_result(n_channels*m_height, m_width/2+1, CV_32FC2);
+    ComplexMat result(m_height, m_width/2 + 1, n_channels);
 
     float *in = reinterpret_cast<float*>(in_all.data);
-    fftwf_complex *out = reinterpret_cast<fftwf_complex*>(complex_result.data);
+    fftwf_complex *out = reinterpret_cast<fftwf_complex*>(result.get_p_data());
     if(n_channels <= 44){
         if(!plan_fw){
             int rank = 2;
@@ -116,9 +116,7 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
             fftwf_execute(plan_fwh);
         }else{fftwf_execute_dft_r2c(plan_fwh,in,out);}
     }
-    ComplexMat result(m_height, m_width/2 + 1, n_channels);
-    for (int i = 0; i < n_channels; ++i)
-        result.set_channel(i, complex_result(cv::Rect(0, i*m_height, m_width/2+1, m_height)));
+    
     return result;
 }
 
@@ -134,6 +132,7 @@ cv::Mat Fftw::inverse(const ComplexMat &inputf)
             int rank = 2;
             int n[] = {(int)m_height, (int)m_width};
             int howmany = n_channels;
+            std::cout << n_channels << '\n';
             int idist = m_height*(m_width/2+1), odist = 1;
             int istride = 1, ostride = n_channels;
             int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
@@ -157,6 +156,7 @@ cv::Mat Fftw::inverse(const ComplexMat &inputf)
             int rank = 2;
             int n[] = {(int)m_height, (int)m_width};
             int howmany = n_channels;
+            std::cout << n_channels << '\n';
             int idist = m_height*(m_width/2+1), odist = 1;
             int istride = 1, ostride = n_channels;
             int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
