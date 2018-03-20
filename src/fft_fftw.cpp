@@ -24,11 +24,12 @@ Fftw::Fftw(int num_threads)
 {
 }
 
-void Fftw::init(unsigned width, unsigned height,unsigned num_of_feats)
+void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales)
 {
     m_width = width;
     m_height = height;
     m_num_of_feats = num_of_feats;
+    m_num_of_scales = num_of_scales;
 
 #if defined(ASYNC) || defined(OPENMP)
     fftw_init_threads();
@@ -67,15 +68,15 @@ void Fftw::init(unsigned width, unsigned height,unsigned num_of_feats)
                                           out, onembed, ostride, odist,
                                           FFTW_MEASURE);
     }
-
+    if(num_of_scales > 1)
     {
-        cv::Mat in_all = cv::Mat::zeros(m_height * 7*m_num_of_feats, m_width, CV_32F);
-        ComplexMat out_all(m_height, m_width / 2 + 1, 7*m_num_of_feats);
+        cv::Mat in_all = cv::Mat::zeros(m_height * (num_of_scales*m_num_of_feats), m_width, CV_32F);
+        ComplexMat out_all(m_height, m_width / 2 + 1, num_of_scales*m_num_of_feats);
         float *in = reinterpret_cast<float*>(in_all.data);
         fftwf_complex *out = reinterpret_cast<fftwf_complex*>(out_all.get_p_data());
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
-        int howmany = 7*m_num_of_feats;
+        int howmany = num_of_scales*m_num_of_feats;
         int idist = m_height*m_width, odist = m_height*(m_width/2+1);
         int istride = 1, ostride = 1;
         int *inembed = NULL, *onembed = NULL;
