@@ -7,15 +7,19 @@
 #endif
 
 #ifdef ASYNC
-#define FFTW_PLAN_WITH_NTHREADS() fftw_plan_with_nthreads(m_num_threads)
+#define FFTW_PLAN_WITH_THREADS() fftw_plan_with_nthreads(m_num_threads);
 #elif OPENMP
-#define FFTW_PLAN_WITH_NTHREADS() fftw_plan_with_nthreads(omp_get_max_threads());
+#define FFTW_PLAN_WITH_THREADS() fftw_plan_with_nthreads(omp_get_max_threads());
 #else
-#define FFTW_PLAN_WITH_NTHREADS()
+#define FFTW_PLAN_WITH_THREADS()
 #endif
 
-
 Fftw::Fftw()
+    : m_num_threads(1)
+{
+}
+
+Fftw::Fftw(int num_threads)
     : m_num_threads(num_threads)
 {
 }
@@ -35,30 +39,42 @@ void Fftw::init(unsigned width, unsigned height)
     std::cout << "FFT: cuFFTW" << std::endl;
 #endif
 
+    {
+    cv::Mat real_input = cv::Mat::zeros(m_height, m_width, CV_32FC1);
+    ComplexMat complex_result(m_height, m_width / 2 + 1, 1);
     plan_f = fftwf_plan_dft_r2c_2d(m_height, m_width,
-                                   reinterpret_cast<float*>(input.data),
-                                   reinterpret_cast<fftwf_complex*>(complex_result.data),
+                                   reinterpret_cast<float*>(real_input.data),
+                                   reinterpret_cast<fftwf_complex*>(complex_result.get_p_data()),
                                    FFTW_ESTIMATE);
+    }
 
     {
+        cv::Mat feats_input = cv::Mat::zeros(m_height * 44, m_width, CV_32F);
+        ComplexMat complex_result(m_height, m_width / 2 + 1, 44);
+        float *in = reinterpret_cast<float*>(feats_input.data);
+        fftwf_complex *out = reinterpret_cast<fftwf_complex*>(complex_result.get_p_data());
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
-        int howmany = n_channels;
+        int howmany = 44;
         int idist = m_height*m_width, odist = m_height*(m_width/2+1);
         int istride = 1, ostride = 1;
         int *inembed = NULL, *onembed = NULL;
 
         FFTW_PLAN_WITH_THREADS();
         plan_fw = fftwf_plan_many_dft_r2c(rank, n, howmany,
-                                          in,  inembed, istride, idist,
+                                          in, inembed, istride, idist,
                                           out, onembed, ostride, odist,
                                           FFTW_ESTIMATE);
     }
 
     {
+        cv::Mat feats_input = cv::Mat::zeros(m_height * 308, m_width, CV_32F);
+        ComplexMat complex_result(m_height, m_width / 2 + 1, 308);
+        float *in = reinterpret_cast<float*>(feats_input.data);
+        fftwf_complex *out = reinterpret_cast<fftwf_complex*>(complex_result.get_p_data());
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
-        int howmany = n_channels;
+        int howmany = 308;
         int idist = m_height*m_width, odist = m_height*(m_width/2+1);
         int istride = 1, ostride = 1;
         int *inembed = NULL, *onembed = NULL;
@@ -71,11 +87,15 @@ void Fftw::init(unsigned width, unsigned height)
     }
 
     {
+        ComplexMat input(m_height,m_width,44);
+        cv::Mat real_result = cv::Mat::zeros(m_height, m_width, CV_32FC1);
+        fftwf_complex *in = reinterpret_cast<fftwf_complex*>(input.get_p_data());
+        float *out = reinterpret_cast<float*>(real_result.data);
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
-        int howmany = n_channels;
+        int howmany = 44;
         int idist = m_height*(m_width/2+1), odist = 1;
-        int istride = 1, ostride = n_channels;
+        int istride = 1, ostride = 44;
         int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
 
         FFTW_PLAN_WITH_THREADS();
@@ -86,11 +106,15 @@ void Fftw::init(unsigned width, unsigned height)
     }
 
     {
+        ComplexMat input(m_height,m_width,1);
+        cv::Mat real_result = cv::Mat::zeros(m_height, m_width, CV_32FC1);
+        fftwf_complex *in = reinterpret_cast<fftwf_complex*>(input.get_p_data());
+        float *out = reinterpret_cast<float*>(real_result.data);
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
-        int howmany = n_channels;
+        int howmany = 1;
         int idist = m_height*(m_width/2+1), odist = 1;
-        int istride = 1, ostride = n_channels;
+        int istride = 1, ostride = 1;
         int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
 
         FFTW_PLAN_WITH_THREADS();
@@ -123,18 +147,16 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
         cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
         in_roi = input[i].mul(m_window);
     }
-    cv::Mat complex_result(n_channels*m_height, m_width/2+1, CV_32FC2);
+    ComplexMat result(m_height, m_width/2 + 1, n_channels);
 
     float *in = reinterpret_cast<float*>(in_all.data);
-    fftwf_complex *out = reinterpret_cast<fftwf_complex*>(complex_result.data);
+    fftwf_complex *out = reinterpret_cast<fftwf_complex*>(result.get_p_data());
+
     if (n_channels <= 44)
         fftwf_execute_dft_r2c(plan_fw, in, out);
     else
         fftwf_execute_dft_r2c(plan_fw_all_scales, in, out);
 
-    ComplexMat result(m_height, m_width/2 + 1, n_channels);
-    for (int i = 0; i < n_channels; ++i)
-        result.set_channel(i, complex_result(cv::Rect(0, i*m_height, m_width/2+1, m_height)));
     return result;
 }
 

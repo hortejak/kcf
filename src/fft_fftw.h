@@ -18,6 +18,7 @@ class Fftw : public Fft
 {
 public:
     Fftw();
+    Fftw(int num_of_threads);
     void init(unsigned width, unsigned height) override;
     void set_window(const cv::Mat &window) override;
     ComplexMat forward(const cv::Mat &input) override;
