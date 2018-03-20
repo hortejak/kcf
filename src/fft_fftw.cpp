@@ -40,19 +40,19 @@ void Fftw::init(unsigned width, unsigned height)
 #endif
 
     {
-    cv::Mat real_input = cv::Mat::zeros(m_height, m_width, CV_32FC1);
-    ComplexMat complex_result(m_height, m_width / 2 + 1, 1);
+    cv::Mat in_f = cv::Mat::zeros(m_height, m_width, CV_32FC1);
+    ComplexMat out_f(m_height, m_width / 2 + 1, 1);
     plan_f = fftwf_plan_dft_r2c_2d(m_height, m_width,
-                                   reinterpret_cast<float*>(real_input.data),
-                                   reinterpret_cast<fftwf_complex*>(complex_result.get_p_data()),
-                                   FFTW_ESTIMATE);
+                                   reinterpret_cast<float*>(in_f.data),
+                                   reinterpret_cast<fftwf_complex*>(out_f.get_p_data()),
+                                   FFTW_MEASURE);
     }
 
     {
-        cv::Mat feats_input = cv::Mat::zeros(m_height * 44, m_width, CV_32F);
-        ComplexMat complex_result(m_height, m_width / 2 + 1, 44);
-        float *in = reinterpret_cast<float*>(feats_input.data);
-        fftwf_complex *out = reinterpret_cast<fftwf_complex*>(complex_result.get_p_data());
+        cv::Mat in_fw = cv::Mat::zeros(m_height * 44, m_width, CV_32F);
+        ComplexMat out_fw(m_height, m_width / 2 + 1, 44);
+        float *in = reinterpret_cast<float*>(in_fw.data);
+        fftwf_complex *out = reinterpret_cast<fftwf_complex*>(out_fw.get_p_data());
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
         int howmany = 44;
@@ -64,14 +64,14 @@ void Fftw::init(unsigned width, unsigned height)
         plan_fw = fftwf_plan_many_dft_r2c(rank, n, howmany,
                                           in, inembed, istride, idist,
                                           out, onembed, ostride, odist,
-                                          FFTW_ESTIMATE);
+                                          FFTW_MEASURE);
     }
 
     {
-        cv::Mat feats_input = cv::Mat::zeros(m_height * 308, m_width, CV_32F);
-        ComplexMat complex_result(m_height, m_width / 2 + 1, 308);
-        float *in = reinterpret_cast<float*>(feats_input.data);
-        fftwf_complex *out = reinterpret_cast<fftwf_complex*>(complex_result.get_p_data());
+        cv::Mat in_all = cv::Mat::zeros(m_height * 308, m_width, CV_32F);
+        ComplexMat out_all(m_height, m_width / 2 + 1, 308);
+        float *in = reinterpret_cast<float*>(in_all.data);
+        fftwf_complex *out = reinterpret_cast<fftwf_complex*>(out_all.get_p_data());
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
         int howmany = 308;
@@ -83,14 +83,14 @@ void Fftw::init(unsigned width, unsigned height)
         plan_fw_all_scales = fftwf_plan_many_dft_r2c(rank, n, howmany,
                                                      in,  inembed, istride, idist,
                                                      out, onembed, ostride, odist,
-                                                     FFTW_ESTIMATE);
+                                                     FFTW_MEASURE);
     }
 
     {
-        ComplexMat input(m_height,m_width,44);
-        cv::Mat real_result = cv::Mat::zeros(m_height, m_width, CV_32FC1);
-        fftwf_complex *in = reinterpret_cast<fftwf_complex*>(input.get_p_data());
-        float *out = reinterpret_cast<float*>(real_result.data);
+        ComplexMat in_i(m_height,m_width,44);
+        cv::Mat out_i = cv::Mat::zeros(m_height, m_width, CV_32FC(44));
+        fftwf_complex *in = reinterpret_cast<fftwf_complex*>(in_i.get_p_data());
+        float *out = reinterpret_cast<float*>(out_i.data);
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
         int howmany = 44;
@@ -102,14 +102,14 @@ void Fftw::init(unsigned width, unsigned height)
         plan_i_features = fftwf_plan_many_dft_c2r(rank, n, howmany,
                                                   in,  inembed, istride, idist,
                                                   out, onembed, ostride, odist,
-                                                  FFTW_ESTIMATE);
+                                                  FFTW_MEASURE);
     }
 
     {
-        ComplexMat input(m_height,m_width,1);
-        cv::Mat real_result = cv::Mat::zeros(m_height, m_width, CV_32FC1);
-        fftwf_complex *in = reinterpret_cast<fftwf_complex*>(input.get_p_data());
-        float *out = reinterpret_cast<float*>(real_result.data);
+        ComplexMat in_i1(m_height,m_width,1);
+        cv::Mat out_i1 = cv::Mat::zeros(m_height, m_width, CV_32FC1);
+        fftwf_complex *in = reinterpret_cast<fftwf_complex*>(in_i1.get_p_data());
+        float *out = reinterpret_cast<float*>(out_i1.data);
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
         int howmany = 1;
@@ -121,7 +121,7 @@ void Fftw::init(unsigned width, unsigned height)
         plan_i_1ch = fftwf_plan_many_dft_c2r(rank, n, howmany,
                                              in,  inembed, istride, idist,
                                              out, onembed, ostride, odist,
-                                             FFTW_ESTIMATE);
+                                             FFTW_MEASURE);
     }
 }
 
