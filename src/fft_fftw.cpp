@@ -24,10 +24,11 @@ Fftw::Fftw(int num_threads)
 {
 }
 
-void Fftw::init(unsigned width, unsigned height)
+void Fftw::init(unsigned width, unsigned height,unsigned num_of_feats)
 {
     m_width = width;
     m_height = height;
+    m_num_of_feats = num_of_feats;
 
 #if defined(ASYNC) || defined(OPENMP)
     fftw_init_threads();
@@ -49,13 +50,13 @@ void Fftw::init(unsigned width, unsigned height)
     }
 
     {
-        cv::Mat in_fw = cv::Mat::zeros(m_height * 44, m_width, CV_32F);
-        ComplexMat out_fw(m_height, m_width / 2 + 1, 44);
+        cv::Mat in_fw = cv::Mat::zeros(m_height * m_num_of_feats, m_width, CV_32F);
+        ComplexMat out_fw(m_height, m_width / 2 + 1, m_num_of_feats);
         float *in = reinterpret_cast<float*>(in_fw.data);
         fftwf_complex *out = reinterpret_cast<fftwf_complex*>(out_fw.get_p_data());
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
-        int howmany = 44;
+        int howmany = m_num_of_feats;
         int idist = m_height*m_width, odist = m_height*(m_width/2+1);
         int istride = 1, ostride = 1;
         int *inembed = NULL, *onembed = NULL;
@@ -68,13 +69,13 @@ void Fftw::init(unsigned width, unsigned height)
     }
 
     {
-        cv::Mat in_all = cv::Mat::zeros(m_height * 308, m_width, CV_32F);
-        ComplexMat out_all(m_height, m_width / 2 + 1, 308);
+        cv::Mat in_all = cv::Mat::zeros(m_height * 7*m_num_of_feats, m_width, CV_32F);
+        ComplexMat out_all(m_height, m_width / 2 + 1, 7*m_num_of_feats);
         float *in = reinterpret_cast<float*>(in_all.data);
         fftwf_complex *out = reinterpret_cast<fftwf_complex*>(out_all.get_p_data());
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
-        int howmany = 308;
+        int howmany = 7*m_num_of_feats;
         int idist = m_height*m_width, odist = m_height*(m_width/2+1);
         int istride = 1, ostride = 1;
         int *inembed = NULL, *onembed = NULL;
@@ -87,15 +88,15 @@ void Fftw::init(unsigned width, unsigned height)
     }
 
     {
-        ComplexMat in_i(m_height,m_width,44);
-        cv::Mat out_i = cv::Mat::zeros(m_height, m_width, CV_32FC(44));
+        ComplexMat in_i(m_height,m_width,m_num_of_feats);
+        cv::Mat out_i = cv::Mat::zeros(m_height, m_width, CV_32FC(m_num_of_feats));
         fftwf_complex *in = reinterpret_cast<fftwf_complex*>(in_i.get_p_data());
         float *out = reinterpret_cast<float*>(out_i.data);
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
-        int howmany = 44;
+        int howmany = m_num_of_feats;
         int idist = m_height*(m_width/2+1), odist = 1;
-        int istride = 1, ostride = 44;
+        int istride = 1, ostride = m_num_of_feats;
         int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
 
         FFTW_PLAN_WITH_THREADS();

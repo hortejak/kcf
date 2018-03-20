@@ -111,13 +111,15 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     p_output_sigma = std::sqrt(p_pose.w*p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
 
     //window weights, i.e. labels
-    fft.init(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size);
+    num_of_feats = 31;
+    if(m_use_color) num_of_feats += 3;
+    if(m_use_cnfeat) num_of_feats += 10;
+    fft.init(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size,num_of_feats);
     p_yf = fft.forward(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
     fft.set_window(cosine_window_function(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
 
     //obtain a sub-window for training initial model
     std::vector<cv::Mat> path_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1]);
-    if(m_use_big_batch) num_of_feats = path_feat.size();
     p_model_xf = fft.forward_window(path_feat);
     DEBUG_PRINTM(p_model_xf);
 

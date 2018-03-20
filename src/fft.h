@@ -9,7 +9,7 @@
 class Fft
 {
 public:
-    virtual void init(unsigned width, unsigned height) = 0;
+    virtual void init(unsigned width, unsigned height,unsigned num_of_feats) = 0;
     virtual void set_window(const cv::Mat &window) = 0;
     virtual ComplexMat forward(const cv::Mat &input) = 0;
     virtual ComplexMat forward_window(const std::vector<cv::Mat> &input) = 0;
