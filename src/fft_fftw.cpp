@@ -6,9 +6,9 @@
   #include <omp.h>
 #endif
 
-#ifdef ASYNC
+#if defined(ASYNC) && !defined(CUFFTW)
 #define FFTW_PLAN_WITH_THREADS() fftw_plan_with_nthreads(m_num_threads);
-#elif OPENMP
+#elif defined(OPENMP) && !defined(CUFFTW)
 #define FFTW_PLAN_WITH_THREADS() fftw_plan_with_nthreads(omp_get_max_threads());
 #else
 #define FFTW_PLAN_WITH_THREADS()
@@ -40,7 +40,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
 #else
     std::cout << "FFT: cuFFTW" << std::endl;
 #endif
-
+    //FFT forward one scale
     {
     cv::Mat in_f = cv::Mat::zeros(m_height, m_width, CV_32FC1);
     ComplexMat out_f(m_height, m_width / 2 + 1, 1);
@@ -49,7 +49,27 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                    reinterpret_cast<fftwf_complex*>(out_f.get_p_data()),
                                    FFTW_MEASURE);
     }
+    //FFT forward all scales
+    if(num_of_scales > 1)
+    {
+    cv::Mat in_f_all = cv::Mat::zeros(m_height*m_num_of_scales, m_width, CV_32FC1);
+    ComplexMat out_f_all(m_height, m_width / 2 + 1, m_num_of_scales);
+    float *in = reinterpret_cast<float*>(in_f_all.data);
+    fftwf_complex *out = reinterpret_cast<fftwf_complex*>(out_f_all.get_p_data());
+    int rank = 2;
+    int n[] = {(int)m_height, (int)m_width};
+    int howmany = m_num_of_scales;
+    int idist = m_height*m_width, odist = m_height*(m_width/2+1);
+    int istride = 1, ostride = 1;
+    int *inembed = NULL, *onembed = NULL;
 
+    FFTW_PLAN_WITH_THREADS();
+    plan_f_all_scales = fftwf_plan_many_dft_r2c(rank, n, howmany,
+                                      in, inembed, istride, idist,
+                                      out, onembed, ostride, odist,
+                                      FFTW_MEASURE);
+    }
+    //FFT forward window one scale
     {
         cv::Mat in_fw = cv::Mat::zeros(m_height * m_num_of_feats, m_width, CV_32F);
         ComplexMat out_fw(m_height, m_width / 2 + 1, m_num_of_feats);
@@ -68,6 +88,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                           out, onembed, ostride, odist,
                                           FFTW_MEASURE);
     }
+    //FFT forward window all scales all feats
     if(num_of_scales > 1)
     {
         cv::Mat in_all = cv::Mat::zeros(m_height * (num_of_scales*m_num_of_feats), m_width, CV_32F);
@@ -76,7 +97,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
         fftwf_complex *out = reinterpret_cast<fftwf_complex*>(out_all.get_p_data());
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
-        int howmany = num_of_scales*m_num_of_feats;
+        int howmany = m_num_of_scales*m_num_of_feats;
         int idist = m_height*m_width, odist = m_height*(m_width/2+1);
         int istride = 1, ostride = 1;
         int *inembed = NULL, *onembed = NULL;
@@ -87,7 +108,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                                      out, onembed, ostride, odist,
                                                      FFTW_MEASURE);
     }
-
+    //FFT inverse one scale
     {
         ComplexMat in_i(m_height,m_width,m_num_of_feats);
         cv::Mat out_i = cv::Mat::zeros(m_height, m_width, CV_32FC(m_num_of_feats));
@@ -106,7 +127,27 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                                   out, onembed, ostride, odist,
                                                   FFTW_MEASURE);
     }
+    //FFT inverse all scales
+    if(num_of_scales > 1)
+    {
+        ComplexMat in_i_all(m_height,m_width,m_num_of_feats*m_num_of_scales);
+        cv::Mat out_i_all = cv::Mat::zeros(m_height, m_width, CV_32FC(m_num_of_feats*m_num_of_scales));
+        fftwf_complex *in = reinterpret_cast<fftwf_complex*>(in_i_all.get_p_data());
+        float *out = reinterpret_cast<float*>(out_i_all.data);
+        int rank = 2;
+        int n[] = {(int)m_height, (int)m_width};
+        int howmany = m_num_of_feats*m_num_of_scales;
+        int idist = m_height*(m_width/2+1), odist = 1;
+        int istride = 1, ostride = m_num_of_feats;
+        int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
 
+        FFTW_PLAN_WITH_THREADS();
+        plan_i_features_all_scales = fftwf_plan_many_dft_c2r(rank, n, howmany,
+                                                  in,  inembed, istride, idist,
+                                                  out, onembed, ostride, odist,
+                                                  FFTW_MEASURE);
+    }
+    //FFT inver one channel one scale
     {
         ComplexMat in_i1(m_height,m_width,1);
         cv::Mat out_i1 = cv::Mat::zeros(m_height, m_width, CV_32FC1);
@@ -125,6 +166,26 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                              out, onembed, ostride, odist,
                                              FFTW_MEASURE);
     }
+    //FFT inver one channel all scales
+    if(num_of_scales > 1)
+    {
+        ComplexMat in_i1_all(m_height,m_width,m_num_of_scales);
+        cv::Mat out_i1_all = cv::Mat::zeros(m_height, m_width, CV_32FC(m_num_of_scales));
+        fftwf_complex *in = reinterpret_cast<fftwf_complex*>(in_i1_all.get_p_data());
+        float *out = reinterpret_cast<float*>(out_i1_all.data);
+        int rank = 2;
+        int n[] = {(int)m_height, (int)m_width};
+        int howmany = m_num_of_scales;
+        int idist = m_height*(m_width/2+1), odist = 1;
+        int istride = 1, ostride = 1;
+        int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
+
+        FFTW_PLAN_WITH_THREADS();
+        plan_i_1ch_all_scales = fftwf_plan_many_dft_c2r(rank, n, howmany,
+                                             in,  inembed, istride, idist,
+                                             out, onembed, ostride, odist,
+                                             FFTW_MEASURE);
+    }
 }
 
 void Fftw::set_window(const cv::Mat &window)
@@ -134,9 +195,9 @@ void Fftw::set_window(const cv::Mat &window)
 
 ComplexMat Fftw::forward(const cv::Mat &input)
 {
-    cv::Mat complex_result(m_height, m_width / 2 + 1, CV_32FC2);
+    ComplexMat complex_result(m_height, m_width / 2 + 1, 1);
 
-    fftwf_execute_dft_r2c(plan_f,reinterpret_cast<float*>(input.data),reinterpret_cast<fftwf_complex*>(complex_result.data));
+    fftwf_execute_dft_r2c(plan_f,reinterpret_cast<float*>(input.data),reinterpret_cast<fftwf_complex*>(complex_result.get_p_data()));
 
     return ComplexMat(complex_result);
 }
@@ -154,7 +215,7 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
     float *in = reinterpret_cast<float*>(in_all.data);
     fftwf_complex *out = reinterpret_cast<fftwf_complex*>(result.get_p_data());
 
-    if (n_channels <= 44)
+    if (n_channels <= m_num_of_feats)
         fftwf_execute_dft_r2c(plan_fw, in, out);
     else
         fftwf_execute_dft_r2c(plan_fw_all_scales, in, out);
@@ -180,8 +241,11 @@ cv::Mat Fftw::inverse(const ComplexMat &inputf)
 Fftw::~Fftw()
 {
   fftwf_destroy_plan(plan_f);
+  fftwf_destroy_plan(plan_f_all_scales);
   fftwf_destroy_plan(plan_fw);
   fftwf_destroy_plan(plan_fw_all_scales);
   fftwf_destroy_plan(plan_i_features);
+  fftwf_destroy_plan(plan_i_features_all_scales);
   fftwf_destroy_plan(plan_i_1ch);
+  fftwf_destroy_plan(plan_i_1ch_all_scales);
 }

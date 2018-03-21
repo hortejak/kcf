@@ -29,7 +29,8 @@ private:
     unsigned m_num_threads = 6;
     unsigned m_width, m_height, m_num_of_feats,m_num_of_scales;
     cv::Mat m_window;
-    fftwf_plan plan_f, plan_fw, plan_fw_all_scales, plan_i_features, plan_i_1ch;
+    fftwf_plan plan_f, plan_f_all_scales, plan_fw, plan_fw_all_scales, plan_i_features,
+     plan_i_features_all_scales, plan_i_1ch, plan_i_1ch_all_scales;
 };
 
 #endif // FFT_FFTW_H

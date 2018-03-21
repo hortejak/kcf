@@ -12,12 +12,14 @@ public:
     int cols;
     int rows;
     int n_channels;
+    int n_scales = 1;
 
     ComplexMat_() : cols(0), rows(0), n_channels(0) {}
     ComplexMat_(int _rows, int _cols, int _n_channels) : cols(_cols), rows(_rows), n_channels(_n_channels)
     {
         p_data.resize(n_channels*cols*rows);
     }
+
 
     //assuming that mat has 2 channels (real, img)
     ComplexMat_(const cv::Mat & mat) : cols(mat.cols), rows(mat.rows), n_channels(1)
@@ -29,9 +31,15 @@ public:
     {
         p_data = data;
     }
+
+    ComplexMat_(int _rows, int _cols, int _n_channels,int _n_scales) : cols(_cols), rows(_rows), n_channels(_n_channels), n_scales(_n_scales)
+    {
+        p_data.resize(n_channels*cols*rows);
+    }
     // cv::Mat API compatibility
     cv::Size size() { return cv::Size(cols, rows); }
     int channels() { return n_channels; }
+    int channels() const { return n_channels; }
 
     //assuming that mat has 2 channels (real, imag)
     void set_channel(int idx, const cv::Mat & mat)
@@ -138,6 +146,12 @@ public:
         return matn_mat1_operator( [](std::complex<T> & c_lhs, const std::complex<T> & c_rhs) { c_lhs *= c_rhs; }, rhs);
     }
 
+    //multiplying element-wise multichannel by one channel mats (rhs mat is with multiple channel)
+    ComplexMat_<T> mul2(const ComplexMat_<T> & rhs) const
+    {
+        return matn_mat2_operator( [](std::complex<T> & c_lhs, const std::complex<T> & c_rhs) { c_lhs *= c_rhs; }, rhs);
+    }
+
     //text output
     friend std::ostream & operator<<(std::ostream & os, const ComplexMat_<T> & mat)
     {
@@ -195,6 +209,24 @@ private:
             auto rhs = mat_rhs.p_data.begin();
             for ( ; lhs != result.p_data.begin()+(i+1)*rows*cols; ++lhs, ++rhs)
                 op(*lhs, *rhs);
+        }
+
+        return result;
+    }
+    ComplexMat_<T> matn_mat2_operator(void (*op)(std::complex<T> & c_lhs, const std::complex<T> & c_rhs), const ComplexMat_<T> & mat_rhs) const
+    {
+        assert(mat_rhs.n_channels == n_channels/n_scales && mat_rhs.cols == cols && mat_rhs.rows == rows);
+
+        int n_channels_per_scale = n_channels/n_scales;
+        int scale_offset = n_channels_per_scale*rows*cols;
+        ComplexMat_<T> result = *this;
+        for (int i = 0; i < n_scales; ++i) {
+            for (int j = 0; j < n_channels_per_scale; ++j) {
+                auto lhs = result.p_data.begin()+(j*rows*cols)+(i*scale_offset);
+                auto rhs = mat_rhs.p_data.begin()+(j*rows*cols);
+                for ( ; lhs != result.p_data.begin()+((i+1)*rows*cols)+(i*scale_offset); ++lhs, ++rhs)
+                    op(*lhs, *rhs);
+            }
         }
 
         return result;
