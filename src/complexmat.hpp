@@ -32,8 +32,20 @@ public:
         p_data = data;
     }
 
-    ComplexMat_(int _rows, int _cols, int _n_channels,int _n_scales) : cols(_cols), rows(_rows), n_channels(_n_channels), n_scales(_n_scales)
+    void create(int _rows, int _cols, int _n_channels)
     {
+        rows = _rows;
+        cols = _cols;
+        n_channels = _n_channels;
+        p_data.resize(n_channels*cols*rows);
+    }
+
+    void create(int _rows, int _cols, int _n_channels, int _n_scales)
+    {
+        rows = _rows;
+        cols = _cols;
+        n_channels = _n_channels;
+        n_scales = _n_scales;
         p_data.resize(n_channels*cols*rows);
     }
     // cv::Mat API compatibility
@@ -53,14 +65,21 @@ public:
     }
 
 
-    T sqr_norm() const
+    std::vector<T> sqr_norm() const
     {
-        T sum_sqr_norm = 0;
-        for (int i = 0; i < n_channels; ++i)
-            for (auto lhs = p_data.begin()+i*rows*cols; lhs != p_data.begin()+(i+1)*rows*cols; ++lhs)
-                sum_sqr_norm += lhs->real()*lhs->real() + lhs->imag()*lhs->imag();
-
-        return sum_sqr_norm / static_cast<T>(cols*rows);
+        std::vector<T> sums_sqr_norms;
+        sums_sqr_norms.resize(n_scales);
+        int n_channels_per_scale = n_channels/n_scales;
+        int scale_offset = n_channels_per_scale*rows*cols;
+        T sum_sqr_norm;
+        for(int scale = 0; scale < n_scales; ++scale){
+            sum_sqr_norm = 0;
+            for (int i = 0; i < n_channels_per_scale; ++i)
+                for (auto lhs = p_data.begin()+i*rows*cols+scale*scale_offset; lhs != p_data.begin()+(i+1)*rows*cols+scale*scale_offset; ++lhs)
+                    sum_sqr_norm += lhs->real()*lhs->real() + lhs->imag()*lhs->imag();
+            sums_sqr_norms[scale] = sum_sqr_norm/static_cast<T>(cols*rows);
+        }
+        return sums_sqr_norms;
     }
 
     ComplexMat_<T> sqr_mag() const
@@ -78,7 +97,6 @@ public:
         assert(p_data.size() > 1);
         ComplexMat_<T> result(this->rows, this->cols, 1);
         std::copy(p_data.begin(),p_data.begin()+rows*cols, result.p_data.begin());
-        std::cout << "TEST\n"<< *this << std::endl;
         for (int i = 1; i < n_channels; ++i) {
             std::transform(result.p_data.begin(), result.p_data.end(), p_data.begin()+i*rows*cols, result.p_data.begin(), std::plus<std::complex<T>>());
         }
@@ -224,7 +242,7 @@ private:
             for (int j = 0; j < n_channels_per_scale; ++j) {
                 auto lhs = result.p_data.begin()+(j*rows*cols)+(i*scale_offset);
                 auto rhs = mat_rhs.p_data.begin()+(j*rows*cols);
-                for ( ; lhs != result.p_data.begin()+((i+1)*rows*cols)+(i*scale_offset); ++lhs, ++rhs)
+                for ( ; lhs != result.p_data.begin()+((j+1)*rows*cols)+(i*scale_offset); ++lhs, ++rhs)
                     op(*lhs, *rhs);
             }
         }

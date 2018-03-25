@@ -17,7 +17,7 @@
 #endif //OPENMP
 
 #define DEBUG_PRINT(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;}
-#define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << std::endl << (obj) << std::endl;}
+#define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl << (obj) << std::endl;}
 
 KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor, double output_sigma_factor, int cell_size) :
     fft(*new FFT()),
@@ -246,10 +246,11 @@ void KCF_Tracker::track(cv::Mat &img)
                 ComplexMat kzf = gaussian_correlation(zf, p_model_xf, p_kernel_sigma);
                 DEBUG_PRINTM(p_model_alphaf);
                 DEBUG_PRINTM(kzf);
-                DEBUG_PRINTM(p_model_alphaf * kzf);
-                response = fft.inverse(p_model_alphaf * kzf);
+                response = fft.inverse(kzf.mul(p_model_alphaf));
             }
             DEBUG_PRINTM(response);
+            std::vector<cv::Mat> scales;
+            cv::split(response,scales);
 
             /* target location is at the maximum response. we must take into
                account the fact that, if the target doesn't move, the peak
@@ -258,13 +259,13 @@ void KCF_Tracker::track(cv::Mat &img)
             for (size_t i = 0; i < p_scales.size(); ++i) {
                 double min_val, max_val;
                 cv::Point2i min_loc, max_loc;
-                cv::minMaxLoc(response, &min_val, &max_val, &min_loc, &max_loc);
+                cv::minMaxLoc(scales[i], &min_val, &max_val, &min_loc, &max_loc);
                 DEBUG_PRINT(max_loc);
 
                 double weight = p_scales[i] < 1. ? p_scales[i] : 1./p_scales[i];
                 if (max_val*weight > max_response) {
                     max_response = max_val*weight;
-                    max_response_map = response;
+                    max_response_map = scales[i];
                     max_response_pt = max_loc;
                     scale_index = i;
                 }
@@ -586,35 +587,47 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
 
 ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const ComplexMat &yf, double sigma, bool auto_correlation)
 {
-    float xf_sqr_norm = xf.sqr_norm();
-    float yf_sqr_norm = auto_correlation ? xf_sqr_norm : yf.sqr_norm();
+    std::vector<float> xf_sqr_norm = xf.sqr_norm();
+    std::vector<float> yf_sqr_norm = auto_correlation ? xf_sqr_norm : yf.sqr_norm();
 
     ComplexMat xyf;
-    if(xf.channels() != 308)
-    xyf = auto_correlation ? xf.sqr_mag() : xf * yf.conj();
-    else
     xyf = auto_correlation ? xf.sqr_mag() : xf.mul2(yf.conj());
     DEBUG_PRINTM(xyf);
 
     //ifft2 and sum over 3rd dimension, we dont care about individual channels
     cv::Mat ifft2_res = fft.inverse(xyf);
-    cv::Mat xy_sum(ifft2_res.size(), CV_32FC1);
+    cv::Mat xy_sum;
+    if(xf.channels() != 308)
+    xy_sum.create(ifft2_res.size(), CV_32FC1);
+    else
+    xy_sum.create(ifft2_res.size(), CV_32FC(p_scales.size()));
     xy_sum.setTo(0);
     for (int y = 0; y < ifft2_res.rows; ++y) {
         float * row_ptr = ifft2_res.ptr<float>(y);
         float * row_ptr_sum = xy_sum.ptr<float>(y);
-        for (int x = 0; x < ifft2_res.cols; ++x){
-            row_ptr_sum[x] = std::accumulate((row_ptr + x*ifft2_res.channels()), (row_ptr + x*ifft2_res.channels() + ifft2_res.channels()), 0.f);
+        for (int x = 0; x < ifft2_res.cols; ++x) {
+            for (int sum_ch = 0; sum_ch < xy_sum.channels(); ++sum_ch) {
+                row_ptr_sum[(x*xy_sum.channels())+sum_ch] += std::accumulate(row_ptr + x*ifft2_res.channels() + sum_ch*(ifft2_res.channels()/xy_sum.channels()),
+                                                            (row_ptr + x*ifft2_res.channels() + (sum_ch+1)*(ifft2_res.channels()/xy_sum.channels())), 0.f);
+                }
         }
     }
     DEBUG_PRINTM(ifft2_res);
     DEBUG_PRINTM(xy_sum);
 
-    float numel_xf_inv = 1.f/(xf.cols * xf.rows * xf.n_channels);
-    cv::Mat tmp;
-    cv::exp(- 1.f / (sigma * sigma) * cv::max((xf_sqr_norm + yf_sqr_norm - 2 * xy_sum) * numel_xf_inv, 0), tmp);
+    std::vector<cv::Mat> scales;
+    cv::split(xy_sum,scales);
+    cv::Mat in_all(scales[0].rows * xf.n_scales, scales[0].cols, CV_32F);
 
-    return fft.forward(tmp);
+    float numel_xf_inv = 1.f/(xf.cols * xf.rows * (xf.channels()/xf.n_scales));
+    for(int i = 0; i < xf.n_scales; ++i){
+    cv::Mat in_roi(in_all, cv::Rect(0, i*scales[0].rows, scales[0].cols, scales[0].rows));
+    cv::exp(- 1.f / (sigma * sigma) * cv::max((xf_sqr_norm[i] + yf_sqr_norm[i] - 2 * scales[i]) * numel_xf_inv, 0), in_roi);
+    DEBUG_PRINTM(in_roi);
+    }
+    
+    DEBUG_PRINTM(in_all);
+    return fft.forward(in_all);
 }
 
 float get_response_circular(cv::Point2i & pt, cv::Mat & response)
