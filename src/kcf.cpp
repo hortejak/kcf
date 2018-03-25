@@ -173,7 +173,8 @@ BBox_c KCF_Tracker::getBBox()
 
 void KCF_Tracker::track(cv::Mat &img)
 {
-
+    if (m_debug)
+    std::cout << "NEW FRAME" << '\n';
     cv::Mat input_gray, input_rgb = img.clone();
     if (img.channels() == 3){
         cv::cvtColor(img, input_gray, CV_BGR2GRAY);
@@ -622,10 +623,10 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     float numel_xf_inv = 1.f/(xf.cols * xf.rows * (xf.channels()/xf.n_scales));
     for(int i = 0; i < xf.n_scales; ++i){
     cv::Mat in_roi(in_all, cv::Rect(0, i*scales[0].rows, scales[0].cols, scales[0].rows));
-    cv::exp(- 1.f / (sigma * sigma) * cv::max((xf_sqr_norm[i] + yf_sqr_norm[i] - 2 * scales[i]) * numel_xf_inv, 0), in_roi);
+    cv::exp(- 1.f / (sigma * sigma) * cv::max((xf_sqr_norm[i] + yf_sqr_norm[0] - 2 * scales[i]) * numel_xf_inv, 0), in_roi);
     DEBUG_PRINTM(in_roi);
     }
-    
+
     DEBUG_PRINTM(in_all);
     return fft.forward(in_all);
 }
