@@ -1,6 +1,6 @@
 #include "fft_cufft.h"
 
-void init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales)
+void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales)
 {
     m_width = width;
     m_height = height;
