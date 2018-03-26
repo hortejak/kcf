@@ -259,6 +259,7 @@ void KCF_Tracker::track(cv::Mat &img)
                account the fact that, if the target doesn't move, the peak
                will appear at the top-left corner, not at the center (this is
                discussed in the paper). the responses wrap around cyclically. */
+#pragma omp parallel for ordered
             for (size_t i = 0; i < p_scales.size(); ++i) {
                 double min_val, max_val;
                 cv::Point2i min_loc, max_loc;
