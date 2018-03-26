@@ -37,7 +37,7 @@ ELSEIF(FFT STREQUAL "cuFFTW")
   add_definitions(-DFFTW -DCUFFTW)
   set(use_cuda ON)
 ELSEIF(FFT STREQUAL "cuFFT")
-    list(APPEND KCF_LIB_SRC fftw_cufft.cpp)
+    list(APPEND KCF_LIB_SRC fft_cufft.cpp)
     add_definitions(-DCUFFT)
     set(use_cuda ON)
 ELSE()
@@ -87,7 +87,7 @@ IF(FFT STREQUAL "cuFFTW")
 ENDIF() #cuFFTW
 
 IF(FFT STREQUAL "cuFFT")
-    target_link_libraries(kcf ${CUDA_cufft_LIBRARY})
+    target_link_libraries(kcf ${CUDA_cufft_LIBRARY} ${CUDA_LIBRARIES})
 ENDIF()
 
 IF(PROFILING)

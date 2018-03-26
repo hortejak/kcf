@@ -7,6 +7,9 @@
 #ifdef FFTW
   #include "fft_fftw.h"
   #define FFT Fftw
+#elif CUFFT
+  #include "fft_cufft.h"
+  #define FFT cuFFT
 #else
   #include "fft_opencv.h"
   #define FFT FftOpencv
