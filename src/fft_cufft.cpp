@@ -1,27 +1,27 @@
-#include "fft_opencv.h"
+#include "fft_cufft.h"
 
 void init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales)
 {
-    (void)width;
-    (void)height;
-    (void)num_of_feats;
-    (void)num_of_scales;
-    std::cout << "FFT: OpenCV" << std::endl;
+    m_width = width;
+    m_height = height;
+    m_num_of_feats = num_of_feats;
+    m_num_of_scales = num_of_scales;
+    std::cout << "FFT: cuFFT" << std::endl;
 }
 
-void FftOpencv::set_window(const cv::Mat &window)
+void cuFFT::set_window(const cv::Mat &window)
 {
      m_window = window;
 }
 
-ComplexMat FftOpencv::forward(const cv::Mat &input)
+ComplexMat cuFFT::forward(const cv::Mat &input)
 {
     cv::Mat complex_result;
     cv::dft(input, complex_result, cv::DFT_COMPLEX_OUTPUT);
     return ComplexMat(complex_result);
 }
 
-ComplexMat FftOpencv::forward_window(const std::vector<cv::Mat> &input)
+ComplexMat cuFFT::forward_window(const std::vector<cv::Mat> &input)
 {
     int n_channels = input.size();
     ComplexMat result(input[0].rows, input[0].cols, n_channels);
@@ -34,7 +34,7 @@ ComplexMat FftOpencv::forward_window(const std::vector<cv::Mat> &input)
     return result;
 }
 
-cv::Mat FftOpencv::inverse(const ComplexMat &inputf)
+cv::Mat cuFFT::inverse(const ComplexMat &inputf)
 {
     cv::Mat real_result;
     if (inputf.n_channels == 1) {
@@ -50,7 +50,7 @@ cv::Mat FftOpencv::inverse(const ComplexMat &inputf)
     return real_result;
 }
 
-FftOpencv::~FftOpencv()
+cuFFT::~cuFFT()
 {
 
 }

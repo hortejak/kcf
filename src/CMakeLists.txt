@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 2.8)
 set(KCF_LIB_SRC kcf.cpp kcf.h complexmat.hpp fft.cpp)
 
 SET(FFT "OpenCV" CACHE STRING "Select FFT implementation")
-SET_PROPERTY(CACHE FFT PROPERTY STRINGS OpenCV OpenCV_cuFFT fftw cuFFTW)
+SET_PROPERTY(CACHE FFT PROPERTY STRINGS OpenCV OpenCV_cuFFT fftw cuFFTW cuFFT)
 MESSAGE(STATUS "FFT implementation: ${FFT}")
 
 option(OPENMP "Use OpenMP library. Works with FFTW and OpenCV implementation." OFF)
@@ -36,6 +36,10 @@ ELSEIF(FFT STREQUAL "cuFFTW")
   list(APPEND KCF_LIB_SRC fft_fftw.cpp)
   add_definitions(-DFFTW -DCUFFTW)
   set(use_cuda ON)
+ELSEIF(FFT STREQUAL "cuFFT")
+    list(APPEND KCF_LIB_SRC fftw_cufft.cpp)
+    add_definitions(-DCUFFT)
+    set(use_cuda ON)
 ELSE()
   MESSAGE(FATAL_ERROR "Invalid FFT implementation selected")
 ENDIF()
@@ -81,6 +85,10 @@ ENDIF() #FFTW
 IF(FFT STREQUAL "cuFFTW")
   target_link_libraries(kcf ${CUDA_cufft_LIBRARY} ${CUDA_cufftw_LIBRARY})
 ENDIF() #cuFFTW
+
+IF(FFT STREQUAL "cuFFT")
+    target_link_libraries(kcf ${CUDA_cufft_LIBRARY})
+ENDIF()
 
 IF(PROFILING)
   target_link_libraries(kcf pfm)

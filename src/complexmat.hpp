@@ -261,7 +261,6 @@ private:
     cv::Mat channel_to_cv_mat(int channel_id) const
     {
         cv::Mat result(rows, cols, CV_32FC2);
-        int data_id = 0;
         for (int y = 0; y < rows; ++y) {
             std::complex<T> * row_ptr = result.ptr<std::complex<T>>(y);
             for (int x = 0; x < cols; ++x){
