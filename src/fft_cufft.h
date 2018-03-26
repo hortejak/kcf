@@ -4,6 +4,14 @@
 
 #include "fft.h"
 
+#if CV_MAJOR_VERSION == 2
+  #include <opencv2/gpu/gpu.hpp>
+  #define CUDA cv::gpu
+#else
+  #include "opencv2/opencv.hpp"
+  #define CUDA cv::cuda
+#endif
+
 #include <cufft.h>
 #include <cuda_runtime.h>
 
