@@ -1,6 +1,6 @@
 #include "fft_opencv.h"
 
-void init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales)
+void FftOpencv::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales)
 {
     (void)width;
     (void)height;
