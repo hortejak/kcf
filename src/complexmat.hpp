@@ -6,6 +6,13 @@
 #include <algorithm>
 #include <functional>
 
+#ifdef CUFFT
+  #include "managed_allocator.h"
+  
+  template<class T>
+  using managed_vector = std::vector<T,managed_allocator<T>>;
+#endif
+
 template<typename T> class ComplexMat_
 {
 public:
@@ -187,8 +194,11 @@ public:
 
 
 private:
+#ifdef CUFFT 
+    mutable managed_vector<std::complex<T>> p_data;
+#else
     mutable std::vector<std::complex<T>> p_data;
-
+#endif
     //convert 2 channel mat (real, imag) to vector row-by-row
     std::vector<std::complex<T>> convert(const cv::Mat & mat)
     {

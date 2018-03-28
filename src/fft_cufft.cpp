@@ -1,17 +1,8 @@
 #include "fft_cufft.h"
 
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
-{
-   if (code != cudaSuccess)
-   {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
-}
-
 cuFFT::cuFFT(): m_num_of_streams(4)
 {}
+
 void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales)
 {
     m_width = width;
@@ -21,7 +12,9 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
 
     std::cout << "FFT: cuFFT" << std::endl;
 
-    for (unsigned i = 0; i < m_num_of_streams; i++) gpuErrchk(cudaStreamCreate(&streams[i]));
+    cudaSetDeviceFlags(cudaDeviceMapHost);
+
+    for (unsigned i = 0; i < m_num_of_streams; i++) cudaStreamCreate(&streams[i]);
 
     //FFT forward one scale
     {
@@ -138,6 +131,7 @@ void cuFFT::set_window(const cv::Mat &window)
 
 ComplexMat cuFFT::forward(const cv::Mat &input)
 {
+    CUDA::GpuMat input_d(input);
     ComplexMat complex_result;
     if(input.rows == (int)(m_height*m_num_of_scales)){
         complex_result.create(m_height, m_width / 2 + 1, m_num_of_scales);
@@ -159,6 +153,7 @@ ComplexMat cuFFT::forward_window(const std::vector<cv::Mat> &input)
         cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
         in_roi = input[i].mul(m_window);
     }
+    CUDA::GpuMat in_all_d(in_all);
     ComplexMat result;
     if(n_channels > (int) m_num_of_feats)
         result.create(m_height, m_width/2 + 1, n_channels,m_num_of_scales);
@@ -198,7 +193,7 @@ cv::Mat cuFFT::inverse(const ComplexMat &inputf)
 cuFFT::~cuFFT()
 {
 
-  for(unsigned i = 0; i < m_num_of_streams; i++) gpuErrchk(cudaStreamDestroy(streams[i]));
+  for(unsigned i = 0; i < m_num_of_streams; i++) cudaStreamDestroy(streams[i]);
 
   cudaDeviceReset();
 }
