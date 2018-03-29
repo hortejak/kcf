@@ -65,10 +65,10 @@ public:
     }
 
 
-    std::vector<T> sqr_norm() const
+    T* sqr_norm() const
     {
-        std::vector<T> sums_sqr_norms;
-        sums_sqr_norms.resize(n_scales);
+        T* sums_sqr_norms;
+        sums_sqr_norms = (T*) malloc(n_scales*sizeof(T));
         int n_channels_per_scale = n_channels/n_scales;
         int scale_offset = n_channels_per_scale*rows*cols;
         T sum_sqr_norm;

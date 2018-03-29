@@ -598,8 +598,8 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
 
 ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const ComplexMat &yf, double sigma, bool auto_correlation)
 {
-    std::vector<float> xf_sqr_norm = xf.sqr_norm();
-    std::vector<float> yf_sqr_norm = auto_correlation ? xf_sqr_norm : yf.sqr_norm();
+    float* xf_sqr_norm = xf.sqr_norm();
+    float* yf_sqr_norm = auto_correlation ? xf_sqr_norm : yf.sqr_norm();
 
     ComplexMat xyf;
     xyf = auto_correlation ? xf.sqr_mag() : xf.mul2(yf.conj());
@@ -636,7 +636,9 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     cv::exp(- 1.f / (sigma * sigma) * cv::max((xf_sqr_norm[i] + yf_sqr_norm[0] - 2 * scales[i]) * numel_xf_inv, 0), in_roi);
     DEBUG_PRINTM(in_roi);
     }
-
+    
+    free(xf_sqr_norm);
+    if(!auto_correlation)free(yf_sqr_norm);
     DEBUG_PRINTM(in_all);
     return fft.forward(in_all);
 }
