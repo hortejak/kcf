@@ -117,7 +117,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     num_of_feats = 31;
     if(m_use_color) num_of_feats += 3;
     if(m_use_cnfeat) num_of_feats += 10;
-    fft.init(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size, num_of_feats, p_scales.size());
+    fft.init(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size, num_of_feats, p_scales.size(), m_use_big_batch);
     p_yf = fft.forward(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
     fft.set_window(cosine_window_function(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
 
@@ -262,7 +262,6 @@ void KCF_Tracker::track(cv::Mat &img)
                account the fact that, if the target doesn't move, the peak
                will appear at the top-left corner, not at the center (this is
                discussed in the paper). the responses wrap around cyclically. */
-#pragma omp parallel for ordered
             for (size_t i = 0; i < p_scales.size(); ++i) {
                 double min_val, max_val;
                 cv::Point2i min_loc, max_loc;
@@ -270,16 +269,13 @@ void KCF_Tracker::track(cv::Mat &img)
                 DEBUG_PRINT(max_loc);
 
                 double weight = p_scales[i] < 1. ? p_scales[i] : 1./p_scales[i];
-#pragma omp critical
-            {
+
                 if (max_val*weight > max_response) {
                     max_response = max_val*weight;
                     max_response_map = scales[i];
                     max_response_pt = max_loc;
                     scale_index = i;
                 }
-            }
-#pragma omp ordered
                 scale_responses.push_back(max_val*weight);
             }
     } else {
@@ -636,9 +632,10 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     cv::exp(- 1.f / (sigma * sigma) * cv::max((xf_sqr_norm[i] + yf_sqr_norm[0] - 2 * scales[i]) * numel_xf_inv, 0), in_roi);
     DEBUG_PRINTM(in_roi);
     }
-    
+
     free(xf_sqr_norm);
     if(!auto_correlation)free(yf_sqr_norm);
+
     DEBUG_PRINTM(in_all);
     return fft.forward(in_all);
 }

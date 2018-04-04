@@ -1,11 +1,12 @@
 #include "fft_opencv.h"
 
-void FftOpencv::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales)
+void FftOpencv::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales, bool big_batch_mode)
 {
     (void)width;
     (void)height;
     (void)num_of_feats;
     (void)num_of_scales;
+    (void)big_batch_mode;
     std::cout << "FFT: OpenCV" << std::endl;
 }
 

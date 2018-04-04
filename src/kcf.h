@@ -4,7 +4,14 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include "fhog.hpp"
-#include "complexmat.hpp"
+
+#ifdef CUFFT
+  #include "complexmat.cuh"
+  #include <cuda_runtime.h>
+#else
+  #include "complexmat.hpp"
+#endif
+
 #include "cnfeat.hpp"
 #include "fft.h"
 
@@ -31,13 +38,8 @@ class KCF_Tracker
 {
 public:
     bool m_debug     {false};
-#ifdef OPENCV_CUFFT
-    bool m_use_scale {false};
-    bool m_use_color {false};
-#else //OPENCV_CUFFT
     bool m_use_scale {true};
     bool m_use_color {true};
-#endif //OPENCV_CUFFT
 #ifdef ASYNC
     bool m_use_multithreading {true};
 #else
@@ -51,6 +53,11 @@ public:
     bool m_use_big_batch {true};
 #else
     bool m_use_big_batch {false};
+#endif
+#ifdef BIG_BATCH
+    bool m_use_cuda {true};
+#else
+    bool m_use_cuda {false};
 #endif
 
     /*
