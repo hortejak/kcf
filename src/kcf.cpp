@@ -33,6 +33,13 @@ KCF_Tracker::KCF_Tracker()
 KCF_Tracker::~KCF_Tracker()
 {
     delete &fft;
+#ifdef CUFFT
+    cudaFreeHost(xf_sqr_norm);
+    cudaFreeHost(yf_sqr_norm);
+#else
+    free(xf_sqr_norm);
+    free(yf_sqr_norm);
+#endif
 }
 
 void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
@@ -99,6 +106,18 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
             p_scales.push_back(std::pow(p_scale_step, i));
     else
         p_scales.push_back(1.);
+    
+#ifdef CUFFT
+    cudaSetDeviceFlags(cudaDeviceMapHost);
+    cudaHostAlloc((void**)&xf_sqr_norm, p_scales.size()*sizeof(float), cudaHostAllocMapped);
+    cudaHostGetDevicePointer((void**)&xf_sqr_norm_d, (void*)xf_sqr_norm, 0);
+    
+    cudaHostAlloc((void**)&yf_sqr_norm, sizeof(float), cudaHostAllocMapped);
+    cudaHostGetDevicePointer((void**)&yf_sqr_norm_d, (void*)yf_sqr_norm, 0);
+#else
+    xf_sqr_norm = (float*) malloc(p_scales.size()*sizeof(float));
+    xf_sqr_norm = (float*) malloc(sizeof(float));
+#endif
 
     p_current_scale = 1.;
 
@@ -594,8 +613,20 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
 
 ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const ComplexMat &yf, double sigma, bool auto_correlation)
 {
-    float* xf_sqr_norm = xf.sqr_norm();
-    float* yf_sqr_norm = auto_correlation ? xf_sqr_norm : yf.sqr_norm();
+#ifdef CUFFT
+    xf.sqr_norm(xf_sqr_norm_d);
+#else
+    xf.sqr_norm(xf_sqr_norm);
+#endif
+    if(auto_correlation){
+        yf_sqr_norm = xf_sqr_norm;
+    } else {
+#ifdef CUFFT
+        yf.sqr_norm(yf_sqr_norm_d);
+#else
+        yf.sqr_norm(yf_sqr_norm);
+#endif
+    }
 
     ComplexMat xyf;
     xyf = auto_correlation ? xf.sqr_mag() : xf.mul2(yf.conj());
@@ -632,9 +663,6 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     cv::exp(- 1.f / (sigma * sigma) * cv::max((xf_sqr_norm[i] + yf_sqr_norm[0] - 2 * scales[i]) * numel_xf_inv, 0), in_roi);
     DEBUG_PRINTM(in_roi);
     }
-
-    free(xf_sqr_norm);
-    if(!auto_correlation)free(yf_sqr_norm);
 
     DEBUG_PRINTM(in_all);
     return fft.forward(in_all);

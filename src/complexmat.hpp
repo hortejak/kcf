@@ -60,10 +60,8 @@ public:
     }
 
 
-    T* sqr_norm() const
+    void sqr_norm(T *sums_sqr_norms) const
     {
-        T* sums_sqr_norms;
-        sums_sqr_norms = (T*) malloc(n_scales*sizeof(T));
         int n_channels_per_scale = n_channels/n_scales;
         int scale_offset = n_channels_per_scale*rows*cols;
         T sum_sqr_norm;
@@ -74,7 +72,7 @@ public:
                     sum_sqr_norm += lhs->real()*lhs->real() + lhs->imag()*lhs->imag();
             sums_sqr_norms[scale] = sum_sqr_norm/static_cast<T>(cols*rows);
         }
-        return sums_sqr_norms;
+        return;
     }
 
     ComplexMat_<T> sqr_mag() const

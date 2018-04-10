@@ -32,7 +32,8 @@ private:
     cudaStream_t streams[4];
     cufftHandle plan_f, plan_f_all_scales, plan_fw, plan_fw_all_scales, plan_i_features,
      plan_i_features_all_scales, plan_i_1ch, plan_i_1ch_all_scales;
-    float *data_f, *data_f_all_scales, *data_fw, *data_fw_all_scales, *data_i_features, *data_i_features_all_scales, *data_i_1ch, *data_i_1ch_all_scales;
+    float *data_f, *data_f_all_scales, *data_fw, *data_fw_d, *data_fw_all_scales, *data_fw_all_scales_d, *data_i_features, *data_i_features_d,
+          *data_i_features_all_scales, *data_i_features_all_scales_d, *data_i_1ch, *data_i_1ch_d, *data_i_1ch_all_scales, *data_i_1ch_all_scales_d;
 };
 
 #endif // FFT_CUDA_H

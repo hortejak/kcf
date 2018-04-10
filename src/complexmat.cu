@@ -1,8 +1,8 @@
 #include "complexmat.cuh"
 
-__global__ void sqr_norm_kernel(int n, double* out, float* data, float rows, float cols)
+__global__ void sqr_norm_kernel(int n, float* out, float* data, float rows, float cols)
 {
-    extern __shared__ double sdata[];
+    extern __shared__ float sdata[];
     int i = blockDim.x * threadIdx.y + threadIdx.x;
     int blockId = blockIdx.x + blockIdx.y * gridDim.x;
     int threadId = 2*(blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
@@ -27,32 +27,16 @@ __global__ void sqr_norm_kernel(int n, double* out, float* data, float rows, flo
     }
 }
 
-float* ComplexMat::sqr_norm() const
+void ComplexMat::sqr_norm(float *result) const
 {
-    
-    double *sums_sqr_norms_from_d_d, *sums_sqr_norms_d_d;
-    float *sums_sqr_norms_from_d_f;
-    sums_sqr_norms_from_d_d = (double*) malloc(n_scales*sizeof(double));
-    sums_sqr_norms_from_d_f = (float*) malloc(n_scales*sizeof(float));
-    cudaMalloc(&sums_sqr_norms_d_d, n_scales*sizeof(double));
-    cudaMemset(sums_sqr_norms_d_d, 0, n_scales*sizeof(double));
+    cudaMemset(result, 0, n_scales*sizeof(float));
     
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels/n_scales, n_scales);
     
-    sqr_norm_kernel<<<numBlocks, threadsPerBlock, rows*cols*sizeof(double)>>>(n_channels/n_scales, sums_sqr_norms_d_d, p_data_d, rows, cols);
-    
-    cudaError_t error = cudaGetLastError(); if(error != cudaSuccess) {printf("CUDA error: %s\n", cudaGetErrorString(error)); exit(-1); }
-    
-    cudaMemcpy(sums_sqr_norms_from_d_d, sums_sqr_norms_d_d, n_scales*sizeof(double), cudaMemcpyDeviceToHost);
-    cudaFree(sums_sqr_norms_d_d);
-    
-    for(int i = 0; i < n_scales; ++i){
-        sums_sqr_norms_from_d_f[i] = sums_sqr_norms_from_d_d[i];
-    }
-    free(sums_sqr_norms_from_d_d);
+    sqr_norm_kernel<<<numBlocks, threadsPerBlock, rows*cols*sizeof(float)>>>(n_channels/n_scales, result, p_data, rows, cols);
         
-    return sums_sqr_norms_from_d_f;
+    return;
 }
 
 __global__ void sqr_mag_kernel(float* data, float* result)
@@ -70,7 +54,7 @@ ComplexMat ComplexMat::sqr_mag() const
     
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels/n_scales, n_scales);
-    sqr_mag_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data_d, result.p_data_d);
+    sqr_mag_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data, result.p_data);
     
     return result;
 }
@@ -90,7 +74,7 @@ ComplexMat ComplexMat::conj() const
     
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels/n_scales, n_scales);
-    conj_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data_d, result.p_data_d);  
+    conj_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data, result.p_data);  
     return result;
 }
 
@@ -103,7 +87,7 @@ ComplexMat ComplexMat::sum_over_channels() const
 
 cufftComplex* ComplexMat::get_p_data() const
 {
-    return (cufftComplex*) p_data_d;
+    return (cufftComplex*) p_data;
 }
 
 __global__ void same_num_channels_mul_kernel(float* data_l, float* data_r, float* result)
@@ -124,7 +108,7 @@ ComplexMat ComplexMat::operator*(const ComplexMat & rhs) const
 
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels/n_scales, n_scales);
-    same_num_channels_mul_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data_d, rhs.p_data_d, result.p_data_d);
+    same_num_channels_mul_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data, rhs.p_data, result.p_data);
 
     return result;
 }
@@ -148,7 +132,7 @@ ComplexMat ComplexMat::operator/(const ComplexMat & rhs) const
     
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels/n_scales, n_scales);
-    same_num_channels_div_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data_d, rhs.p_data_d, result.p_data_d);
+    same_num_channels_div_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data, rhs.p_data, result.p_data);
 
     return result;
 }
@@ -170,7 +154,7 @@ ComplexMat ComplexMat::operator+(const ComplexMat & rhs) const
     
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels/n_scales, n_scales);
-    same_num_channels_add_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data_d, rhs.p_data_d, result.p_data_d);
+    same_num_channels_add_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data, rhs.p_data, result.p_data);
     
     return result;
 }
@@ -190,7 +174,7 @@ ComplexMat ComplexMat::operator*(const float & rhs) const
     
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels/n_scales, n_scales);
-    constant_mul_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data_d, rhs, result.p_data_d);
+    constant_mul_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data, rhs, result.p_data);
 
     return result;
 }
@@ -210,7 +194,7 @@ ComplexMat ComplexMat::operator+(const float & rhs) const
     
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels/n_scales, n_scales);
-    constant_add_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data_d, rhs, result.p_data_d);
+    constant_add_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data, rhs, result.p_data);
 
     return result;
 }
@@ -234,7 +218,7 @@ ComplexMat ComplexMat::mul(const ComplexMat & rhs) const
     
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels/n_scales, n_scales);
-    one_channel_mul_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data_d, rhs.p_data_d, result.p_data_d);
+    one_channel_mul_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data, rhs.p_data, result.p_data);
     
     return result;
 }
@@ -258,7 +242,7 @@ ComplexMat ComplexMat::mul2(const ComplexMat & rhs) const
     
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels/n_scales, n_scales);
-    scales_channel_mul_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data_d, rhs.p_data_d, result.p_data_d);
+    scales_channel_mul_kernel<<<numBlocks, threadsPerBlock>>>(this->p_data, rhs.p_data, result.p_data);
     
     return result;
 }
@@ -271,7 +255,6 @@ void ComplexMat::operator=(ComplexMat & rhs)
     n_scales = rhs.n_scales;
     
     p_data = rhs.p_data;
-    p_data_d = rhs.p_data_d;
     
 }
 
@@ -283,8 +266,6 @@ void ComplexMat::operator=(ComplexMat && rhs)
     n_scales = rhs.n_scales;
     
     p_data = rhs.p_data;
-    p_data_d = rhs.p_data_d;
     
     rhs.p_data = nullptr;
-    rhs.p_data_d = nullptr;
 }

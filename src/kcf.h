@@ -107,6 +107,10 @@ private:
 
     //for big batch
     int num_of_feats;
+    float *xf_sqr_norm, *yf_sqr_norm;
+#ifdef CUFFT
+    float *xf_sqr_norm_d, *yf_sqr_norm_d;
+#endif
 
     //model
     ComplexMat p_yf;
