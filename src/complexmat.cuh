@@ -16,14 +16,12 @@ public:
     ComplexMat() : cols(0), rows(0), n_channels(0) {}
     ComplexMat(int _rows, int _cols, int _n_channels) : cols(_cols), rows(_rows), n_channels(_n_channels)
     {
-        cudaHostAlloc((void **)&p_data, n_channels*cols*rows*sizeof(cufftComplex), cudaHostAllocMapped);
-        cudaHostGetDevicePointer((void **)&p_data_d,  (void *) p_data , 0);
+        cudaMalloc(&p_data,  n_channels*cols*rows*sizeof(cufftComplex));
     }
     
     ComplexMat(int _rows, int _cols, int _n_channels, int _n_scales) : cols(_cols), rows(_rows), n_channels(_n_channels), n_scales(_n_scales)
     {
-        cudaHostAlloc((void **)&p_data, n_channels*cols*rows*sizeof(cufftComplex), cudaHostAllocMapped);
-        cudaHostGetDevicePointer((void **)&p_data_d,  (void *) p_data , 0);
+        cudaMalloc(&p_data,  n_channels*cols*rows*sizeof(cufftComplex));
     }
     
     ComplexMat(ComplexMat &&other)
@@ -35,12 +33,11 @@ public:
         p_data = other.p_data;
         
         other.p_data = nullptr;
-        other.p_data_d = nullptr;
     }
     
     ~ComplexMat()
     {
-        if(p_data != nullptr) cudaFreeHost(p_data);
+        if(p_data != nullptr) cudaFree(p_data);
     }
 
     void create(int _rows, int _cols, int _n_channels)
@@ -48,8 +45,7 @@ public:
         rows = _rows;
         cols = _cols;
         n_channels = _n_channels;
-        cudaHostAlloc((void **)&p_data, n_channels*cols*rows*sizeof(cufftComplex), cudaHostAllocMapped);
-        cudaHostGetDevicePointer((void **)&p_data_d,  (void *) p_data , 0);
+        cudaMalloc(&p_data,  n_channels*cols*rows*sizeof(cufftComplex));
     }
 
     void create(int _rows, int _cols, int _n_channels, int _n_scales)
@@ -58,15 +54,14 @@ public:
         cols = _cols;
         n_channels = _n_channels;
         n_scales = _n_scales;
-        cudaHostAlloc((void **)&p_data, n_channels*cols*rows*sizeof(cufftComplex), cudaHostAllocMapped);
-        cudaHostGetDevicePointer((void **)&p_data_d,  (void *) p_data , 0);
+        cudaMalloc(&p_data,  n_channels*cols*rows*sizeof(cufftComplex));
     }
     // cv::Mat API compatibility
     cv::Size size() { return cv::Size(cols, rows); }
     int channels() { return n_channels; }
     int channels() const { return n_channels; }
 
-    float* sqr_norm() const;
+    void sqr_norm(float *result) const;
     
     ComplexMat sqr_mag() const;
 
@@ -110,5 +105,5 @@ public:
 
 
 private:
-    mutable float *p_data = nullptr, *p_data_d = nullptr;
+    mutable float *p_data = nullptr;
 };
