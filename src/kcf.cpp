@@ -177,7 +177,7 @@ BBox_c KCF_Tracker::getBBox()
 void KCF_Tracker::track(cv::Mat &img)
 {
     if (m_debug)
-    std::cout << "NEW FRAME" << '\n';
+        std::cout << "NEW FRAME" << '\n';
     cv::Mat input_gray, input_rgb = img.clone();
     if (img.channels() == 3){
         cv::cvtColor(img, input_gray, CV_BGR2GRAY);
@@ -242,42 +242,42 @@ void KCF_Tracker::track(cv::Mat &img)
 #pragma omp ordered
             patch_feat.insert(std::end(patch_feat), std::begin(tmp), std::end(tmp));
         }
-            ComplexMat zf = fft.forward_window(patch_feat);
-            DEBUG_PRINTM(zf);
-            cv::Mat response;
+        ComplexMat zf = fft.forward_window(patch_feat);
+        DEBUG_PRINTM(zf);
+        cv::Mat response;
 
-            if (m_use_linearkernel)
-                response = fft.inverse((zf.mul2(p_model_alphaf)).sum_over_channels());
-            else {
-                ComplexMat kzf = gaussian_correlation(zf, p_model_xf, p_kernel_sigma);
-                DEBUG_PRINTM(p_model_alphaf);
-                DEBUG_PRINTM(kzf);
-                response = fft.inverse(kzf.mul(p_model_alphaf));
+        if (m_use_linearkernel)
+            response = fft.inverse((zf.mul2(p_model_alphaf)).sum_over_channels());
+        else {
+            ComplexMat kzf = gaussian_correlation(zf, p_model_xf, p_kernel_sigma);
+            DEBUG_PRINTM(p_model_alphaf);
+            DEBUG_PRINTM(kzf);
+            response = fft.inverse(kzf.mul(p_model_alphaf));
+        }
+        DEBUG_PRINTM(response);
+        std::vector<cv::Mat> scales;
+        cv::split(response,scales);
+
+        /* target location is at the maximum response. we must take into
+           account the fact that, if the target doesn't move, the peak
+           will appear at the top-left corner, not at the center (this is
+           discussed in the paper). the responses wrap around cyclically. */
+        for (size_t i = 0; i < p_scales.size(); ++i) {
+            double min_val, max_val;
+            cv::Point2i min_loc, max_loc;
+            cv::minMaxLoc(scales[i], &min_val, &max_val, &min_loc, &max_loc);
+            DEBUG_PRINT(max_loc);
+
+            double weight = p_scales[i] < 1. ? p_scales[i] : 1./p_scales[i];
+
+            if (max_val*weight > max_response) {
+                max_response = max_val*weight;
+                max_response_map = scales[i];
+                max_response_pt = max_loc;
+                scale_index = i;
             }
-            DEBUG_PRINTM(response);
-            std::vector<cv::Mat> scales;
-            cv::split(response,scales);
-
-            /* target location is at the maximum response. we must take into
-               account the fact that, if the target doesn't move, the peak
-               will appear at the top-left corner, not at the center (this is
-               discussed in the paper). the responses wrap around cyclically. */
-            for (size_t i = 0; i < p_scales.size(); ++i) {
-                double min_val, max_val;
-                cv::Point2i min_loc, max_loc;
-                cv::minMaxLoc(scales[i], &min_val, &max_val, &min_loc, &max_loc);
-                DEBUG_PRINT(max_loc);
-
-                double weight = p_scales[i] < 1. ? p_scales[i] : 1./p_scales[i];
-
-                if (max_val*weight > max_response) {
-                    max_response = max_val*weight;
-                    max_response_map = scales[i];
-                    max_response_pt = max_loc;
-                    scale_index = i;
-                }
-                scale_responses.push_back(max_val*weight);
-            }
+            scale_responses.push_back(max_val*weight);
+        }
     } else {
 #pragma omp parallel for ordered  private(patch_feat) schedule(dynamic)
         for (size_t i = 0; i < p_scales.size(); ++i) {
@@ -605,9 +605,9 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     cv::Mat ifft2_res = fft.inverse(xyf);
     cv::Mat xy_sum;
     if(xf.channels() != 308)
-    xy_sum.create(ifft2_res.size(), CV_32FC1);
+        xy_sum.create(ifft2_res.size(), CV_32FC1);
     else
-    xy_sum.create(ifft2_res.size(), CV_32FC(p_scales.size()));
+        xy_sum.create(ifft2_res.size(), CV_32FC(p_scales.size()));
     xy_sum.setTo(0);
     for (int y = 0; y < ifft2_res.rows; ++y) {
         float * row_ptr = ifft2_res.ptr<float>(y);
@@ -615,8 +615,8 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
         for (int x = 0; x < ifft2_res.cols; ++x) {
             for (int sum_ch = 0; sum_ch < xy_sum.channels(); ++sum_ch) {
                 row_ptr_sum[(x*xy_sum.channels())+sum_ch] += std::accumulate(row_ptr + x*ifft2_res.channels() + sum_ch*(ifft2_res.channels()/xy_sum.channels()),
-                                                            (row_ptr + x*ifft2_res.channels() + (sum_ch+1)*(ifft2_res.channels()/xy_sum.channels())), 0.f);
-                }
+                                                                             (row_ptr + x*ifft2_res.channels() + (sum_ch+1)*(ifft2_res.channels()/xy_sum.channels())), 0.f);
+            }
         }
     }
     DEBUG_PRINTM(ifft2_res);
@@ -628,9 +628,9 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
 
     float numel_xf_inv = 1.f/(xf.cols * xf.rows * (xf.channels()/xf.n_scales));
     for(int i = 0; i < xf.n_scales; ++i){
-    cv::Mat in_roi(in_all, cv::Rect(0, i*scales[0].rows, scales[0].cols, scales[0].rows));
-    cv::exp(- 1.f / (sigma * sigma) * cv::max((xf_sqr_norm[i] + yf_sqr_norm[0] - 2 * scales[i]) * numel_xf_inv, 0), in_roi);
-    DEBUG_PRINTM(in_roi);
+        cv::Mat in_roi(in_all, cv::Rect(0, i*scales[0].rows, scales[0].cols, scales[0].rows));
+        cv::exp(- 1.f / (sigma * sigma) * cv::max((xf_sqr_norm[i] + yf_sqr_norm[0] - 2 * scales[i]) * numel_xf_inv, 0), in_roi);
+        DEBUG_PRINTM(in_roi);
     }
 
     free(xf_sqr_norm);
