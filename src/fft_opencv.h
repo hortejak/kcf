@@ -12,6 +12,7 @@ public:
     ComplexMat forward(const cv::Mat &input) override;
     ComplexMat forward_window(const std::vector<cv::Mat> &input) override;
     cv::Mat inverse(const ComplexMat &inputf) override;
+    float* inverse_raw(const ComplexMat &input) override;
     ~FftOpencv() override;
 private:
     cv::Mat m_window;

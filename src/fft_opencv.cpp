@@ -51,6 +51,11 @@ cv::Mat FftOpencv::inverse(const ComplexMat &inputf)
     return real_result;
 }
 
+float* FftOpencv::inverse_raw(const ComplexMat &input)
+{
+    return nullptr;
+}
+
 FftOpencv::~FftOpencv()
 {
 

@@ -19,6 +19,7 @@ public:
     virtual ComplexMat forward(const cv::Mat &input) = 0;
     virtual ComplexMat forward_window(const std::vector<cv::Mat> &input) = 0;
     virtual cv::Mat inverse(const ComplexMat &input) = 0;
+    virtual float* inverse_raw(const ComplexMat &input) = 0;
     virtual ~Fft() = 0;
 };
 

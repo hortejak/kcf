@@ -236,6 +236,15 @@ cv::Mat cuFFT::inverse(const ComplexMat &inputf)
     return real_result/(m_width*m_height);
 }
 
+float* cuFFT::inverse_raw(const ComplexMat &input)
+{
+    cv::Mat real_result(m_height, m_width, CV_32FC(n_channels), data_i_features_all_scales);
+
+    CufftErrorCheck(cufftExecC2R(plan_i_features_all_scales, in, reinterpret_cast<cufftReal*>(data_i_features_all_scales_d)));
+
+    return data_i_features_all_scales;
+}
+
 cuFFT::~cuFFT()
 {
   CufftErrorCheck(cufftDestroy(plan_f));

@@ -7,7 +7,7 @@
 
 #ifdef CUFFT
   #include "complexmat.cuh"
-  #include "cuda_error_check.cuh"
+  #include "cuda/cuda_error_check.cuh"
   #include <cuda_runtime.h>
 #else
   #include "complexmat.hpp"

@@ -249,6 +249,11 @@ cv::Mat Fftw::inverse(const ComplexMat &inputf)
     return real_result/(m_width*m_height);
 }
 
+float* Fftw::inverse_raw(const ComplexMat &input)
+{
+    return nullptr;
+}
+
 Fftw::~Fftw()
 {
     fftwf_destroy_plan(plan_f);

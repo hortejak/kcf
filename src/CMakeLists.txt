@@ -69,6 +69,7 @@ IF(use_cuda)
   list( APPEND CUDA_NVCC_FLAGS -O3 --gpu-architecture sm_62 -std=c++11 -default-stream per-thread)
   find_cuda_helper_libs(cufftw)
   IF(FFT STREQUAL "cuFFT")
+  add_subdirectory(cuda)
   cuda_add_library(complexmat complexmat.cu)
   ENDIF()
   

@@ -3,7 +3,7 @@
 #define FFT_CUDA_H
 
 #include "fft.h"
-#include "cuda_error_check.cuh"
+#include "cuda/cuda_error_check.cuh"
 
 #if CV_MAJOR_VERSION == 2
   #include <opencv2/gpu/gpu.hpp>
@@ -24,6 +24,7 @@ public:
     ComplexMat forward(const cv::Mat &input) override;
     ComplexMat forward_window(const std::vector<cv::Mat> &input) override;
     cv::Mat inverse(const ComplexMat &inputf) override;
+    float* inverse_raw(const ComplexMat &input) override;
     ~cuFFT() override;
 private:
     cv::Mat m_window;

@@ -6,7 +6,7 @@
 #include "cuda_runtime.h"
 #include "cufft.h"
 
-#include "cuda_error_check.cuh"
+#include "cuda/cuda_error_check.cuh"
 
 class ComplexMat
 {
