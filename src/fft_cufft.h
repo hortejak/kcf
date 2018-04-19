@@ -23,7 +23,7 @@ public:
     void set_window(const cv::Mat &window) override;
     ComplexMat forward(const cv::Mat &input) override;
     ComplexMat forward_window(const std::vector<cv::Mat> &input) override;
-    cv::Mat inverse(const ComplexMat &inputf) override;
+    cv::Mat inverse(const ComplexMat &input) override;
     float* inverse_raw(const ComplexMat &input) override;
     ~cuFFT() override;
 private:

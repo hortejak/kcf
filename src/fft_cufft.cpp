@@ -200,10 +200,10 @@ ComplexMat cuFFT::forward_window(const std::vector<cv::Mat> &input)
     return result;
 }
 
-cv::Mat cuFFT::inverse(const ComplexMat &inputf)
+cv::Mat cuFFT::inverse(const ComplexMat &input)
 {
-    int n_channels = inputf.n_channels;
-    cufftComplex *in = reinterpret_cast<cufftComplex*>(inputf.get_p_data());
+    int n_channels = input.n_channels;
+    cufftComplex *in = reinterpret_cast<cufftComplex*>(input.get_p_data());
     
     if(n_channels == 1){
         cv::Mat real_result(m_height, m_width, CV_32FC1, data_i_1ch);
@@ -238,8 +238,8 @@ cv::Mat cuFFT::inverse(const ComplexMat &inputf)
 
 float* cuFFT::inverse_raw(const ComplexMat &input)
 {
-    cv::Mat real_result(m_height, m_width, CV_32FC(n_channels), data_i_features_all_scales);
-
+    cufftComplex *in = reinterpret_cast<cufftComplex*>(input.get_p_data());
+    
     CufftErrorCheck(cufftExecC2R(plan_i_features_all_scales, in, reinterpret_cast<cufftReal*>(data_i_features_all_scales_d)));
 
     return data_i_features_all_scales;

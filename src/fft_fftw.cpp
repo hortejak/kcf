@@ -230,11 +230,11 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
     return result;
 }
 
-cv::Mat Fftw::inverse(const ComplexMat &inputf)
+cv::Mat Fftw::inverse(const ComplexMat &input)
 {
-    int n_channels = inputf.n_channels;
+    int n_channels = input.n_channels;
     cv::Mat real_result(m_height, m_width, CV_32FC(n_channels));
-    fftwf_complex *in = reinterpret_cast<fftwf_complex*>(inputf.get_p_data());
+    fftwf_complex *in = reinterpret_cast<fftwf_complex*>(input.get_p_data());
     float *out = reinterpret_cast<float*>(real_result.data);
 
     if(n_channels == 1)
