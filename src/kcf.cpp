@@ -34,8 +34,8 @@ KCF_Tracker::~KCF_Tracker()
 {
     delete &fft;
 #ifdef CUFFT
-    cudaFreeHost(xf_sqr_norm);
-    cudaFreeHost(yf_sqr_norm);
+    CudaSafeCall(cudaFreeHost(xf_sqr_norm));
+    CudaSafeCall(cudaFreeHost(yf_sqr_norm));
 #else
     free(xf_sqr_norm);
     free(yf_sqr_norm);
@@ -77,7 +77,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     p_pose.w = x2-x1;
     p_pose.h = y2-y1;
     p_pose.cx = x1 + p_pose.w/2.;
-    p_pose.cy = y1 + p_pose.h/2.;
+    p_pose.cy = y1 + p_pose.h /2.;
 
 
     cv::Mat input_gray, input_rgb = img.clone();
@@ -109,11 +109,11 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     
 #ifdef CUFFT
     cudaSetDeviceFlags(cudaDeviceMapHost);
-    cudaHostAlloc((void**)&xf_sqr_norm, p_scales.size()*sizeof(float), cudaHostAllocMapped);
-    cudaHostGetDevicePointer((void**)&xf_sqr_norm_d, (void*)xf_sqr_norm, 0);
-    
-    cudaHostAlloc((void**)&yf_sqr_norm, sizeof(float), cudaHostAllocMapped);
-    cudaHostGetDevicePointer((void**)&yf_sqr_norm_d, (void*)yf_sqr_norm, 0);
+    CudaSafeCall(cudaHostAlloc((void**)&xf_sqr_norm, p_scales.size()*sizeof(float), cudaHostAllocMapped));
+    CudaSafeCall(cudaHostGetDevicePointer((void**)&xf_sqr_norm_d, (void*)xf_sqr_norm, 0));
+    std::cout << &xf_sqr_norm << std::endl;
+    CudaSafeCall(cudaHostAlloc((void**)&yf_sqr_norm, sizeof(float), cudaHostAllocMapped));
+    CudaSafeCall(cudaHostGetDevicePointer((void**)&yf_sqr_norm_d, (void*)yf_sqr_norm, 0));
 #else
     xf_sqr_norm = (float*) malloc(p_scales.size()*sizeof(float));
     xf_sqr_norm = (float*) malloc(sizeof(float));
@@ -619,12 +619,12 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     xf.sqr_norm(xf_sqr_norm);
 #endif
     if(auto_correlation){
-        yf_sqr_norm = xf_sqr_norm;
+      yf_sqr_norm[0] = xf_sqr_norm[0];
     } else {
 #ifdef CUFFT
-        yf.sqr_norm(yf_sqr_norm_d);
+       yf.sqr_norm(yf_sqr_norm_d);
 #else
-        yf.sqr_norm(yf_sqr_norm);
+       yf.sqr_norm(yf_sqr_norm);
 #endif
     }
 

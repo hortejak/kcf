@@ -1,9 +1,12 @@
-#pragma once
+#ifndef COMPLEXMAT_H
+#define COMPLEXMAT_H
 
 #include <opencv2/opencv.hpp>
 
 #include "cuda_runtime.h"
 #include "cufft.h"
+
+#include "cuda_error_check.cuh"
 
 class ComplexMat
 {
@@ -16,12 +19,12 @@ public:
     ComplexMat() : cols(0), rows(0), n_channels(0) {}
     ComplexMat(int _rows, int _cols, int _n_channels) : cols(_cols), rows(_rows), n_channels(_n_channels)
     {
-        cudaMalloc(&p_data,  n_channels*cols*rows*sizeof(cufftComplex));
+        CudaSafeCall(cudaMalloc(&p_data,  n_channels*cols*rows*sizeof(cufftComplex)));
     }
     
     ComplexMat(int _rows, int _cols, int _n_channels, int _n_scales) : cols(_cols), rows(_rows), n_channels(_n_channels), n_scales(_n_scales)
     {
-        cudaMalloc(&p_data,  n_channels*cols*rows*sizeof(cufftComplex));
+        CudaSafeCall(cudaMalloc(&p_data,  n_channels*cols*rows*sizeof(cufftComplex)));
     }
     
     ComplexMat(ComplexMat &&other)
@@ -37,7 +40,10 @@ public:
     
     ~ComplexMat()
     {
-        if(p_data != nullptr) cudaFree(p_data);
+        if(p_data != nullptr){
+          CudaSafeCall(cudaFree(p_data));
+          p_data = nullptr;
+        }
     }
 
     void create(int _rows, int _cols, int _n_channels)
@@ -45,7 +51,7 @@ public:
         rows = _rows;
         cols = _cols;
         n_channels = _n_channels;
-        cudaMalloc(&p_data,  n_channels*cols*rows*sizeof(cufftComplex));
+        CudaSafeCall(cudaMalloc(&p_data,  n_channels*cols*rows*sizeof(cufftComplex)));
     }
 
     void create(int _rows, int _cols, int _n_channels, int _n_scales)
@@ -54,7 +60,7 @@ public:
         cols = _cols;
         n_channels = _n_channels;
         n_scales = _n_scales;
-        cudaMalloc(&p_data,  n_channels*cols*rows*sizeof(cufftComplex));
+        CudaSafeCall(cudaMalloc(&p_data,  n_channels*cols*rows*sizeof(cufftComplex)));
     }
     // cv::Mat API compatibility
     cv::Size size() { return cv::Size(cols, rows); }
@@ -107,3 +113,5 @@ public:
 private:
     mutable float *p_data = nullptr;
 };
+
+#endif // COMPLEXMAT_H

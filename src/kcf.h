@@ -7,6 +7,7 @@
 
 #ifdef CUFFT
   #include "complexmat.cuh"
+  #include "cuda_error_check.cuh"
   #include <cuda_runtime.h>
 #else
   #include "complexmat.hpp"
@@ -107,9 +108,9 @@ private:
 
     //for big batch
     int num_of_feats;
-    float *xf_sqr_norm, *yf_sqr_norm;
+    float *xf_sqr_norm = nullptr, *yf_sqr_norm = nullptr;
 #ifdef CUFFT
-    float *xf_sqr_norm_d, *yf_sqr_norm_d;
+    float *xf_sqr_norm_d = nullptr, *yf_sqr_norm_d = nullptr;
 #endif
 
     //model
