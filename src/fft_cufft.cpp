@@ -71,9 +71,6 @@ static const char *_cudaGetErrorEnum(cufftResult error)
     } \
 }
 
-cuFFT::cuFFT(): m_num_of_streams(4)
-{}
-
 void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales, bool big_batch_mode)
 {
     m_width = width;
@@ -88,8 +85,6 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
         std::cerr << "Image dimension after forward FFT are too big for CUDA kernels." << std::endl;
         std::exit(EXIT_FAILURE);
     }
-
-    for (unsigned i = 0; i < m_num_of_streams; i++) cudaStreamCreate(&streams[i]);
     
     //FFT forward one scale
     {
@@ -314,8 +309,6 @@ cv::Mat cuFFT::inverse(const ComplexMat &inputf)
 
 cuFFT::~cuFFT()
 {
-
-  for(unsigned i = 0; i < m_num_of_streams; i++) cudaStreamDestroy(streams[i]);
   
   cufftDestroy(plan_f);
   cufftDestroy(plan_f_all_scales);
