@@ -136,6 +136,8 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     num_of_feats = 31;
     if(m_use_color) num_of_feats += 3;
     if(m_use_cnfeat) num_of_feats += 10;
+    poi_width = p_windows_size[0]/p_cell_size;
+    poi_height = p_windows_size[1]/p_cell_size;
     fft.init(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size, num_of_feats, p_scales.size(), m_use_big_batch);
     p_yf = fft.forward(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
     fft.set_window(cosine_window_function(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));

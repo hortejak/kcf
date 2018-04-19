@@ -108,6 +108,7 @@ private:
 
     //for big batch
     int num_of_feats;
+    int poi_height, poi_width;
     float *xf_sqr_norm = nullptr, *yf_sqr_norm = nullptr;
 #ifdef CUFFT
     float *xf_sqr_norm_d = nullptr, *yf_sqr_norm_d = nullptr;

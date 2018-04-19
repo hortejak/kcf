@@ -264,6 +264,7 @@ void ComplexMat::operator=(ComplexMat & rhs)
     rows = rhs.rows;
     n_channels = rhs.n_channels;
     n_scales = rhs.n_scales;
+    foreign_data = true;
     
     p_data = rhs.p_data;
 }
