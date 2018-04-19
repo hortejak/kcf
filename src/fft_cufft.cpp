@@ -172,6 +172,12 @@ ComplexMat cuFFT::forward(const cv::Mat &input)
     return complex_result;
 }
 
+ComplexMat cuFFT::forward_raw(float *input)
+{
+    ComplexMat dummy;
+    return dummy;
+}
+
 ComplexMat cuFFT::forward_window(const std::vector<cv::Mat> &input)
 {
     int n_channels = input.size();

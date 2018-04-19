@@ -22,6 +22,12 @@ ComplexMat FftOpencv::forward(const cv::Mat &input)
     return ComplexMat(complex_result);
 }
 
+ComplexMat FftOpencv::forward_raw(float *input)
+{
+    ComplexMat dummy;
+    return dummy;
+}
+
 ComplexMat FftOpencv::forward_window(const std::vector<cv::Mat> &input)
 {
     int n_channels = input.size();
