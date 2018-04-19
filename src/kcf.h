@@ -107,8 +107,8 @@ private:
     std::vector<double> p_scales;
 
     //for big batch
-    int num_of_feats;
-    int poi_height, poi_width;
+    int p_num_of_feats;
+    int p_poi_height, p_poi_width;
     float *xf_sqr_norm = nullptr, *yf_sqr_norm = nullptr;
 #ifdef CUFFT
     float *xf_sqr_norm_d = nullptr, *yf_sqr_norm_d = nullptr;

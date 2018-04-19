@@ -109,13 +109,13 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     
 #ifdef CUFFT
     cudaSetDeviceFlags(cudaDeviceMapHost);
-    CudaSafeCall(cudaHostAlloc((void**)&xf_sqr_norm, p_scales.size()*sizeof(float), cudaHostAllocMapped));
+    CudaSafeCall(cudaHostAlloc((void**)&xf_sqr_norm, p_num_scales*sizeof(float), cudaHostAllocMapped));
     CudaSafeCall(cudaHostGetDevicePointer((void**)&xf_sqr_norm_d, (void*)xf_sqr_norm, 0));
     std::cout << &xf_sqr_norm << std::endl;
     CudaSafeCall(cudaHostAlloc((void**)&yf_sqr_norm, sizeof(float), cudaHostAllocMapped));
     CudaSafeCall(cudaHostGetDevicePointer((void**)&yf_sqr_norm_d, (void*)yf_sqr_norm, 0));
 #else
-    xf_sqr_norm = (float*) malloc(p_scales.size()*sizeof(float));
+    xf_sqr_norm = (float*) malloc(p_num_scales*sizeof(float));
     xf_sqr_norm = (float*) malloc(sizeof(float));
 #endif
 
@@ -133,12 +133,13 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
     p_output_sigma = std::sqrt(p_pose.w*p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
 
     //window weights, i.e. labels
-    num_of_feats = 31;
-    if(m_use_color) num_of_feats += 3;
-    if(m_use_cnfeat) num_of_feats += 10;
-    poi_width = p_windows_size[0]/p_cell_size;
-    poi_height = p_windows_size[1]/p_cell_size;
-    fft.init(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size, num_of_feats, p_scales.size(), m_use_big_batch);
+    p_num_of_feats = 31;
+    if(m_use_color) p_num_of_feats += 3;
+    if(m_use_cnfeat) p_num_of_feats += 10;
+    p_poi_width = p_windows_size[0]/p_cell_size;
+    p_poi_height = p_windows_size[1]/p_cell_size;
+
+    fft.init(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size, p_num_of_feats, p_num_scales, m_use_big_batch);
     p_yf = fft.forward(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
     fft.set_window(cosine_window_function(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
 
@@ -637,7 +638,7 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     //ifft2 and sum over 3rd dimension, we dont care about individual channels
     cv::Mat ifft2_res = fft.inverse(xyf);
     cv::Mat xy_sum;
-    if(xf.channels() != 308)
+    if(xf.channels() != p_num_scales*p_num_of_feats)
         xy_sum.create(ifft2_res.size(), CV_32FC1);
     else
         xy_sum.create(ifft2_res.size(), CV_32FC(p_scales.size()));
