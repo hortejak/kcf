@@ -205,7 +205,7 @@ ComplexMat Fftw::forward(const cv::Mat &input)
     return complex_result;
 }
 
-ComplexMat Ffftw::forward_raw(float *input)
+ComplexMat Fftw::forward_raw(float *input, bool all_scales)
 {
     ComplexMat dummy;
     return dummy;

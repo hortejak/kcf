@@ -172,10 +172,19 @@ ComplexMat cuFFT::forward(const cv::Mat &input)
     return complex_result;
 }
 
-ComplexMat cuFFT::forward_raw(float *input)
+ComplexMat cuFFT::forward_raw(float *input, bool all_scales)
 {
-    ComplexMat dummy;
-    return dummy;
+    ComplexMat complex_result;
+    if (all_scales){
+        complex_result.create(m_height, m_width / 2 + 1, m_num_of_scales);
+        CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal*>(input),
+                                complex_result.get_p_data()));
+    } else {
+        complex_result.create(m_height, m_width/ 2 + 1, 1);
+        CufftErrorCheck(cufftExecR2C(plan_f, reinterpret_cast<cufftReal*>(input),
+                                complex_result.get_p_data()));
+    }
+    return complex_result;
 }
 
 ComplexMat cuFFT::forward_window(const std::vector<cv::Mat> &input)
@@ -244,11 +253,26 @@ cv::Mat cuFFT::inverse(const ComplexMat &input)
 
 float* cuFFT::inverse_raw(const ComplexMat &input)
 {
+    int n_channels = input.n_channels;
     cufftComplex *in = reinterpret_cast<cufftComplex*>(input.get_p_data());
-    
-    CufftErrorCheck(cufftExecC2R(plan_i_features_all_scales, in, reinterpret_cast<cufftReal*>(data_i_features_all_scales_d)));
 
-    return data_i_features_all_scales;
+    if(n_channels == 1){
+        CufftErrorCheck(cufftExecC2R(plan_i_1ch, in, reinterpret_cast<cufftReal*>(data_i_1ch_d)));
+
+        return data_i_1ch_d;
+    } else if(n_channels == (int) m_num_of_scales){
+        CufftErrorCheck(cufftExecC2R(plan_i_1ch_all_scales, in, reinterpret_cast<cufftReal*>(data_i_1ch_all_scales_d)));
+
+        return data_i_1ch_all_scales_d;
+    } else if(n_channels == (int) m_num_of_feats * (int) m_num_of_scales){
+        CufftErrorCheck(cufftExecC2R(plan_i_features_all_scales, in, reinterpret_cast<cufftReal*>(data_i_features_all_scales_d)));
+
+        return data_i_features_all_scales_d;
+    }
+
+    CufftErrorCheck(cufftExecC2R(plan_i_features, in, reinterpret_cast<cufftReal*>(data_i_features_d)));
+    
+    return data_i_features_d;
 }
 
 cuFFT::~cuFFT()

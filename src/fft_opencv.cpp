@@ -22,7 +22,7 @@ ComplexMat FftOpencv::forward(const cv::Mat &input)
     return ComplexMat(complex_result);
 }
 
-ComplexMat FftOpencv::forward_raw(float *input)
+ComplexMat FftOpencv::forward_raw(float *input, bool all_scales)
 {
     ComplexMat dummy;
     return dummy;

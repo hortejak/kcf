@@ -1,6 +1,8 @@
 #ifndef CUDA_ERROR_CHECK_H
 #define CUDA_ERROR_CHECK_H
 
+#include <iostream>
+
 #define CudaSafeCall( err ) __cudaSafeCall( err, __FILE__, __LINE__ )
 #define CudaCheckError()    __cudaCheckError( __FILE__, __LINE__ )
 
@@ -103,7 +105,6 @@ static const char *_cudaGetErrorEnum(cufftResult error)
 
     return "<unknown>";
 }
-#endif
 
 #define CufftErrorCheck(call) __cufftErrorCheck(call, __FILE__, __LINE__ )
 
@@ -118,5 +119,6 @@ inline void __cufftErrorCheck(cufftResult_t call, const char *file, const int li
 
     return;
 }
+#endif
 
 #endif
