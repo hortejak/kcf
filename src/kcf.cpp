@@ -43,7 +43,7 @@ KCF_Tracker::~KCF_Tracker()
 #endif
 }
 
-void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
+void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size)
 {
     //check boundary, enforce min size
     double x1 = bbox.x, x2 = bbox.x + bbox.width, y1 = bbox.y, y2 = bbox.y + bbox.height;
@@ -89,19 +89,41 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
         img.convertTo(input_gray, CV_32FC1);
 
     // don't need too large image
-    if (p_pose.w * p_pose.h > 100.*100.) {
+    if (p_pose.w * p_pose.h > 100.*100. && fit_size < 0) {
         std::cout << "resizing image by factor of " << 1/p_downscale_factor << std::endl;
         p_resize_image = true;
         p_pose.scale(p_downscale_factor);
         cv::resize(input_gray, input_gray, cv::Size(0,0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
         cv::resize(input_rgb, input_rgb, cv::Size(0,0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
+    } else if (!(fit_size < 0)) {
+        if (fit_size%p_cell_size != 0) {
+            std::cerr << "Fit size does not fit to hog cell size.\n";
+            exit(1);
+        }
+        double tmp;
+        if (( tmp = (p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size ) != fit_size)
+            p_scale_factor_x = fit_size/tmp;
+        if (( tmp = (p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size ) != fit_size)
+            p_scale_factor_y = fit_size/tmp;
+        std::cout << "resizing image horizontaly by factor of " << p_scale_factor_x
+                  << " and verticaly by factor of " << p_scale_factor_y << std::endl;
+        p_fit_to_pw2 = true;
+        p_pose.scale_x(p_scale_factor_x);
+        p_pose.scale_y(p_scale_factor_y);
+        if (p_scale_factor_x != 1 && p_scale_factor_y != 1) {
+            if (p_scale_factor_x < 1 && p_scale_factor_y < 1) {
+                cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
+                cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
+            } else {
+                cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
+                cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
+            }
+        }
     }
 
     //compute win size + fit to fhog cell size
-    p_windows_size[0] = 128;
-    p_windows_size[1] = 128;
-//     p_windows_size[0] = round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
-//     p_windows_size[1] = round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size;
+    p_windows_size[0] = round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
+    p_windows_size[1] = round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size;
 
     p_scales.clear();
     if (m_use_scale)
@@ -109,7 +131,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
             p_scales.push_back(std::pow(p_scale_step, i));
     else
         p_scales.push_back(1.);
-    
+
 #ifdef CUFFT
     cudaSetDeviceFlags(cudaDeviceMapHost);
     CudaSafeCall(cudaHostAlloc((void**)&xf_sqr_norm, p_num_scales*sizeof(float), cudaHostAllocMapped));
@@ -172,9 +194,9 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox)
 //        p_model_alphaf = p_yf / (kf + p_lambda);   //equation for fast training
 }
 
-void KCF_Tracker::setTrackerPose(BBox_c &bbox, cv::Mat & img)
+void KCF_Tracker::setTrackerPose(BBox_c &bbox, cv::Mat & img, int fit_size)
 {
-    init(img, bbox.get_rect());
+    init(img, bbox.get_rect(), fit_size);
 }
 
 void KCF_Tracker::updateTrackerPosition(BBox_c &bbox)
@@ -182,6 +204,12 @@ void KCF_Tracker::updateTrackerPosition(BBox_c &bbox)
     if (p_resize_image) {
         BBox_c tmp = bbox;
         tmp.scale(p_downscale_factor);
+        p_pose.cx = tmp.cx;
+        p_pose.cy = tmp.cy;
+    } else if (p_fit_to_pw2) {
+        BBox_c tmp = bbox;
+        tmp.scale_x(p_scale_factor_x);
+        tmp.scale_y(p_scale_factor_y);
         p_pose.cx = tmp.cx;
         p_pose.cy = tmp.cy;
     } else {
@@ -198,6 +226,10 @@ BBox_c KCF_Tracker::getBBox()
 
     if (p_resize_image)
         tmp.scale(1/p_downscale_factor);
+    if (p_fit_to_pw2) {
+        tmp.scale_x(1/p_scale_factor_x);
+        tmp.scale_y(1/p_scale_factor_y);
+    }
 
     return tmp;
 }
@@ -217,6 +249,14 @@ void KCF_Tracker::track(cv::Mat &img)
     if (p_resize_image) {
         cv::resize(input_gray, input_gray, cv::Size(0, 0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
         cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
+    } else if (p_fit_to_pw2 && p_scale_factor_x != 1 && p_scale_factor_y != 1) {
+        if (p_scale_factor_x < 1 && p_scale_factor_y < 1) {
+            cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
+            cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
+        } else {
+            cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
+            cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
+        }
     }
 
 
@@ -364,10 +404,17 @@ void KCF_Tracker::track(cv::Mat &img)
 
     p_pose.cx += p_current_scale*p_cell_size*new_location.x;
     p_pose.cy += p_current_scale*p_cell_size*new_location.y;
-    if (p_pose.cx < 0) p_pose.cx = 0;
-    if (p_pose.cx > img.cols-1) p_pose.cx = img.cols-1;
-    if (p_pose.cy < 0) p_pose.cy = 0;
-    if (p_pose.cy > img.rows-1) p_pose.cy = img.rows-1;
+    if (p_fit_to_pw2) {
+        if (p_pose.cx < 0) p_pose.cx = 0;
+        if (p_pose.cx > (img.cols*p_scale_factor_x)-1) p_pose.cx = (img.cols*p_scale_factor_x)-1;
+        if (p_pose.cy < 0) p_pose.cy = 0;
+        if (p_pose.cy > (img.rows*p_scale_factor_y)-1) p_pose.cy = (img.rows*p_scale_factor_y)-1;
+    } else {
+        if (p_pose.cx < 0) p_pose.cx = 0;
+        if (p_pose.cx > img.cols-1) p_pose.cx = img.cols-1;
+        if (p_pose.cy < 0) p_pose.cy = 0;
+        if (p_pose.cy > img.rows-1) p_pose.cy = img.rows-1;
+    }
 
     //sub grid scale interpolation
     double new_scale = p_scales[scale_index];

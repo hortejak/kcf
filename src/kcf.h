@@ -29,6 +29,18 @@ struct BBox_c
         h  *= factor;
     }
 
+    inline void scale_x(double factor)
+    {
+        cx *= factor;
+        w  *= factor;
+    }
+
+    inline void scale_y(double factor)
+    {
+        cy *= factor;
+        h  *= factor;
+    }
+
     inline cv::Rect get_rect()
     {
         return cv::Rect(cx-w/2., cy-h/2., w, h);
@@ -75,8 +87,8 @@ public:
     ~KCF_Tracker();
 
     // Init/re-init methods
-    void init(cv::Mat & img, const cv::Rect & bbox);
-    void setTrackerPose(BBox_c & bbox, cv::Mat & img);
+    void init(cv::Mat & img, const cv::Rect & bbox, int fit_size);
+    void setTrackerPose(BBox_c & bbox, cv::Mat & img, int fit_size);
     void updateTrackerPosition(BBox_c & bbox);
 
     // frame-to-frame object tracking
@@ -88,10 +100,13 @@ private:
 
     BBox_c p_pose;
     bool p_resize_image = false;
+    bool p_fit_to_pw2 = false;
 
     bool first = true;
 
     const double p_downscale_factor = 0.5;
+    double p_scale_factor_x = 1;
+    double p_scale_factor_y = 1;
 
     double p_padding = 1.5;
     double p_output_sigma_factor = 0.1;

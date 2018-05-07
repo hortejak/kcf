@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 {
     //load region, images and prepare for output
     std::string region, images, output;
-    int visualize_delay = -1;
+    int visualize_delay = -1, fit_size = -1;
     KCF_Tracker tracker;
 
     while (1) {
@@ -20,10 +20,11 @@ int main(int argc, char *argv[])
             {"help",      no_argument,       0,  'h' },
             {"output",    required_argument, 0,  'o' },
             {"visualize", optional_argument, 0,  'v' },
+            {"fit",       optional_argument, 0,  'f' },
             {0,           0,                 0,  0 }
         };
 
-        int c = getopt_long(argc, argv, "dhv::o:",
+        int c = getopt_long(argc, argv, "dhv::o:f:",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -40,7 +41,8 @@ int main(int argc, char *argv[])
                       << "Options:\n"
                       << " --visualize | -v [delay_ms]\n"
                       << " --output    | -o <outout.txt>\n"
-                      << " --debug     | -d\n";
+                      << " --debug     | -d\n"
+                      << " --fit       | -f [dimension_size]\n";
             exit(0);
             break;
         case 'o':
@@ -48,6 +50,9 @@ int main(int argc, char *argv[])
             break;
         case 'v':
             visualize_delay = optarg ? atol(optarg) : 1;
+            break;
+        case 'f':
+            fit_size = optarg ? atol(optarg) : 128;
             break;
         }
     }
@@ -90,7 +95,7 @@ int main(int argc, char *argv[])
     vot_io.outputBoundingBox(init_rect);
     vot_io.getNextImage(image);
 
-    tracker.init(image, init_rect);
+    tracker.init(image, init_rect, fit_size);
 
     BBox_c bb;
     double avg_time = 0.;
