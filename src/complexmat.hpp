@@ -65,7 +65,7 @@ public:
         int n_channels_per_scale = n_channels/n_scales;
         int scale_offset = n_channels_per_scale*rows*cols;
         T sum_sqr_norm;
-        for(int scale = 0; scale < n_scales; ++scale){
+        for (int scale = 0; scale < n_scales; ++scale) {
             sum_sqr_norm = 0;
             for (int i = 0; i < n_channels_per_scale; ++i)
                 for (auto lhs = p_data.begin()+i*rows*cols+scale*scale_offset; lhs != p_data.begin()+(i+1)*rows*cols+scale*scale_offset; ++lhs)
@@ -88,10 +88,17 @@ public:
     ComplexMat_<T> sum_over_channels() const
     {
         assert(p_data.size() > 1);
-        ComplexMat_<T> result(this->rows, this->cols, 1);
-        std::copy(p_data.begin(),p_data.begin()+rows*cols, result.p_data.begin());
-        for (int i = 1; i < n_channels; ++i) {
-            std::transform(result.p_data.begin(), result.p_data.end(), p_data.begin()+i*rows*cols, result.p_data.begin(), std::plus<std::complex<T>>());
+        
+        int n_channels_per_scale = n_channels/n_scales;
+        int scale_offset = n_channels_per_scale*rows*cols;
+        
+        ComplexMat_<T> result(this->rows, this->cols, n_scales);
+        for (int scale = 0; scale < n_scales; ++scale) {
+            std::copy(p_data.begin()+scale*scale_offset,p_data.begin()+rows*cols+scale*scale_offset, result.p_data.begin()+scale*rows*cols);
+            for (int i = 1; i < n_channels_per_scale; ++i) {
+                std::transform(result.p_data.begin()+scale*rows*cols, result.p_data.begin()+(scale+1)*rows*cols, p_data.begin()+i*rows*cols+scale*scale_offset,
+                               result.p_data.begin()+scale*rows*cols, std::plus<std::complex<T>>());
+            }
         }
         return result;
     }
