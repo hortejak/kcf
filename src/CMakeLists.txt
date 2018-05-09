@@ -48,6 +48,10 @@ ELSE()
   MESSAGE(FATAL_ERROR "Invalid FFT implementation selected")
 ENDIF()
 
+IF((FFT STREQUAL "cuFFT") AND (ASYNC OR (OPENMP AND NOT BIG_BATCH)))
+  message(SEND_ERROR "cuFFT version does not support ASYNC and OpenMP only if used with big batch mode.")
+ENDIF()
+
 IF(ASYNC AND NOT OPENMP)
   add_definitions(-DASYNC)
   MESSAGE(STATUS "ASYNC")
