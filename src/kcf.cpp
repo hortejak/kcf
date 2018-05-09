@@ -133,6 +133,10 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size)
         p_scales.push_back(1.);
 
 #ifdef CUFFT
+    if (m_use_linearkernel){
+        std::cerr << "cuFFT supports only Gaussian kernel." << std::endl;
+        exit(1);
+    }
     cudaSetDeviceFlags(cudaDeviceMapHost);
     CudaSafeCall(cudaHostAlloc((void**)&xf_sqr_norm, p_num_scales*sizeof(float), cudaHostAllocMapped));
     CudaSafeCall(cudaHostGetDevicePointer((void**)&xf_sqr_norm_d, (void*)xf_sqr_norm, 0));
