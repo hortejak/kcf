@@ -6,7 +6,7 @@
   #include <omp.h>
 #endif
 
-#if defined(ASYNC) && !defined(CUFFTW)
+#if !defined(ASYNC) && !defined(OPENMP) && !defined(CUFFTW)
 #define FFTW_PLAN_WITH_THREADS() fftw_plan_with_nthreads(m_num_threads);
 #elif defined(OPENMP) && !defined(CUFFTW)
 #define FFTW_PLAN_WITH_THREADS() fftw_plan_with_nthreads(omp_get_max_threads());
@@ -15,7 +15,7 @@
 #endif
 
 Fftw::Fftw()
-    : m_num_threads(1)
+    : m_num_threads(2)
 {
 }
 
@@ -32,7 +32,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
     m_num_of_scales = num_of_scales;
     m_big_batch_mode = big_batch_mode;
 
-#if defined(ASYNC) || defined(OPENMP)
+#if (!defined(ASYNC) && !defined(CUFFTW))|| defined(OPENMP)
     fftw_init_threads();
 #endif //OPENMP
 
@@ -48,7 +48,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
         plan_f = fftwf_plan_dft_r2c_2d(m_height, m_width,
                                        reinterpret_cast<float*>(in_f.data),
                                        reinterpret_cast<fftwf_complex*>(out_f.get_p_data()),
-                                       FFTW_MEASURE);
+                                       FFTW_MEASURE|FFTW_PATIENT);
     }
     //FFT forward all scales
     if (m_num_of_scales > 1 && m_big_batch_mode) {
@@ -67,7 +67,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
         plan_f_all_scales = fftwf_plan_many_dft_r2c(rank, n, howmany,
                                                     in, inembed, istride, idist,
                                                     out, onembed, ostride, odist,
-                                                    FFTW_MEASURE);
+                                                    FFTW_MEASURE|FFTW_PATIENT);
     }
     //FFT forward window one scale
     {
@@ -86,7 +86,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
         plan_fw = fftwf_plan_many_dft_r2c(rank, n, howmany,
                                           in, inembed, istride, idist,
                                           out, onembed, ostride, odist,
-                                          FFTW_MEASURE);
+                                          FFTW_MEASURE|FFTW_PATIENT);
     }
     //FFT forward window all scales all feats
     if (m_num_of_scales > 1 && m_big_batch_mode) {
@@ -105,7 +105,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
         plan_fw_all_scales = fftwf_plan_many_dft_r2c(rank, n, howmany,
                                                      in,  inembed, istride, idist,
                                                      out, onembed, ostride, odist,
-                                                     FFTW_MEASURE);
+                                                     FFTW_MEASURE|FFTW_PATIENT);
     }
     //FFT inverse one scale
     {
@@ -124,7 +124,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
         plan_i_features = fftwf_plan_many_dft_c2r(rank, n, howmany,
                                                   in,  inembed, istride, idist,
                                                   out, onembed, ostride, odist,
-                                                  FFTW_MEASURE);
+                                                  FFTW_MEASURE|FFTW_PATIENT);
     }
     //FFT inverse all scales
     if (m_num_of_scales > 1 && m_big_batch_mode) {
@@ -143,10 +143,10 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
         plan_i_features_all_scales = fftwf_plan_many_dft_c2r(rank, n, howmany,
                                                              in,  inembed, istride, idist,
                                                              out, onembed, ostride, odist,
-                                                             FFTW_MEASURE);
+                                                             FFTW_MEASURE|FFTW_PATIENT);
     }
     //FFT inver one channel one scale
-    {
+    if(!m_big_batch_mode) {
         ComplexMat in_i1(m_height,m_width,1);
         cv::Mat out_i1 = cv::Mat::zeros(m_height, m_width, CV_32FC1);
         fftwf_complex *in = reinterpret_cast<fftwf_complex*>(in_i1.get_p_data());
@@ -162,7 +162,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
         plan_i_1ch = fftwf_plan_many_dft_c2r(rank, n, howmany,
                                              in,  inembed, istride, idist,
                                              out, onembed, ostride, odist,
-                                             FFTW_MEASURE);
+                                             FFTW_MEASURE|FFTW_PATIENT);
     }
     //FFT inver one channel all scales
     if (m_num_of_scales > 1 && m_big_batch_mode) {
@@ -181,7 +181,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
         plan_i_1ch_all_scales = fftwf_plan_many_dft_c2r(rank, n, howmany,
                                                         in,  inembed, istride, idist,
                                                         out, onembed, ostride, odist,
-                                                        FFTW_MEASURE);
+                                                        FFTW_MEASURE|FFTW_PATIENT);
     }
 }
 
