@@ -1,6 +1,7 @@
 #ifndef CUDA_ERROR_CHECK_H
 #define CUDA_ERROR_CHECK_H
-
+//##################################################################################
+//Code taken from https://codeyarns.com/2011/03/02/how-to-do-error-checking-in-cuda/
 #include <iostream>
 
 #define CudaSafeCall( err ) __cudaSafeCall( err, __FILE__, __LINE__ )
@@ -44,7 +45,7 @@ inline void __cudaCheckError( const char *file, const int line )
 
     return;
 }
-
+//##############################################################################
 #ifdef _CUFFT_H_
 // cuFFT API errors
 static const char *_cudaGetErrorEnum(cufftResult error)
