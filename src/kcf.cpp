@@ -89,7 +89,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
         img.convertTo(input_gray, CV_32FC1);
 
     // don't need too large image
-    if (p_pose.w * p_pose.h > 100.*100. && (fit_size_x < -1 || fit_size_y < -1)) {
+    if (p_pose.w * p_pose.h > 100.*100. && (fit_size_x == -1 || fit_size_y == -1)) {
         std::cout << "resizing image by factor of " << 1/p_downscale_factor << std::endl;
         p_resize_image = true;
         p_pose.scale(p_downscale_factor);
