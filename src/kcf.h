@@ -87,8 +87,8 @@ public:
     ~KCF_Tracker();
 
     // Init/re-init methods
-    void init(cv::Mat & img, const cv::Rect & bbox, int fit_size);
-    void setTrackerPose(BBox_c & bbox, cv::Mat & img, int fit_size);
+    void init(cv::Mat & img, const cv::Rect & bbox, int fit_size_x, int fit_size_y);
+    void setTrackerPose(BBox_c & bbox, cv::Mat & img, int fit_size_x, int fit_size_y);
     void updateTrackerPosition(BBox_c & bbox);
 
     // frame-to-frame object tracking

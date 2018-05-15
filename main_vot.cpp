@@ -10,7 +10,7 @@ int main(int argc, char *argv[])
 {
     //load region, images and prepare for output
     std::string region, images, output;
-    int visualize_delay = -1, fit_size = -1;
+    int visualize_delay = -1, fit_size_x = -1, fit_size_y = -1;
     KCF_Tracker tracker;
 
     while (1) {
@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
             {0,           0,                 0,  0 }
         };
 
-        int c = getopt_long(argc, argv, "dhv::o:f:",
+        int c = getopt_long(argc, argv, "dhv::f::o:",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -52,7 +52,14 @@ int main(int argc, char *argv[])
             visualize_delay = optarg ? atol(optarg) : 1;
             break;
         case 'f':
-            fit_size = optarg ? atol(optarg) : 128;
+            std::string sizes = optarg ? optarg : "128x128";
+            std::string delimiter = "x";
+            size_t pos = sizes.find(delimiter);
+            std::string first_argument = sizes.substr(0, pos);
+            sizes.erase(0, pos + delimiter.length());
+
+            fit_size_x = stol(first_argument);
+	    fit_size_y = stol(sizes);
             break;
         }
     }
@@ -95,7 +102,7 @@ int main(int argc, char *argv[])
     vot_io.outputBoundingBox(init_rect);
     vot_io.getNextImage(image);
 
-    tracker.init(image, init_rect, fit_size);
+    tracker.init(image, init_rect, fit_size_x, fit_size_y);
 
     BBox_c bb;
     double avg_time = 0.;

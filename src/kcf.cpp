@@ -43,7 +43,7 @@ KCF_Tracker::~KCF_Tracker()
 #endif
 }
 
-void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size)
+void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int fit_size_y)
 {
     //check boundary, enforce min size
     double x1 = bbox.x, x2 = bbox.x + bbox.width, y1 = bbox.y, y2 = bbox.y + bbox.height;
@@ -89,22 +89,22 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size)
         img.convertTo(input_gray, CV_32FC1);
 
     // don't need too large image
-    if (p_pose.w * p_pose.h > 100.*100. && fit_size < 0) {
+    if (p_pose.w * p_pose.h > 100.*100. && (fit_size_x < -1 || fit_size_y < -1)) {
         std::cout << "resizing image by factor of " << 1/p_downscale_factor << std::endl;
         p_resize_image = true;
         p_pose.scale(p_downscale_factor);
         cv::resize(input_gray, input_gray, cv::Size(0,0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
         cv::resize(input_rgb, input_rgb, cv::Size(0,0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
-    } else if (!(fit_size < 0)) {
-        if (fit_size%p_cell_size != 0) {
+    } else if (!(fit_size_x == -1 && fit_size_y == -1)) {
+        if (fit_size_x%p_cell_size != 0 || fit_size_y%p_cell_size != 0) {
             std::cerr << "Fit size does not fit to hog cell size.\n";
             exit(1);
         }
         double tmp;
-        if (( tmp = (p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size ) != fit_size)
-            p_scale_factor_x = fit_size/tmp;
-        if (( tmp = (p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size ) != fit_size)
-            p_scale_factor_y = fit_size/tmp;
+        if (( tmp = (p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size ) != fit_size_x)
+            p_scale_factor_x = fit_size_x/tmp;
+        if (( tmp = (p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size ) != fit_size_y)
+            p_scale_factor_y = fit_size_y/tmp;
         std::cout << "resizing image horizontaly by factor of " << p_scale_factor_x
                   << " and verticaly by factor of " << p_scale_factor_y << std::endl;
         p_fit_to_pw2 = true;
@@ -198,9 +198,9 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size)
 //        p_model_alphaf = p_yf / (kf + p_lambda);   //equation for fast training
 }
 
-void KCF_Tracker::setTrackerPose(BBox_c &bbox, cv::Mat & img, int fit_size)
+void KCF_Tracker::setTrackerPose(BBox_c &bbox, cv::Mat & img, int fit_size_x, int fit_size_y)
 {
-    init(img, bbox.get_rect(), fit_size);
+    init(img, bbox.get_rect(), fit_size_x, fit_size_y);
 }
 
 void KCF_Tracker::updateTrackerPosition(BBox_c &bbox)
