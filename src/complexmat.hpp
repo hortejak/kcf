@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <functional>
 
+#ifdef TEMPLATE_COMPLEXMAT
 template<typename T> class ComplexMat_
 {
 public:
@@ -88,10 +89,10 @@ public:
     ComplexMat_<T> sum_over_channels() const
     {
         assert(p_data.size() > 1);
-        
+
         int n_channels_per_scale = n_channels/n_scales;
         int scale_offset = n_channels_per_scale*rows*cols;
-        
+
         ComplexMat_<T> result(this->rows, this->cols, n_scales);
         for (int scale = 0; scale < n_scales; ++scale) {
             std::copy(p_data.begin()+scale*scale_offset,p_data.begin()+rows*cols+scale*scale_offset, result.p_data.begin()+scale*rows*cols);
@@ -180,7 +181,7 @@ public:
 
 private:
     mutable std::vector<std::complex<T>> p_data;
-    
+
     //convert 2 channel mat (real, imag) to vector row-by-row
     std::vector<std::complex<T>> convert(const cv::Mat & mat)
     {
@@ -265,6 +266,91 @@ private:
 };
 
 typedef ComplexMat_<float> ComplexMat;
+#else
+class ComplexMat
+{
+public:
+    int cols;
+    int rows;
+    int n_channels;
+    int n_scales = 1;
 
+    ComplexMat();
+    ComplexMat(int _rows, int _cols, int _n_channels);
+    ComplexMat(const cv::Mat & mat);
+
+    void create(int _rows, int _cols, int _n_channels);
+
+    void create(int _rows, int _cols, int _n_channels, int _n_scales);
+    // cv::Mat API compatibility
+    cv::Size size();
+    int channels();
+    int channels() const;
+
+    //assuming that mat has 2 channels (real, imag)
+    void set_channel(int idx, const cv::Mat & mat);
+
+
+    void sqr_norm(float *sums_sqr_norms) const;
+
+    ComplexMat sqr_mag() const;
+
+    ComplexMat conj() const;
+
+    ComplexMat sum_over_channels() const;
+
+    //return 2 channels (real, imag) for first complex channel
+    cv::Mat to_cv_mat() const;
+    // return a vector of 2 channels (real, imag) per one complex channel
+    std::vector<cv::Mat> to_cv_mat_vector() const;
+
+    std::complex<float>* get_p_data() const;
+
+    //element-wise per channel multiplication, division and addition
+    ComplexMat operator*(const ComplexMat & rhs) const;
+    ComplexMat operator/(const ComplexMat & rhs) const;
+    ComplexMat operator+(const ComplexMat & rhs) const;
+
+    //multiplying or adding constant
+    ComplexMat operator*(const float & rhs) const;
+    ComplexMat operator+(const float & rhs) const;
+
+    //multiplying element-wise multichannel by one channel mats (rhs mat is with one channel)
+    ComplexMat mul(const ComplexMat & rhs) const;
+
+    //multiplying element-wise multichannel by one channel mats (rhs mat is with multiple channel)
+    ComplexMat mul2(const ComplexMat & rhs) const;
+
+    //text output
+    friend std::ostream & operator<<(std::ostream & os, const ComplexMat & mat)
+    {
+        //for (int i = 0; i < mat.n_channels; ++i){
+        for (int i = 0; i < 1; ++i){
+            os << "Channel " << i << std::endl;
+            for (int j = 0; j < mat.rows; ++j) {
+                for (int k = 0; k < mat.cols-1; ++k)
+                    os << mat.p_data[j*mat.cols + k] << ", ";
+                os << mat.p_data[j*mat.cols + mat.cols-1] << std::endl;
+            }
+        }
+        return os;
+    }
+
+
+private:
+    mutable std::vector<std::complex<float>> p_data;
+
+    //convert 2 channel mat (real, imag) to vector row-by-row
+    std::vector<std::complex<float>> convert(const cv::Mat & mat);
+
+    ComplexMat mat_mat_operator(void (*op)(std::complex<float> & c_lhs, const std::complex<float> & c_rhs), const ComplexMat & mat_rhs) const;
+    ComplexMat matn_mat1_operator(void (*op)(std::complex<float> & c_lhs, const std::complex<float> & c_rhs), const ComplexMat & mat_rhs) const;
+    ComplexMat matn_mat2_operator(void (*op)(std::complex<float> & c_lhs, const std::complex<float> & c_rhs), const ComplexMat & mat_rhs) const;
+    ComplexMat mat_const_operator(const std::function<void(std::complex<float> & c_rhs)> & op) const;
+
+    cv::Mat channel_to_cv_mat(int channel_id) const;
+
+};
+#endif
 
 #endif //COMPLEX_MAT_HPP_213123048309482094

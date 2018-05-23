@@ -10,6 +10,7 @@ option(OPENMP "Use OpenMP library. Works with FFTW and OpenCV implementation." O
 option(ASYNC "Works only if OPENCV_CUFFT is not ON. Will enable C++ async directive." OFF)
 option(CUDA_DEBUG "Enables error cheking for cuda and cufft. " OFF)
 option(BIG_BATCH "Enable transforming all features from all scales together." OFF)
+option(TEMPLATE_COMPLEXMAT "Use ComplexMat as abstract class." ON)
 
 IF(PROFILING)
   add_definitions(-DPROFILING )
@@ -19,6 +20,11 @@ ENDIF()
 IF(BIG_BATCH)
   add_definitions(-DBIG_BATCH )
   MESSAGE(STATUS "Big_batch mode")
+ENDIF()
+
+IF(TEMPLATE_COMPLEXMAT)
+  add_definitions(-DTEMPLATE_COMPLEXMAT )
+  MESSAGE(STATUS "ComplexMat abstract class version.")
 ENDIF()
 
 SET(use_cuda OFF)
@@ -81,14 +87,19 @@ IF(use_cuda)
   cuda_add_library(complexmat complexmat.cu)
   cuda_add_library(cuda_func cuda_functions.cu)
   ENDIF()
-  
+
 ENDIF()
 
 add_subdirectory(piotr_fhog)
 add_subdirectory(cn)
 
 add_library(kcf STATIC ${KCF_LIB_SRC})
-target_link_libraries(kcf fhog cndata  ${OpenCV_LIBS})
+IF(NOT TEMPLATE_COMPLEXMAT)
+    add_library(complexmat complexmat.cpp)
+    target_link_libraries(kcf fhog cndata complexmat ${OpenCV_LIBS})
+ELSE()
+    target_link_libraries(kcf fhog cndata ${OpenCV_LIBS})
+ENDIF()
 set_target_properties(kcf PROPERTIES VERSION 1.0.0 SOVERSION 1)
 
 IF(FFT STREQUAL "fftw")
