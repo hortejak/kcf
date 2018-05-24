@@ -8,6 +8,8 @@ The code depends on OpenCV 2.4+ library and build via cmake toolchain. Depending
 
 SSE instructions were used in the original code and these are only supported on x86 architecture. Thanks to the [SSE2NEON](https://github.com/jratcliff63367/sse2neon) code, we now support both ARM and x86 architecture.
 
+The CuFFT version is set up to run on NVIDIA Jetson TX2. If you want to run it on different architecture, change the `--gpu-architecture sm_62` NVCC flag in **/src/CMakeLists.txt** to your architecture of NVIDIA GPU. To find what SM variation you architecure has please visit http://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/.
+
 ## Getting Started
 Open terminal in the directory with the code:
 Using cmake gui:
