@@ -675,12 +675,8 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
 {
 #ifdef CUFFT
     xf.sqr_norm(xf_sqr_norm_d);
-    if (auto_correlation){
-        cudaDeviceSynchronize();
-        yf_sqr_norm[0] = xf_sqr_norm[0];
-    } else {
+    if (!auto_correlation)
         yf.sqr_norm(yf_sqr_norm_d);
-    }
 #else
     xf.sqr_norm(xf_sqr_norm);
     if (auto_correlation){
@@ -693,7 +689,10 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     xyf = auto_correlation ? xf.sqr_mag() : xf.mul2(yf.conj());
     DEBUG_PRINTM(xyf);
 #ifdef CUFFT
-    cuda_gaussian_correlation(fft.inverse_raw(xyf), gauss_corr_res, xf_sqr_norm_d, yf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
+    if(auto_correlation)
+        cuda_gaussian_correlation(fft.inverse_raw(xyf), gauss_corr_res, xf_sqr_norm_d, xf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
+    else
+        cuda_gaussian_correlation(fft.inverse_raw(xyf), gauss_corr_res, xf_sqr_norm_d, yf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
 
     return fft.forward_raw(gauss_corr_res, xf.n_scales==p_num_scales);
 #else
