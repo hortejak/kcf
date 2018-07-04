@@ -84,10 +84,10 @@ This code compiles into binary **kcf_vot**
 
 |Option| Description |
 | --- | --- |
-| `--visualize | -v [delay_ms]` | Visualize the output with specified delay. If the delay is set to 0 the output file will stay until the user presses any button.|
-| `---output | -o <outout.txt>` | Specifies output file.|
-| `--debug | -d` | Additional debugging output.|
-| `--fit | -f [dimensions]` | Specifies dimension to which the extracted patch should be scaled. It should be divisible by 4, which is the size of the HOG cell. You can either input single dimension, which will result in in the other both dimensions being the same. Or both dimensions in the form of: `[X dimension]X[Y dimension]`.|
+| `--visualize \| -v [delay_ms]` | Visualize the output with specified delay. If the delay is set to 0 the output file will stay until the user presses any button.|
+| `---output \| -o <outout.txt>` | Specifies output file.|
+| `--debug \| -d` | Additional debugging output.|
+| `--fit \| -f [dimensions]` | Specifies dimension to which the extracted patch should be scaled. It should be divisible by 4, which is the size of the HOG cell. You can either input single dimension, which will result in in the other both dimensions being the same. Or both dimensions in the form of: `[X dimension]X[Y dimension]`.|
 
 ## Author
 * **Karafiát Vít**, **Sojka Michal**
