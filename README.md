@@ -34,8 +34,8 @@ The following table shows multiple options how to run cmake to get different ver
 | --- | --- |
 | `-DFFT=OpenCV` | OpenCV version of FFT.|
 | `-DFFT=fftw` | Fftw version of FFT using plan many and new execute functions.|
-| `-DFFT=cuFFTW` | cuFFT version using FFTW interface.|
-| `-DFFT=cuFFT` | cuFFT version of FFT. This version also uses pure CUDA for ComplexMat class and Gaussian correlation.|
+| `-DFFT=cuFFTW` | CuFFT version using FFTW interface.|
+| `-DFFT=cuFFT` | CuFFT version of FFT. This version also uses pure CUDA for ComplexMat class and Gaussian correlation.|
 
 With all of these FFT version aditional options can be added:
 
@@ -51,19 +51,42 @@ Finally call make:
 $ make
 ```
 
-There is also Makefile located in main directory. It will build all possible versions, with all possible combination of additional options (except for CUDA_DEBUG). Each version will have build directory named after it. Build system used is [Ninja](https://ninja-build.org/).
+There is also Makefile located in main directory. It will build all possible versions, with all possible combination of additional options (except for CUDA_DEBUG). Each version will have build directory named after it. Default build system used by this Makefile is [Ninja](https://ninja-build.org/). If you want to build only specific version use `make [version]`, where inplace of `version` use one the following:
+
+|Version| Description |
+| --- | --- |
+| `opencvfft-st` | OpenCV FFT single threaded version|
+| `opencvfft-async` | OpenCV FFT multithreaded version using C++ async directive|
+| `fftw` | FFTW FFT single threaded version|
+| `fftw_openmp` | FFTW FFT multithreaded version using OpenMP|
+| `fftw_async` | FFTW FFT multithreaded version using C++ async directive|
+| `fftw_big` | FFTW FFT single threaded version using Big batch mode|
+| `fftw_big_openmp` | FFTW FFT multithreaded version using Big batch mode|
+| `cufftw` | CuFFTW version|
+| `cufftw_big` | CuFFTW version using Big batch mode|
+| `cufftw_big_openmp` | CuFFTW version using Big batch mode and OpenMP multithreading to get maximal response|
+| `cufft` | CuFFT FFT version|
+| `cufft_big` | CuFFT FFT version using Big batch mode|
+| `cufft_big_openmp` | CuFFT FFT version using Big batch mode and OpenMP multithreading to get maximal response|
+
 
 This code compiles into binary **kcf_vot**
 
-./kcf_vot [-v[delay\_ms]]
+## Usage
+`./kcf_vot [options] <path/to/region.txt or groundtruth.txt> <path/to/images.txt> [path/to/output.txt]`
 - using [VOT 2014 methodology](http://www.votchallenge.net/)
 - to get dataset used in VOT go [here](http://www.votchallenge.net/vot2016/dataset.html)
  - INPUT : expecting two files, images.txt (list of sequence images with absolute path) and
            region.txt with initial bounding box in the first frame in format "top_left_x, top_left_y, width, height" or
            four corner points listed clockwise starting from bottom left corner.
  - OUTPUT : output.txt containing the bounding boxes in the format "top_left_x, top_left_y, width, height"
-
- 
+ -There are also multiple additional terminal `[options]`, which you can use:
+|Option| Description |
+| --- | --- |
+| `--visualize | -v [delay_ms]` | Visualize the output with specified delay. If the delay is set to 0 the output file will stay until the user presses any button.|
+| `---output | -o <outout.txt>` | Specifies output file.|
+| `--debug | -d` | Additional debugging output.|
+| `--fit | -f [dimensions]` | Specifies dimension to which the extracted patch should be scaled. It should be divisible by 4, which is the size of the HOG cell. You can either input single dimension, which will result in in the other both dimensions being the same. Or both dimensions in the form of: `[X dimension]X[Y dimension]`.|
 
 ## Author
 * **Karafiát Vít**, **Sojka Michal**
