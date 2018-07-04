@@ -81,6 +81,7 @@ This code compiles into binary **kcf_vot**
            four corner points listed clockwise starting from bottom left corner.
  - OUTPUT : output.txt containing the bounding boxes in the format "top_left_x, top_left_y, width, height"
  -There are also multiple additional terminal `[options]`, which you can use:
+
 |Option| Description |
 | --- | --- |
 | `--visualize | -v [delay_ms]` | Visualize the output with specified delay. If the delay is set to 0 the output file will stay until the user presses any button.|
