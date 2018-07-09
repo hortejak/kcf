@@ -19,7 +19,7 @@
 
 struct BBox_c
 {
-    double cx, cy, w, h;
+    double cx, cy, w, h, a;
 
     inline void scale(double factor)
     {
@@ -51,8 +51,9 @@ struct BBox_c
 class KCF_Tracker
 {
 public:
-    bool m_debug     {false};
+    bool m_debug {false};
     bool m_use_scale {true};
+    bool m_use_angle {true};
     bool m_use_color {true};
 #ifdef ASYNC
     bool m_use_multithreading {true};
@@ -116,11 +117,15 @@ private:
     double p_interp_factor = 0.02;  //def = 0.02, linear interpolation factor for adaptation
     int p_cell_size = 4;            //4 for hog (= bin_size)
     int p_windows_size[2];
-    int p_num_scales {7};
+    int p_num_scales {5};
     double p_scale_step = 1.02;
     double p_current_scale = 1.;
     double p_min_max_scale[2];
     std::vector<double> p_scales;
+    int p_num_angles {5};
+    int p_current_angle = 0;
+    int p_angle_step = 10;
+    std::vector<double> p_angles;
 
     //for big batch
     int p_num_of_feats;
@@ -137,12 +142,12 @@ private:
     ComplexMat p_model_alphaf_den;
     ComplexMat p_model_xf;
     //helping functions
-    cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y);
+    cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y, int angle);
     cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);
     ComplexMat gaussian_correlation(const ComplexMat & xf, const ComplexMat & yf, double sigma, bool auto_correlation = false);
     cv::Mat circshift(const cv::Mat & patch, int x_rot, int y_rot);
     cv::Mat cosine_window_function(int dim1, int dim2);
-    std::vector<cv::Mat> get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx, int cy, int size_x, int size_y, double scale = 1.);
+    std::vector<cv::Mat> get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx, int cy, int size_x, int size_y, double scale = 1., int angle = 0);
     cv::Point2f sub_pixel_peak(cv::Point & max_loc, cv::Mat & response);
     double sub_grid_scale(std::vector<double> & responses, int index = -1);
 
