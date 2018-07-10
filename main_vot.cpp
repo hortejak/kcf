@@ -40,9 +40,9 @@ int main(int argc, char *argv[])
                       << argv[0] << " [options] <path/to/region.txt or groundtruth.txt> <path/to/images.txt> [path/to/output.txt]\n"
                       << "Options:\n"
                       << " --visualize | -v [delay_ms]\n"
-                      << " --output    | -o <outout.txt>\n"
+                      << " --output    | -o <output.txt>\n"
                       << " --debug     | -d\n"
-                      << " --fit       | -f [dimension_size]\n";
+                      << " --fit       | -f [WxH]\n";
             exit(0);
             break;
         case 'o':
