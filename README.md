@@ -63,7 +63,7 @@ The following table shows how to configure different FFT implementations.
 |Option| Description |
 | --- | --- |
 | `-DFFT=OpenCV` | Use OpenCV to calculate FFT.|
-| `-DFFT=fftw` | Use fftw and its `plan_many` and "New-array execute" functions.|
+| `-DFFT=fftw` | Use fftw and its `plan_many` and "New-array execute" functions. If `std::async`, OpenMP or cuFFTW is not used the plans will use 2 threads by default.|
 | `-DFFT=cuFFTW` | Use cuFFTW interface to cuFFT library.|
 | `-DFFT=cuFFT` | Use cuFFT. This version also uses pure CUDA implementation of `ComplexMat` class and Gaussian correlation.|
 
@@ -72,7 +72,7 @@ With all of these FFT version additional options can be added:
 |Option| Description |
 | --- | --- |
 | `-DASYNC=ON` | Use C++ `std::async` to run computations for different scales in parallel. This doesn't work with `BIG_BATCH` mode.|
-| `-DOPENMP=ON` | FIXME: Fftw version of FFT using plan many and new execute functions. If not selected with big batch mode, it also is used to compute all response maps for all scales in parallel. If used with big batch mode it parallelize extraction of features for all scales and selection of scale with highest response.|
+| `-DOPENMP=ON` | This option can only be used with CPU versions of the tracker. In normal mode it will run computations for differenct scales in parallel. In the case of the big batch mode it will parallelize the feature extraction  and the search for maximal response for differenct scales. If Fftw version is used with big batch mode it will also parallelize Ffftw's plans.|
 | `-DBIG_BATCH=ON` | Concatenate matrices of different scales to one big matrix and perform all computations on this matrix. This mode doesn't work for OpenCV FFT.|
 | `-DCUDA_DEBUG=ON` | This mode adds CUDA error checking for all kernels and CUDA runtime libraries. Only works with cuFFT version.|
 
