@@ -23,10 +23,12 @@ $ make -k
 
 This will create several `build-*` directories and compile different
 versions in them. If prerequisites of some builds are missing, the
-`-k` option ensures that the errors are ignored. This uses [Ninja](https://ninja-build.org/) build system, which is useful when building naively on TX2, because builds with `ninja` are faster (better parallelized) than with `make`. To build only specific version run:
+`-k` option ensures that the errors are ignored. This uses [Ninja](https://ninja-build.org/) build system, which is useful when building naively on TX2, because builds with `ninja` are faster (better parallelized) than with `make`.
+
+To build only a specific version run `make <version>`, for example:
 
 ``` shellsession
-make <version>
+make cufft
 ```
 
 ### Using cmake gui
