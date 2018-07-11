@@ -42,6 +42,7 @@ int main(int argc, char *argv[])
         int option_index = 0;
         static struct option long_options[] = {
             {"debug",     no_argument,       0,  'd' },
+            {"visualDebug",     no_argument,       0,  'p' },
             {"help",      no_argument,       0,  'h' },
             {"output",    required_argument, 0,  'o' },
             {"visualize", optional_argument, 0,  'v' },
@@ -49,7 +50,7 @@ int main(int argc, char *argv[])
             {0,           0,                 0,  0 }
         };
 
-        int c = getopt_long(argc, argv, "dhv::f::o:",
+        int c = getopt_long(argc, argv, "dphv::f::o:",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -57,6 +58,10 @@ int main(int argc, char *argv[])
         switch (c) {
         case 'd':
             tracker.m_debug = true;
+            break;
+        case 'p':
+            tracker.m_visual_debug = true;
+            visualize_delay = 0;
             break;
         case 'h':
             std::cerr << "Usage: \n"
@@ -67,6 +72,7 @@ int main(int argc, char *argv[])
                       << " --visualize | -v[delay_ms]\n"
                       << " --output    | -o <output.txt>\n"
                       << " --debug     | -d\n"
+                      << " --visualDebug | -p\n"
                       << " --fit       | -f[WxH]\n";
             exit(0);
             break;

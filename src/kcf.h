@@ -52,6 +52,7 @@ class KCF_Tracker
 {
 public:
     bool m_debug {false};
+	bool m_visual_debug {false};
     bool m_use_scale {false};
     bool m_use_angle {true};
     bool m_use_color {true};
