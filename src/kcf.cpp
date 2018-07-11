@@ -369,6 +369,53 @@ void KCF_Tracker::track(cv::Mat &img)
                         max_response_pt = &(*it)->max_locs[j];
                         max_response_map = &(*it)->response_maps[j];
                         scale_index = int(j);
+        //#pragma omp parallel for ordered  private(patch_feat) schedule(dynamic)
+        //        for (size_t i = 0; i < p_scales.size(); ++i) {
+        //            std::cout << "CURRENT SCALE: " << p_current_scale * p_scales[i] << std::endl;
+        //                for (size_t j = 0; j < p_angles.size(); ++j) {
+        //                    patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0],
+        //                    p_windo>>>>>>> Commiting work done so far on rotationws_size[1], p_current_scale * p_scales[i], p_current_angle + p_angles[j]);
+        //                    ComplexMat zf = fft.forward_window(patch_feat);
+        //                    DEBUG_PRINTM(zf);
+        //                    cv::Mat response;
+        //                    if (m_use_linearkernel)
+        //                        response = fft.inverse((p_model_alphaf * zf).sum_over_channels());
+        //                    else {
+        //                        ComplexMat kzf = gaussian_correlation(zf, p_model_xf, p_kernel_sigma);
+        //                        DEBUG_PRINTM(p_model_alphaf);
+        //                        DEBUG_PRINTM(kzf);
+        //                        DEBUG_PRINTM(p_model_alphaf * kzf);
+        //                        response = fft.inverse(p_model_alphaf * kzf);
+        //                    }
+        //                    if (1) {
+        //                        cv::Mat copy_response = response.clone();
+
+        //                        // crop the spectrum, if it has an odd number of rows or columns
+        //                        copy_response = copy_response(cv::Rect(0, 0, copy_response.cols & -2,
+        //                        copy_response.rows & -2));
+
+        //                        // rearrange the quadrants of Fourier image  so that the origin is at the image center
+        //                        int cx = copy_response.cols/2;
+        //                        int cy = copy_response.rows/2;
+
+        //                        cv::Mat q0(copy_response, cv::Rect(0, 0, cx, cy));   // Top-Left - Create a ROI per
+        //                        quadrant cv::Mat q1(copy_response, cv::Rect(cx, 0, cx, cy));  // Top-Right cv::Mat
+        //                        q2(copy_response, cv::Rect(0, cy, cx, cy));  // Bottom-Left cv::Mat q3(copy_response,
+        //                        cv::Rect(cx, cy, cx, cy)); // Bottom-Right
+
+        //                        cv::Mat tmp;                           // swap quadrants (Top-Left with Bottom-Right)
+        //                        q0.copyTo(tmp);
+        //                        q3.copyTo(q0);
+        //                        tmp.copyTo(q3);
+
+        //                        q1.copyTo(tmp);                    // swap quadrant (Top-Right with Bottom-Left)
+        //                        q2.copyTo(q1);
+        //                        tmp.copyTo(q2);
+
+        //                        cv::namedWindow("Response map",cv::WINDOW_NORMAL);
+        //                        cv::resizeWindow("Response map", 128, 128);
+        //                        cv::imshow("Response map", copy_response);
+        //                        cv::waitKey(100);
                     }
                 }
             } else {
@@ -423,12 +470,17 @@ void KCF_Tracker::track(cv::Mat &img)
     if (p_current_scale < p_min_max_scale[0]) p_current_scale = p_min_max_scale[0];
     if (p_current_scale > p_min_max_scale[1]) p_current_scale = p_min_max_scale[1];
 
+    // TODO Missing angle_index
+    //            int tmp_angle = p_current_angle + p_angles[angle_index];
+    //            p_current_angle = tmp_angle < 0 ? -std::abs(tmp_angle)%360 : tmp_angle%360;
+
     // obtain a subwindow for training at newly estimated target position
     p_threadctxs.front()->patch_feats.clear();
     get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size.width, p_windows_size.height,
-                 *p_threadctxs.front(), p_current_scale);
+                 *p_threadctxs.front(), p_current_scale, p_current_angle);
     fft.forward_window(p_threadctxs.front()->patch_feats, p_xf, p_threadctxs.front()->fw_all,
-                       m_use_cuda ? p_threadctxs.front()->data_features.deviceMem() : nullptr, p_threadctxs.front()->stream);
+                       m_use_cuda ? p_threadctxs.front()->data_features.deviceMem() : nullptr,
+                       p_threadctxs.front()->stream);
 
     // subsequent frames, interpolate model
     p_model_xf = p_model_xf * float((1. - p_interp_factor)) + p_xf * float(p_interp_factor);
@@ -552,10 +604,10 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
     } else {
         cv::resize(patch_gray, patch_gray, cv::Size(size_x, size_y), 0., 0., cv::INTER_LINEAR);
     }
-//     cv::Point2f center((patch_gray.cols-1)/2., (patch_gray.rows-1)/2.);    
-//     cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
-// 
-//     cv::warpAffine(patch_gray, patch_gray, r, cv::Size(patch_gray.cols, patch_gray.rows), cv::BORDER_CONSTANT, 1);
+    cv::Point2f center((patch_gray.cols-1)/2., (patch_gray.rows-1)/2.);    
+    cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
+
+    cv::warpAffine(patch_gray, patch_gray, r, cv::Size(patch_gray.cols, patch_gray.rows), cv::BORDER_CONSTANT, 1);
 
     // get hog(Histogram of Oriented Gradients) features
     FHoG::extract(patch_gray, vars, 2, p_cell_size, 9);
@@ -574,25 +626,18 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
         }
 //         cv::imshow("Test", patch_rgb);
 //         cv::waitKey();
-//         cv::Point2f center((patch_rgb.cols-1)/2., (patch_rgb.rows-1)/2.);    
-//         cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
-//                 
-//         cv::warpAffine(patch_rgb, patch_rgb, r, cv::Size(patch_rgb.cols, patch_rgb.rows), cv::BORDER_CONSTANT, 1);
-//         if (1) {
-//                 cv::Mat dst;
-//                 cv::Point2f center((patch_rgb.cols-1)/2., (patch_rgb.rows-1)/2.);   
-//                 cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
-//                 
-//                 cv::warpAffine(patch_rgb, dst, r, cv::Size(patch_rgb.cols, patch_rgb.rows), cv::BORDER_CONSTANT, 1);
-//                 
-//                 std::string name = "Patch RGB resized rotated";
-//                 name = name + std::to_string(angle);
-//                 std::cout << angle <<  std::endl;
-//                 cv::namedWindow(name, cv::WINDOW_NORMAL);
-//                 cv::resizeWindow(name, 64, 64);
-//                 cv::imshow(name, dst);
-//             cv::waitKey();
-//         }
+        cv::Point2f center((patch_rgb.cols-1)/2., (patch_rgb.rows-1)/2.);    
+        cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
+
+        cv::warpAffine(patch_rgb, patch_rgb, r, cv::Size(patch_rgb.cols, patch_rgb.rows), cv::BORDER_CONSTANT, 1);
+        cv::Mat patch_rgb_copy = patch_rgb.clone();
+        
+        cv::namedWindow("Patch RGB copy", CV_WINDOW_NORMAL);
+        cv::resizeWindow("Patch RGB copy", 200, 200);
+        cv::putText(patch_rgb_copy, std::to_string(angle), cv::Point(0, patch_rgb_copy.rows-1), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0,255,0),2,cv::LINE_AA);
+        cv::imshow("Patch RGB copy",  patch_rgb_copy);
+        cv::waitKey(0);
+
     }
 
     if (m_use_color && input_rgb.channels() == 3) {
@@ -769,14 +814,12 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     } else
         y2 += height % 2;
 
-    cv::Mat input_copy;
-    cv::Point2f center(cx, cy);    
-    cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
-                
-    cv::warpAffine(input, input_copy, r, cv::Size(input.cols, input.rows), cv::BORDER_CONSTANT, 1);
+//     cv::Mat input_copy;
+//     cv::Point2f center(x2-x1, y2-y1);    
+//     cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
+//                 
+//     cv::warpAffine(input, input_copy, r, cv::Size(input.cols, input.rows), cv::BORDER_CONSTANT, 1);
     
-    std::cout << " New coordinates x1: " << x1 << " y1: " << y1 << " x2: " << x2 << " y2: " << y2 << std::endl;
-    std::cout << " Patch coordinates? top: " << top << " bottom: " << bottom << " left: " << left << " right: " << right << std::endl;
     if (x2 - x1 == 0 || y2 - y1 == 0)
         patch = cv::Mat::zeros(height, width, CV_32FC1);
     else {

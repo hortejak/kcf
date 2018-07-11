@@ -178,7 +178,9 @@ int main(int argc, char *argv[])
             for (int i = 0; i < 4; i++)
                 cv::line(image, vertices[i], vertices[(i+1)%4], cv::Scalar(0,255,0), 2);
 //             cv::rectangle(image, cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h), CV_RGB(0,255,0), 2);
-            cv::putText(image, "Frame: " + std::to_string(frames) + " " + std::to_string(time_profile_counter/((double)cvGetTickFrequency()*1000)) + " ms.", cv::Point(0, image.rows-1), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0,255,0),2,cv::LINE_AA);
+            std::string angle = std::to_string (bb.a);
+            angle.erase ( angle.find_last_not_of('0') + 1, std::string::npos );
+            cv::putText(image, "Frame: " + std::to_string(frames) + " " + angle + " angle", cv::Point(0, image.rows-1), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0,255,0),2,cv::LINE_AA);
             cv::imshow("output", image);
             int ret = cv::waitKey(visualize_delay);
             if (visualize_delay > 0 && ret != -1 && ret != 255)
