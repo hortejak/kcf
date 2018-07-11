@@ -374,7 +374,7 @@ void KCF_Tracker::track(cv::Mat &img)
         //            std::cout << "CURRENT SCALE: " << p_current_scale * p_scales[i] << std::endl;
         //                for (size_t j = 0; j < p_angles.size(); ++j) {
         //                    patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0],
-        //                    p_windo>>>>>>> Commiting work done so far on rotationws_size[1], p_current_scale * p_scales[i], p_current_angle + p_angles[j]);
+        //                    p_windows_size[1], p_current_scale * p_scales[i], p_current_angle + p_angles[j]);
         //                    ComplexMat zf = fft.forward_window(patch_feat);
         //                    DEBUG_PRINTM(zf);
         //                    cv::Mat response;
@@ -387,7 +387,7 @@ void KCF_Tracker::track(cv::Mat &img)
         //                        DEBUG_PRINTM(p_model_alphaf * kzf);
         //                        response = fft.inverse(p_model_alphaf * kzf);
         //                    }
-        //                    if (1) {
+        //                    if (m_visual_debug) {
         //                        cv::Mat copy_response = response.clone();
 
         //                        // crop the spectrum, if it has an odd number of rows or columns
@@ -592,8 +592,25 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
 
     cv::Mat patch_gray = get_subwindow(input_gray, cx, cy, size_x_scaled, size_y_scaled, angle);
     cv::Mat patch_rgb = get_subwindow(input_rgb, cx, cy, size_x_scaled, size_y_scaled, angle);
-    if (m_debug) {
-        cv::imshow("Patch RGB unresized", patch_rgb);
+	if (m_visual_debug) {
+        cv::Mat patch_rgb_copy = patch_rgb.clone();
+        // Check 4 sectors of image if they have same number of black pixels
+        for(int sector = 0; sector < 4; sector++){
+            int blackPixels = 0;
+            for (int row = (sector<2?0:1)*patch_rgb_copy.rows/2; row < (patch_rgb_copy.rows-1)/(sector<2?2:1); row++){
+                for (int col = (sector == 0 || sector == 2?0:1)*patch_rgb_copy.cols/2; col < (patch_rgb_copy.cols-1)/((sector == 0 || sector == 2?2:1)); col++){
+                    cv::Vec3b pixel = patch_rgb_copy.at<cv::Vec3b>(row,col);
+                    if (pixel.val[0] == 0 && pixel.val[1] == 0 && pixel.val[2] == 0)
+                        ++blackPixels;
+                }
+            }
+            std::cout << blackPixels << std::endl;
+        }
+        std::cout << std::endl;
+
+        cv::line(patch_rgb_copy, cv::Point(0, (patch_rgb_copy.cols-1)/2), cv::Point(patch_rgb_copy.rows-1, (patch_rgb_copy.cols-1)/2),cv::Scalar(0, 255, 0));
+        cv::line(patch_rgb_copy, cv::Point((patch_rgb_copy.rows-1)/2, 0), cv::Point((patch_rgb_copy.rows-1)/2, patch_rgb_copy.cols-1),cv::Scalar(0, 255, 0));
+        cv::imshow("Patch RGB unresized", patch_rgb_copy);
         cv::waitKey();
     }
 
@@ -631,12 +648,12 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
 
         cv::warpAffine(patch_rgb, patch_rgb, r, cv::Size(patch_rgb.cols, patch_rgb.rows), cv::BORDER_CONSTANT, 1);
         cv::Mat patch_rgb_copy = patch_rgb.clone();
-        
-        cv::namedWindow("Patch RGB copy", CV_WINDOW_NORMAL);
-        cv::resizeWindow("Patch RGB copy", 200, 200);
-        cv::putText(patch_rgb_copy, std::to_string(angle), cv::Point(0, patch_rgb_copy.rows-1), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0,255,0),2,cv::LINE_AA);
-        cv::imshow("Patch RGB copy",  patch_rgb_copy);
-        cv::waitKey(0);
+        if(m_visual_debug){
+            cv::namedWindow("Patch RGB copy", CV_WINDOW_NORMAL);
+            cv::resizeWindow("Patch RGB copy", 200, 200);
+            cv::putText(patch_rgb_copy, std::to_string(angle), cv::Point(0, patch_rgb_copy.rows-1), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0,255,0),2,cv::LINE_AA);
+            cv::imshow("Patch RGB copy",  patch_rgb_copy);
+        }
 
     }
 
