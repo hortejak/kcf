@@ -8,7 +8,7 @@
 
 #if !defined(ASYNC) && !defined(OPENMP) && !defined(CUFFTW)
 #define FFTW_PLAN_WITH_THREADS() fftw_plan_with_nthreads(m_num_threads);
-#elif defined(OPENMP) && !defined(CUFFTW)
+#elif defined(OPENMP) && defined(BIG_BATCH)&& !defined(CUFFTW)
 #define FFTW_PLAN_WITH_THREADS() fftw_plan_with_nthreads(omp_get_max_threads());
 #else
 #define FFTW_PLAN_WITH_THREADS()
