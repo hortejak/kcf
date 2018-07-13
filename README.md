@@ -40,9 +40,9 @@ $ cmake-gui .
 ```
 
 - Use the just created build directory as "Where to build the binaries".
-- Press "Configure". 
+- Press "Configure".
 - Choose desired build options. Each option has a comment  briefly explaining what it does.
-- Press "Generate" and close the window. 
+- Press "Generate" and close the window.
 
 ```shellsession
 $ make -C build
@@ -56,7 +56,7 @@ $ cd build
 $ cmake [options] ..
 ```
 
-The `cmake`  options below allow to select, which version to build.
+The `cmake` options below allow to select, which version to build.
 
 The following table shows how to configure different FFT implementations.
 
