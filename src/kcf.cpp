@@ -19,6 +19,7 @@
 #include <omp.h>
 #endif // OPENMP
 
+<<<<<<< HEAD
 #define DEBUG_PRINT(obj)                                                                                               \
     if (m_debug) {                                                                                                     \
         std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;                                      \
@@ -28,6 +29,10 @@
         std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl       \
                   << (obj) << std::endl;                                                                               \
     }
+=======
+#define DEBUG_PRINT(obj) if (m_debug || m_visual_debug) {std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;}
+#define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl << (obj) << std::endl;}
+>>>>>>> Addded visual debug mode and also modified the rotation tracking implementation.
 
 KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor,
                          double output_sigma_factor, int cell_size)
@@ -141,7 +146,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         p_scales.push_back(1.);
     
      if (m_use_angle)
-        for (int i = -2*p_angle_step; i <=2*p_angle_step ; i += p_angle_step)
+        for (int i = p_angle_min; i <=p_angle_max ; i += p_angle_step)
             p_angles.push_back(i);
     else
         p_angles.push_back(0);
@@ -307,7 +312,7 @@ BBox_c KCF_Tracker::getBBox()
 
 void KCF_Tracker::track(cv::Mat &img)
 {
-    if (m_debug) std::cout << "NEW FRAME" << '\n';
+    if (m_debug || m_visual_debug) std::cout << "\nNEW FRAME" << std::endl;
     cv::Mat input_gray, input_rgb = img.clone();
     if (img.channels() == 3) {
         cv::cvtColor(img, input_gray, CV_BGR2GRAY);
@@ -369,53 +374,6 @@ void KCF_Tracker::track(cv::Mat &img)
                         max_response_pt = &(*it)->max_locs[j];
                         max_response_map = &(*it)->response_maps[j];
                         scale_index = int(j);
-        //#pragma omp parallel for ordered  private(patch_feat) schedule(dynamic)
-        //        for (size_t i = 0; i < p_scales.size(); ++i) {
-        //            std::cout << "CURRENT SCALE: " << p_current_scale * p_scales[i] << std::endl;
-        //                for (size_t j = 0; j < p_angles.size(); ++j) {
-        //                    patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0],
-        //                    p_windows_size[1], p_current_scale * p_scales[i], p_current_angle + p_angles[j]);
-        //                    ComplexMat zf = fft.forward_window(patch_feat);
-        //                    DEBUG_PRINTM(zf);
-        //                    cv::Mat response;
-        //                    if (m_use_linearkernel)
-        //                        response = fft.inverse((p_model_alphaf * zf).sum_over_channels());
-        //                    else {
-        //                        ComplexMat kzf = gaussian_correlation(zf, p_model_xf, p_kernel_sigma);
-        //                        DEBUG_PRINTM(p_model_alphaf);
-        //                        DEBUG_PRINTM(kzf);
-        //                        DEBUG_PRINTM(p_model_alphaf * kzf);
-        //                        response = fft.inverse(p_model_alphaf * kzf);
-        //                    }
-        //                    if (m_visual_debug) {
-        //                        cv::Mat copy_response = response.clone();
-
-        //                        // crop the spectrum, if it has an odd number of rows or columns
-        //                        copy_response = copy_response(cv::Rect(0, 0, copy_response.cols & -2,
-        //                        copy_response.rows & -2));
-
-        //                        // rearrange the quadrants of Fourier image  so that the origin is at the image center
-        //                        int cx = copy_response.cols/2;
-        //                        int cy = copy_response.rows/2;
-
-        //                        cv::Mat q0(copy_response, cv::Rect(0, 0, cx, cy));   // Top-Left - Create a ROI per
-        //                        quadrant cv::Mat q1(copy_response, cv::Rect(cx, 0, cx, cy));  // Top-Right cv::Mat
-        //                        q2(copy_response, cv::Rect(0, cy, cx, cy));  // Bottom-Left cv::Mat q3(copy_response,
-        //                        cv::Rect(cx, cy, cx, cy)); // Bottom-Right
-
-        //                        cv::Mat tmp;                           // swap quadrants (Top-Left with Bottom-Right)
-        //                        q0.copyTo(tmp);
-        //                        q3.copyTo(q0);
-        //                        tmp.copyTo(q3);
-
-        //                        q1.copyTo(tmp);                    // swap quadrant (Top-Right with Bottom-Left)
-        //                        q2.copyTo(q1);
-        //                        tmp.copyTo(q2);
-
-        //                        cv::namedWindow("Response map",cv::WINDOW_NORMAL);
-        //                        cv::resizeWindow("Response map", 128, 128);
-        //                        cv::imshow("Response map", copy_response);
-        //                        cv::waitKey(100);
                     }
                 }
             } else {
@@ -447,8 +405,16 @@ void KCF_Tracker::track(cv::Mat &img)
     if (m_use_subpixel_localization) new_location = sub_pixel_peak(*max_response_pt, *max_response_map);
     DEBUG_PRINT(new_location);
 
+    if (m_visual_debug) std::cout << "Old p_pose, cx: " << p_pose.cx << " cy: " << p_pose.cy << std::endl;
+
     p_pose.cx += p_current_scale * p_cell_size * double(new_location.x);
     p_pose.cy += p_current_scale * p_cell_size * double(new_location.y);
+
+    if (m_visual_debug) {
+        std::cout << "New p_pose, cx: " << p_pose.cx << " cy: " << p_pose.cy << std::endl;
+        cv::waitKey();
+    }
+
     if (p_fit_to_pw2) {
         if (p_pose.cx < 0) p_pose.cx = 0;
         if (p_pose.cx > (img.cols * p_scale_factor_x) - 1) p_pose.cx = (img.cols * p_scale_factor_x) - 1;
@@ -590,30 +556,16 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
     int size_x_scaled = int(floor(size_x * scale));
     int size_y_scaled = int(floor(size_y * scale));
 
-    cv::Mat patch_gray = get_subwindow(input_gray, cx, cy, size_x_scaled, size_y_scaled, angle);
-    cv::Mat patch_rgb = get_subwindow(input_rgb, cx, cy, size_x_scaled, size_y_scaled, angle);
-	if (m_visual_debug) {
-        cv::Mat patch_rgb_copy = patch_rgb.clone();
-        // Check 4 sectors of image if they have same number of black pixels
-        for(int sector = 0; sector < 4; sector++){
-            int blackPixels = 0;
-            for (int row = (sector<2?0:1)*patch_rgb_copy.rows/2; row < (patch_rgb_copy.rows-1)/(sector<2?2:1); row++){
-                for (int col = (sector == 0 || sector == 2?0:1)*patch_rgb_copy.cols/2; col < (patch_rgb_copy.cols-1)/((sector == 0 || sector == 2?2:1)); col++){
-                    cv::Vec3b pixel = patch_rgb_copy.at<cv::Vec3b>(row,col);
-                    if (pixel.val[0] == 0 && pixel.val[1] == 0 && pixel.val[2] == 0)
-                        ++blackPixels;
-                }
-            }
-            std::cout << blackPixels << std::endl;
-        }
-        std::cout << std::endl;
+    cv::Mat patch_gray = get_subwindow(input_gray, cx, cy, size_x_scaled, size_y_scaled /*, angle*/);
+    cv::Mat patch_rgb = get_subwindow(input_rgb, cx, cy, size_x_scaled, size_y_scaled /*, angle*/);
 
-        cv::line(patch_rgb_copy, cv::Point(0, (patch_rgb_copy.cols-1)/2), cv::Point(patch_rgb_copy.rows-1, (patch_rgb_copy.cols-1)/2),cv::Scalar(0, 255, 0));
-        cv::line(patch_rgb_copy, cv::Point((patch_rgb_copy.rows-1)/2, 0), cv::Point((patch_rgb_copy.rows-1)/2, patch_rgb_copy.cols-1),cv::Scalar(0, 255, 0));
-        cv::imshow("Patch RGB unresized", patch_rgb_copy);
-        cv::waitKey();
+    if (m_use_angle) {
+        cv::Point2f center((patch_gray.cols - 1) / 2., (patch_gray.rows - 1) / 2.);
+        cv::Mat r = cv::getRotationMatrix2D(center, angle, 1.0);
+
+        cv::warpAffine(patch_gray, patch_gray, r, cv::Size(patch_gray.cols, patch_gray.rows), cv::INTER_LINEAR,
+                       cv::BORDER_REPLICATE);
     }
-
     // resize to default size
     if (scale > 1.) {
         // if we downsample use  INTER_AREA interpolation
@@ -621,10 +573,6 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
     } else {
         cv::resize(patch_gray, patch_gray, cv::Size(size_x, size_y), 0., 0., cv::INTER_LINEAR);
     }
-    cv::Point2f center((patch_gray.cols-1)/2., (patch_gray.rows-1)/2.);    
-    cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
-
-    cv::warpAffine(patch_gray, patch_gray, r, cv::Size(patch_gray.cols, patch_gray.rows), cv::BORDER_CONSTANT, 1);
 
     // get hog(Histogram of Oriented Gradients) features
     FHoG::extract(patch_gray, vars, 2, p_cell_size, 9);
@@ -632,6 +580,21 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
     // get color rgb features (simple r,g,b channels)
     std::vector<cv::Mat> color_feat;
     if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
+        if (m_use_angle) {
+            cv::Point2f center((patch_rgb.cols - 1) / 2., (patch_rgb.rows - 1) / 2.);
+            cv::Mat r = cv::getRotationMatrix2D(center, angle, 1.0);
+
+            cv::warpAffine(patch_rgb, patch_rgb, r, cv::Size(patch_rgb.cols, patch_rgb.rows), cv::INTER_LINEAR,
+                           cv::BORDER_REPLICATE);
+        }
+        if (m_visual_debug) {
+            cv::Mat patch_rgb_copy = patch_rgb.clone();
+            cv::namedWindow("Patch RGB copy", CV_WINDOW_AUTOSIZE);
+            cv::putText(patch_rgb_copy, std::to_string(angle), cv::Point(0, patch_rgb_copy.rows - 1),
+                        cv::FONT_HERSHEY_COMPLEX_SMALL, 1, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
+            cv::imshow("Patch RGB copy", patch_rgb_copy);
+        }
+
         // resize to default size
         if (scale > 1.) {
             // if we downsample use  INTER_AREA interpolation
@@ -641,20 +604,6 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
             cv::resize(patch_rgb, patch_rgb, cv::Size(size_x / p_cell_size, size_y / p_cell_size), 0., 0.,
                        cv::INTER_LINEAR);
         }
-//         cv::imshow("Test", patch_rgb);
-//         cv::waitKey();
-        cv::Point2f center((patch_rgb.cols-1)/2., (patch_rgb.rows-1)/2.);    
-        cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
-
-        cv::warpAffine(patch_rgb, patch_rgb, r, cv::Size(patch_rgb.cols, patch_rgb.rows), cv::BORDER_CONSTANT, 1);
-        cv::Mat patch_rgb_copy = patch_rgb.clone();
-        if(m_visual_debug){
-            cv::namedWindow("Patch RGB copy", CV_WINDOW_NORMAL);
-            cv::resizeWindow("Patch RGB copy", 200, 200);
-            cv::putText(patch_rgb_copy, std::to_string(angle), cv::Point(0, patch_rgb_copy.rows-1), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0,255,0),2,cv::LINE_AA);
-            cv::imshow("Patch RGB copy",  patch_rgb_copy);
-        }
-
     }
 
     if (m_use_color && input_rgb.channels() == 3) {
@@ -791,17 +740,16 @@ cv::Mat KCF_Tracker::cosine_window_function(int dim1, int dim2)
 // Returns sub-window of image input centered at [cx, cy] coordinates),
 // with size [width, height]. If any pixels are outside of the image,
 // they will replicate the values at the borders.
-cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int width, int height, int angle)
+cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int width, int height/*, int angle*/)
 {
     cv::Mat patch;
 
-    int x1 = cx - width/2;
-    int y1 = cy - height/2;
-    int x2 = cx + width/2;
-    int y2 = cy + height/2;
-    
-//     std::cout << "Original coordinates x1: " << x1 << " y1: " << y1 << " x2: " << x2 << " y2: " << y2 << std::endl;
-    //out of image
+    int x1 = cx - width / 2;
+    int y1 = cy - height / 2;
+    int x2 = cx + width / 2;
+    int y2 = cy + height / 2;
+
+    // out of image
     if (x1 >= input.cols || y1 >= input.rows || x2 < 0 || y2 < 0) {
         patch.create(height, width, input.type());
         patch.setTo(double(0.f));
@@ -831,19 +779,36 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     } else
         y2 += height % 2;
 
-//     cv::Mat input_copy;
-//     cv::Point2f center(x2-x1, y2-y1);    
-//     cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
-//                 
-//     cv::warpAffine(input, input_copy, r, cv::Size(input.cols, input.rows), cv::BORDER_CONSTANT, 1);
-    
+    //     cv::Point2f center(x1+width/2, y1+height/2);
+    //     cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
+    //
+    //     cv::Mat input_clone = input.clone();
+    //
+    //     cv::warpAffine(input_clone, input_clone, r, cv::Size(input_clone.cols, input_clone.rows), cv::INTER_LINEAR,
+    //     cv::BORDER_CONSTANT);
+    cv::Mat input_clone;
+    if (m_visual_debug) {
+        input_clone = input.clone();
+        cv::rectangle(input_clone, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0, 255, 0));
+        cv::line(input_clone, cv::Point(0, (input_clone.rows - 1) / 2),
+                 cv::Point(input_clone.cols - 1, (input_clone.rows - 1) / 2), cv::Scalar(0, 0, 255));
+        cv::line(input_clone, cv::Point((input_clone.cols - 1) / 2, 0),
+                 cv::Point((input_clone.cols - 1) / 2, input_clone.rows - 1), cv::Scalar(0, 0, 255));
+
+        cv::imshow("Patch before copyMakeBorder", input_clone);
+    }
+
     if (x2 - x1 == 0 || y2 - y1 == 0)
         patch = cv::Mat::zeros(height, width, CV_32FC1);
     else {
         cv::copyMakeBorder(input(cv::Range(y1, y2), cv::Range(x1, x2)), patch, top, bottom, left, right,
                            cv::BORDER_REPLICATE);
-        //      imshow( "copyMakeBorder", patch);
-        //      cv::waitKey();
+        if (m_visual_debug) {
+            cv::Mat patch_dummy;
+            cv::copyMakeBorder(input_clone(cv::Range(y1, y2), cv::Range(x1, x2)), patch_dummy, top, bottom, left, right,
+                               cv::BORDER_REPLICATE);
+            cv::imshow("Patch after copyMakeBorder", patch_dummy);
+        }
     }
 
     // sanity check

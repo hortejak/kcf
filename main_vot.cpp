@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
             break;
         case 'p':
             tracker.m_visual_debug = true;
-            visualize_delay = 0;
+            visualize_delay = 500;
             break;
         case 'h':
             std::cerr << "Usage: \n"
@@ -186,6 +186,7 @@ int main(int argc, char *argv[])
 //             cv::rectangle(image, cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h), CV_RGB(0,255,0), 2);
             std::string angle = std::to_string (bb.a);
             angle.erase ( angle.find_last_not_of('0') + 1, std::string::npos );
+            angle.erase ( angle.find_last_not_of('.') + 1, std::string::npos );
             cv::putText(image, "Frame: " + std::to_string(frames) + " " + angle + " angle", cv::Point(0, image.rows-1), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0,255,0),2,cv::LINE_AA);
             cv::imshow("output", image);
             int ret = cv::waitKey(visualize_delay);
