@@ -21,9 +21,14 @@ CMAKE_OTPS_cufft             = -DFFT=cuFFT
 CMAKE_OTPS_cufft_big         = -DFFT=cuFFT -DBIG_BATCH=ON
 CMAKE_OTPS_cufft_big_openmp  = -DFFT=cuFFT -DBIG_BATCH=ON -DOPENMP=ON
 
-build-%/kcf_vot: $(shell git ls-files)
+.SECONDARY: $(BUILDS:%=build-%/build.ninja)
+
+build-%/build.ninja:
 	mkdir -p $(@D)
 	cd $(@D) && cmake $(CMAKE_OPTS) $(CMAKE_OTPS_$*) ..
+
+.PHONY: FORCE
+build-%/kcf_vot: build-%/build.ninja FORCE
 	cmake --build $(@D)
 
 $(BUILDS): %: build-%/kcf_vot
