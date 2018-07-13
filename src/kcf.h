@@ -54,7 +54,7 @@ public:
     bool m_debug {false};
 	bool m_visual_debug {false};
     bool m_use_scale {false};
-    bool m_use_angle {true};
+    bool m_use_angle {true}; //Works only when m_use_scale is off and m_use_subpixel_localization too and used on RotatingBox dataset.
     bool m_use_color {true};
 #ifdef ASYNC
     bool m_use_multithreading {true};
@@ -125,6 +125,7 @@ private:
     std::vector<double> p_scales;
     int p_num_angles {5};
     int p_current_angle = 0;
+    int p_angle_min  = -20, p_angle_max = 20;
     int p_angle_step = 10;
     std::vector<double> p_angles;
 
@@ -143,7 +144,7 @@ private:
     ComplexMat p_model_alphaf_den;
     ComplexMat p_model_xf;
     //helping functions
-    cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y, int angle);
+    cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y/*, int angle*/);
     cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);
     ComplexMat gaussian_correlation(const ComplexMat & xf, const ComplexMat & yf, double sigma, bool auto_correlation = false);
     cv::Mat circshift(const cv::Mat & patch, int x_rot, int y_rot);
