@@ -583,47 +583,15 @@ std::vector<cv::Mat> KCF_Tracker::get_features(cv::Mat & input_rgb, cv::Mat & in
     cv::Mat patch_gray = get_subwindow(input_gray, cx, cy, size_x_scaled, size_y_scaled/*, angle*/);
     cv::Mat patch_rgb = get_subwindow(input_rgb, cx, cy, size_x_scaled, size_y_scaled/*, angle*/);
 
-    if (m_use_angle) {
-    cv::Point2f center((patch_gray.cols-1)/2., (patch_gray.rows-1)/2.);
-    cv::Mat r = cv::getRotationMatrix2D(center, angle, 1.0);
-
-    cv::warpAffine(patch_gray, patch_gray, r, cv::Size(patch_gray.cols, patch_gray.rows), cv::INTER_LINEAR, cv::BORDER_REPLICATE);
-    }
-    //resize to default size
-    if (scale > 1.){
-        //if we downsample use  INTER_AREA interpolation
-        cv::resize(patch_gray, patch_gray, cv::Size(size_x, size_y), 0., 0., cv::INTER_AREA);
-    }else {
-        cv::resize(patch_gray, patch_gray, cv::Size(size_x, size_y), 0., 0., cv::INTER_LINEAR);
-    }
+    geometric_transformations(patch_gray, scale, size_x, size_y, angle);
 
     // get hog(Histogram of Oriented Gradients) features
     std::vector<cv::Mat> hog_feat = FHoG::extract(patch_gray, 2, p_cell_size, 9);
 
     //get color rgb features (simple r,g,b channels)
     std::vector<cv::Mat> color_feat;
-    if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
-        if (m_use_angle) {
-        cv::Point2f center((patch_rgb.cols-1)/2., (patch_rgb.rows-1)/2.);
-        cv::Mat r = cv::getRotationMatrix2D(center, angle, 1.0);
-
-        cv::warpAffine(patch_rgb, patch_rgb, r, cv::Size(patch_rgb.cols, patch_rgb.rows), cv::INTER_LINEAR, cv::BORDER_REPLICATE);
-        }
-        if(m_visual_debug){
-            cv::Mat patch_rgb_copy = patch_rgb.clone();
-            cv::namedWindow("Patch RGB copy", CV_WINDOW_AUTOSIZE);
-            cv::putText(patch_rgb_copy, std::to_string(angle), cv::Point(0, patch_rgb_copy.rows-1), cv::FONT_HERSHEY_COMPLEX_SMALL, 1, cv::Scalar(0,255,0),2,cv::LINE_AA);
-            cv::imshow("Patch RGB copy",  patch_rgb_copy);
-        }
-
-        //resize to default size
-        if (scale > 1.){
-            //if we downsample use  INTER_AREA interpolation
-            cv::resize(patch_rgb, patch_rgb, cv::Size(size_x/p_cell_size, size_y/p_cell_size), 0., 0., cv::INTER_AREA);
-        }else {
-            cv::resize(patch_rgb, patch_rgb, cv::Size(size_x/p_cell_size, size_y/p_cell_size), 0., 0., cv::INTER_LINEAR);
-        }
-    }
+    if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3)
+        geometric_transformations(patch_rgb, scale, size_x, size_y, angle);
 
     if (m_use_color && input_rgb.channels() == 3) {
         //use rgb color space
@@ -823,6 +791,39 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
 
     return patch;
 }
+
+ void KCF_Tracker::geometric_transformations(cv::Mat & patch,  double scale,int size_x, int size_y, int angle)
+ {
+     if (m_use_angle) {
+         cv::Point2f center((patch.cols-1)/2., (patch.rows-1)/2.);
+         cv::Mat r = cv::getRotationMatrix2D(center, angle, 1.0);
+
+         cv::warpAffine(patch, patch, r, cv::Size(patch.cols, patch.rows), cv::INTER_LINEAR, cv::BORDER_REPLICATE);
+
+         if(m_visual_debug){
+             cv::Mat patch_copy = patch.clone();
+             cv::namedWindow("Patch RGB copy", CV_WINDOW_AUTOSIZE);
+             cv::putText(patch_copy, std::to_string(angle), cv::Point(0, patch_copy.rows-1), cv::FONT_HERSHEY_COMPLEX_SMALL, 1, cv::Scalar(0,255,0),2,cv::LINE_AA);
+             cv::imshow("Rotated patch",  patch_copy);
+         }
+     }
+     //resize to default size
+     if (patch.channels() != 3){
+        if (scale > 1.){
+            //if we downsample use  INTER_AREA interpolation
+            cv::resize(patch, patch, cv::Size(size_x, size_y), 0., 0., cv::INTER_AREA);
+        }else {
+            cv::resize(patch, patch, cv::Size(size_x, size_y), 0., 0., cv::INTER_LINEAR);
+        }
+     } else {
+         if (scale > 1.){
+             //if we downsample use  INTER_AREA interpolation
+             cv::resize(patch, patch, cv::Size(size_x/p_cell_size, size_y/p_cell_size), 0., 0., cv::INTER_AREA);
+         }else {
+             cv::resize(patch, patch, cv::Size(size_x/p_cell_size, size_y/p_cell_size), 0., 0., cv::INTER_LINEAR);
+         }
+     }
+ }
 
 ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const ComplexMat &yf, double sigma, bool auto_correlation)
 {
