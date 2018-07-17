@@ -49,7 +49,7 @@ builds with `ninja` are faster (better parallelized) than with `make`.
 To build only a specific version run `make <version>`, for example:
 
 ``` shellsession
-make cufft
+$ make cufft
 ```
 
 [8]: https://ninja-build.org/
