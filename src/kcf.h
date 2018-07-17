@@ -54,7 +54,7 @@ public:
     bool m_debug {false};
 	bool m_visual_debug {false};
     bool m_use_scale {false};
-    bool m_use_angle {true}; //Works only when m_use_scale is off and m_use_subpixel_localization too and used on RotatingBox dataset.
+    bool m_use_angle {true}; //Currently only works when m_use_scale is off and m_use_subpixel_localization too and used on RotatingBox dataset.
     bool m_use_color {true};
 #ifdef ASYNC
     bool m_use_multithreading {true};
@@ -129,6 +129,12 @@ private:
     int p_angle_step = 10;
     std::vector<double> p_angles;
 
+    //for visual debug
+    int p_debug_image_size = 100;
+    int p_count = 0;
+    std::vector<cv::Mat> p_debug_scale_responses;
+    std::vector<cv::Mat> p_debug_subwindows;
+
     //for big batch
     int p_num_of_feats;
     int p_roi_height, p_roi_width;
@@ -144,13 +150,13 @@ private:
     ComplexMat p_model_alphaf_den;
     ComplexMat p_model_xf;
     //helping functions
-    cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y/*, int angle*/);
+    cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y);
     cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);
     ComplexMat gaussian_correlation(const ComplexMat & xf, const ComplexMat & yf, double sigma, bool auto_correlation = false);
     cv::Mat circshift(const cv::Mat & patch, int x_rot, int y_rot);
     cv::Mat cosine_window_function(int dim1, int dim2);
-    std::vector<cv::Mat> get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx, int cy, int size_x, int size_y, double scale = 1., int angle = 0);
-    void geometric_transformations(cv::Mat & patch,  double scale,int size_x, int size_y, int angle);
+    std::vector<cv::Mat> get_features(cv::Mat & input_rgb, cv::Mat & input_gray);
+    void geometric_transformations(cv::Mat & patch, int size_x, int size_y, double scale = 1, int angle = 0, bool search = true);
     cv::Point2f sub_pixel_peak(cv::Point & max_loc, cv::Mat & response);
     double sub_grid_scale(std::vector<double> & responses, int index = -1);
 

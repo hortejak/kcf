@@ -131,12 +131,13 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
             p_scales.push_back(std::pow(p_scale_step, i));
     else
         p_scales.push_back(1.);
-    
-     if (m_use_angle)
+
+     if (m_use_angle) {
         for (int i = p_angle_min; i <=p_angle_max ; i += p_angle_step)
             p_angles.push_back(i);
-    else
+     } else {
         p_angles.push_back(0);
+     }
 
 #ifdef CUFFT
     if (p_windows_size[1]/p_cell_size*(p_windows_size[0]/p_cell_size/2+1) > 1024) {
@@ -190,7 +191,18 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
       CudaSafeCall(cudaMalloc((void**)&gauss_corr_res, (p_windows_size[0]/p_cell_size)*(p_windows_size[1]/p_cell_size)*p_num_scales*sizeof(float)));
 #endif
     //obtain a sub-window for training initial model
-    std::vector<cv::Mat> path_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1]);
+    int size_x_scaled = floor(p_windows_size[0]);
+    int size_y_scaled = floor(p_windows_size[1]);
+
+    cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+    geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1], 1, 0, false);
+
+    cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
+    if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
+        patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+        geometric_transformations(patch_rgb,  p_windows_size[0], p_windows_size[1], 1, 0, false);
+    }
+    std::vector<cv::Mat> path_feat = get_features(patch_rgb, patch_gray);
     p_model_xf = fft.forward_window(path_feat);
     DEBUG_PRINTM(p_model_xf);
 
@@ -293,8 +305,19 @@ void KCF_Tracker::track(cv::Mat &img)
             async_res[i] = std::async(std::launch::async,
                                       [this, &input_gray, &input_rgb, i]() -> cv::Mat
                                       {
-                                          std::vector<cv::Mat> patch_feat_async = get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size[0],
-                                                                                               this->p_windows_size[1], this->p_current_scale * this->p_scales[i]);
+                                          int size_x_scaled = floor(p_windows_size[0]*p_current_scale * this->p_scales[i]);
+                                          int size_y_scaled = floor(p_windows_size[1]*p_current_scale * this->p_scales[i]);
+
+                                          cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+                                          geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1], p_current_scale * this->p_scales[i]);
+
+                                          cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
+                                          if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
+                                              patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+                                              geometric_transformations(patch_rgb, p_windows_size[0], p_windows_size[1], p_current_scale * this->p_scales[i]);
+                                          }
+
+                                          std::vector<cv::Mat> patch_feat_async = get_features(patch_rgb, patch_gray);
                                           ComplexMat zf = fft.forward_window(patch_feat_async);
                                           if (m_use_linearkernel)
                                               return fft.inverse((p_model_alphaf * zf).sum_over_channels());
@@ -326,7 +349,18 @@ void KCF_Tracker::track(cv::Mat &img)
     } else if (m_use_big_batch){
 #pragma omp parallel for ordered
         for (size_t i = 0; i < p_scales.size(); ++i) {
-            std::vector<cv::Mat> tmp = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i]);
+            int size_x_scaled = floor(p_windows_size[0]*p_current_scale * this->p_scales[i]);
+            int size_y_scaled = floor(p_windows_size[1]*p_current_scale * this->p_scales[i]);
+
+            cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+            geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1], p_current_scale * this->p_scales[i]);
+
+            cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
+            if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
+                patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+                geometric_transformations(patch_rgb, p_windows_size[0], p_windows_size[1],  p_current_scale * this->p_scales[i]);
+            }
+            std::vector<cv::Mat> tmp = get_features(input_rgb, input_gray);
 #pragma omp ordered
             patch_feat.insert(std::end(patch_feat), std::begin(tmp), std::end(tmp));
         }
@@ -370,7 +404,19 @@ void KCF_Tracker::track(cv::Mat &img)
 #pragma omp parallel for ordered  private(patch_feat) schedule(dynamic)
         for (size_t i = 0; i < p_scales.size(); ++i) {
                 for (size_t j = 0; j < p_angles.size(); ++j) {
-                    patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i], p_current_angle + p_angles[j]);
+                    int size_x_scaled = floor(p_windows_size[0]*p_current_scale * p_scales[i]);
+                    int size_y_scaled = floor(p_windows_size[1]*p_current_scale * p_scales[i]);
+
+                    cv::Mat patch_gray = get_subwindow(input_gray, p_pose.cx, p_pose.cy, size_x_scaled, size_y_scaled);
+                    geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i], p_current_angle + p_angles[j]);
+
+                    cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
+                    if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
+                        patch_rgb = get_subwindow(input_rgb, p_pose.cx, p_pose.cy, size_x_scaled, size_y_scaled);
+                        geometric_transformations(patch_rgb, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i],  p_current_angle + p_angles[j]);
+                    }
+
+                    patch_feat = get_features(patch_rgb, patch_gray);
                     ComplexMat zf = fft.forward_window(patch_feat);
                     DEBUG_PRINTM(zf);
                     cv::Mat response;
@@ -395,7 +441,7 @@ void KCF_Tracker::track(cv::Mat &img)
                     DEBUG_PRINT(max_loc);
 
                     double weight = p_scales[i] < 1. ? p_scales[i] : 1./p_scales[i];
-                    if (m_visual_debug) {
+                    if (m_visual_debug){
                         std::string scale = std::to_string(p_scales[i]);
                         scale.erase ( scale.find_last_not_of('0') + 1, std::string::npos );
                         scale.erase ( scale.find_last_not_of('.') + 1, std::string::npos );
@@ -427,16 +473,12 @@ void KCF_Tracker::track(cv::Mat &img)
                         q2.copyTo(q1);
                         tmp.copyTo(q2);
 
-                        cv::namedWindow("Response map",cv::WINDOW_AUTOSIZE);
-                        cv::resize(copy_response, copy_response, cv::Size(200, 200), 0., 0., cv::INTER_LINEAR);
+                        cv::resize(copy_response, copy_response, cv::Size(p_debug_image_size, p_debug_image_size), 0., 0., cv::INTER_LINEAR);
+                        cv::putText(copy_response, angle,  cv::Point(0, copy_response.rows-1), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5, cv::Scalar(255,255,255),1,cv::LINE_AA);
+                        if ((p_count-1)%5 == 0)
+                            cv::putText(copy_response, scale,  cv::Point(0, 10), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5, cv::Scalar(255,255,255),1,cv::LINE_AA);
 
-                        cv::putText(copy_response, angle,  cv::Point(0, copy_response.rows-1), cv::FONT_HERSHEY_COMPLEX_SMALL, 1, cv::Scalar(255,255,255),2,cv::LINE_AA);
-                        cv::imshow("Response map", copy_response);
-                        cv::waitKey(1000);
-//                         cv::line(copy_response, cv::Point(0, (copy_response.rows-1)/2), cv::Point(copy_response.cols-1, (copy_response.rows-1)/2),cv::Scalar(255, 255, 255));
-//                         cv::line(copy_response, cv::Point((copy_response.cols-1)/2, 0), cv::Point((copy_response.cols-1)/2, copy_response.rows-1),cv::Scalar(255, 255, 255));
-//                         cv::imshow("Response map", copy_response);
-//                         cv::waitKey(1000);
+                        p_debug_scale_responses.push_back(copy_response);
                     }
 #pragma omp critical
                     {
@@ -452,48 +494,28 @@ void KCF_Tracker::track(cv::Mat &img)
                     scale_responses.push_back(max_val*weight);
             }
         }
+        if (m_visual_debug){
+            cv::Mat all_responses(cv::Size(p_angles.size()*p_debug_image_size, p_scales.size()*p_debug_image_size), p_debug_scale_responses[0].type(), cv::Scalar::all(0));
+            cv::Mat all_subwindows(cv::Size(p_angles.size()*p_debug_image_size, p_scales.size()*p_debug_image_size), p_debug_subwindows[0].type(), cv::Scalar::all(0));
+            for (size_t i = 0; i < p_scales.size(); ++i) {
+                for (size_t j = 0; j < p_angles.size(); ++j) {
+                    cv::Mat in_roi(all_responses, cv::Rect(j*p_debug_image_size, i*p_debug_image_size, p_debug_image_size, p_debug_image_size));
+                    p_debug_scale_responses[5*i+j].copyTo(in_roi);
+                    in_roi = all_subwindows(cv::Rect(j*p_debug_image_size, i*p_debug_image_size, p_debug_image_size, p_debug_image_size));
+                    p_debug_subwindows[5*i+j].copyTo(in_roi);
+                }
+            }
+            cv::namedWindow("All subwindows", CV_WINDOW_AUTOSIZE);
+            cv::imshow("All subwindows", all_subwindows);
+            cv::namedWindow("All responses", CV_WINDOW_AUTOSIZE);
+            cv::imshow("All responses", all_responses);
+            cv::waitKey();
+            p_debug_scale_responses.clear();
+            p_debug_subwindows.clear();
+        }
     }
     DEBUG_PRINTM(max_response_map);
     DEBUG_PRINT(max_response_pt);
-
-    if (m_visual_debug) {
-        std::string scale = std::to_string(p_scales[scale_index]);
-        scale.erase ( scale.find_last_not_of('0') + 1, std::string::npos );
-        scale.erase ( scale.find_last_not_of('.') + 1, std::string::npos );
-
-        std::string angle = std::to_string(p_current_angle + p_angles[angle_index]);
-        angle.erase ( angle.find_last_not_of('0') + 1, std::string::npos );
-        angle.erase ( angle.find_last_not_of('.') + 1, std::string::npos );
-        std::cout << "\nSelected scale: " << scale << " and angle:" << angle <<  " with response: " << std::to_string(max_response) << std::endl;
-        cv::Mat copy_response = max_response_map.clone();
-
-        // crop the spectrum, if it has an odd number of rows or columns
-        copy_response = copy_response(cv::Rect(0, 0, copy_response.cols & -2, copy_response.rows & -2));
-
-        // rearrange the quadrants of Fourier image  so that the origin is at the image center
-        int cx = copy_response.cols/2;
-        int cy = copy_response.rows/2;
-
-        cv::Mat q0(copy_response, cv::Rect(0, 0, cx, cy));   // Top-Left - Create a ROI per quadrant
-        cv::Mat q1(copy_response, cv::Rect(cx, 0, cx, cy));  // Top-Right
-        cv::Mat q2(copy_response, cv::Rect(0, cy, cx, cy));  // Bottom-Left
-        cv::Mat q3(copy_response, cv::Rect(cx, cy, cx, cy)); // Bottom-Right
-
-        cv::Mat tmp;                           // swap quadrants (Top-Left with Bottom-Right)
-        q0.copyTo(tmp);
-        q3.copyTo(q0);
-        tmp.copyTo(q3);
-
-        q1.copyTo(tmp);                    // swap quadrant (Top-Right with Bottom-Left)
-        q2.copyTo(q1);
-        tmp.copyTo(q2);
-
-        cv::namedWindow("Response map",cv::WINDOW_AUTOSIZE);
-        cv::resize(copy_response, copy_response, cv::Size(200, 200), 0., 0., cv::INTER_LINEAR);
-
-        cv::putText(copy_response, angle,  cv::Point(0, copy_response.rows-1), cv::FONT_HERSHEY_COMPLEX_SMALL, 1, cv::Scalar(255,255,255),2,cv::LINE_AA);
-        cv::imshow("Response map", copy_response);
-    }
 
     //sub pixel quadratic interpolation from neighbours
     if (max_response_pt.y > max_response_map.rows / 2) //wrap around to negative half-space of vertical axis
@@ -514,10 +536,8 @@ void KCF_Tracker::track(cv::Mat &img)
     p_pose.cx += p_current_scale*p_cell_size*new_location.x;
     p_pose.cy += p_current_scale*p_cell_size*new_location.y;
 
-    if (m_visual_debug) {
+    if (m_visual_debug)
         std::cout << "New p_pose, cx: " << p_pose.cx << " cy: " << p_pose.cy << std::endl;
-        cv::waitKey();
-    }
 
     if (p_fit_to_pw2) {
         if (p_pose.cx < 0) p_pose.cx = 0;
@@ -547,7 +567,18 @@ void KCF_Tracker::track(cv::Mat &img)
     p_current_angle = tmp_angle < 0 ? -std::abs(tmp_angle)%360 : tmp_angle%360;
 
     //obtain a subwindow for training at newly estimated target position
-    patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_current_scale, p_current_angle);
+    int size_x_scaled = floor(p_windows_size[0]*p_current_scale);
+    int size_y_scaled = floor(p_windows_size[1]*p_current_scale);
+
+    cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+    geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1],  p_current_scale, p_current_angle,  false);
+
+    cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
+    if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
+        patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+        geometric_transformations(patch_rgb, p_windows_size[0], p_windows_size[1],  p_current_scale, p_current_angle,  false);
+    }
+    patch_feat = get_features(patch_rgb, patch_gray);
     ComplexMat xf = fft.forward_window(patch_feat);
 
     //subsequent frames, interpolate model
@@ -575,25 +606,16 @@ void KCF_Tracker::track(cv::Mat &img)
 
 // ****************************************************************************
 
-std::vector<cv::Mat> KCF_Tracker::get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx, int cy, int size_x, int size_y, double scale, int angle)
+std::vector<cv::Mat> KCF_Tracker::get_features(cv::Mat & patch_rgb, cv::Mat & patch_gray)
 {
-    int size_x_scaled = floor(size_x*scale);
-    int size_y_scaled = floor(size_y*scale);
-
-    cv::Mat patch_gray = get_subwindow(input_gray, cx, cy, size_x_scaled, size_y_scaled/*, angle*/);
-    cv::Mat patch_rgb = get_subwindow(input_rgb, cx, cy, size_x_scaled, size_y_scaled/*, angle*/);
-
-    geometric_transformations(patch_gray, scale, size_x, size_y, angle);
 
     // get hog(Histogram of Oriented Gradients) features
     std::vector<cv::Mat> hog_feat = FHoG::extract(patch_gray, 2, p_cell_size, 9);
 
     //get color rgb features (simple r,g,b channels)
     std::vector<cv::Mat> color_feat;
-    if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3)
-        geometric_transformations(patch_rgb, scale, size_x, size_y, angle);
 
-    if (m_use_color && input_rgb.channels() == 3) {
+    if (m_use_color && patch_rgb.channels() == 3) {
         //use rgb color space
         cv::Mat patch_rgb_norm;
         patch_rgb.convertTo(patch_rgb_norm, CV_32F, 1. / 255., -0.5);
@@ -605,7 +627,7 @@ std::vector<cv::Mat> KCF_Tracker::get_features(cv::Mat & input_rgb, cv::Mat & in
         color_feat.insert(color_feat.end(), rgb.begin(), rgb.end());
     }
 
-    if (m_use_cnfeat && input_rgb.channels() == 3) {
+    if (m_use_cnfeat && patch_rgb.channels() == 3) {
         std::vector<cv::Mat> cn_feat = CNFeat::extract(patch_rgb);
         color_feat.insert(color_feat.end(), cn_feat.begin(), cn_feat.end());
     }
@@ -719,7 +741,7 @@ cv::Mat KCF_Tracker::cosine_window_function(int dim1, int dim2)
 // Returns sub-window of image input centered at [cx, cy] coordinates),
 // with size [width, height]. If any pixels are outside of the image,
 // they will replicate the values at the borders.
-cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int width, int height/*, int angle*/)
+cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int width, int height)
 {
     cv::Mat patch;
 
@@ -758,33 +780,10 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     } else
         y2 += height % 2;
 
-//     cv::Point2f center(x1+width/2, y1+height/2);
-//     cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
-//
-//     cv::Mat input_clone = input.clone();
-//
-//     cv::warpAffine(input_clone, input_clone, r, cv::Size(input_clone.cols, input_clone.rows), cv::INTER_LINEAR, cv::BORDER_CONSTANT);
-    cv::Mat input_clone;
-    if (m_visual_debug) {
-        input_clone = input.clone();
-        cv::rectangle(input_clone, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0, 255, 0));
-        cv::line(input_clone, cv::Point(0, (input_clone.rows-1)/2), cv::Point(input_clone.cols-1, (input_clone.rows-1)/2),cv::Scalar(0, 0, 255));
-        cv::line(input_clone, cv::Point((input_clone.cols-1)/2, 0), cv::Point((input_clone.cols-1)/2, input_clone.rows-1),cv::Scalar(0, 0, 255));
-
-        cv::imshow("Patch before copyMakeBorder", input_clone);
-    }
-
     if (x2 - x1 == 0 || y2 - y1 == 0)
         patch = cv::Mat::zeros(height, width, CV_32FC1);
     else
-        {
-            cv::copyMakeBorder(input(cv::Range(y1, y2), cv::Range(x1, x2)), patch, top, bottom, left, right, cv::BORDER_REPLICATE);
-            if (m_visual_debug) {
-                cv::Mat patch_dummy;
-                cv::copyMakeBorder(input_clone(cv::Range(y1, y2), cv::Range(x1, x2)), patch_dummy, top, bottom, left, right, cv::BORDER_REPLICATE);
-                cv::imshow("Patch after copyMakeBorder", patch_dummy);
-            }
-        }
+        cv::copyMakeBorder(input(cv::Range(y1, y2), cv::Range(x1, x2)), patch, top, bottom, left, right, cv::BORDER_REPLICATE);
 
     //sanity check
     assert(patch.cols == width && patch.rows == height);
@@ -792,21 +791,15 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     return patch;
 }
 
- void KCF_Tracker::geometric_transformations(cv::Mat & patch,  double scale,int size_x, int size_y, int angle)
- {
+void KCF_Tracker::geometric_transformations(cv::Mat& patch, int size_x, int size_y, double scale,int angle, bool search)
+{
      if (m_use_angle) {
          cv::Point2f center((patch.cols-1)/2., (patch.rows-1)/2.);
          cv::Mat r = cv::getRotationMatrix2D(center, angle, 1.0);
 
          cv::warpAffine(patch, patch, r, cv::Size(patch.cols, patch.rows), cv::INTER_LINEAR, cv::BORDER_REPLICATE);
-
-         if(m_visual_debug){
-             cv::Mat patch_copy = patch.clone();
-             cv::namedWindow("Patch RGB copy", CV_WINDOW_AUTOSIZE);
-             cv::putText(patch_copy, std::to_string(angle), cv::Point(0, patch_copy.rows-1), cv::FONT_HERSHEY_COMPLEX_SMALL, 1, cv::Scalar(0,255,0),2,cv::LINE_AA);
-             cv::imshow("Rotated patch",  patch_copy);
-         }
      }
+
      //resize to default size
      if (patch.channels() != 3){
         if (scale > 1.){
@@ -821,6 +814,23 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
              cv::resize(patch, patch, cv::Size(size_x/p_cell_size, size_y/p_cell_size), 0., 0., cv::INTER_AREA);
          }else {
              cv::resize(patch, patch, cv::Size(size_x/p_cell_size, size_y/p_cell_size), 0., 0., cv::INTER_LINEAR);
+         }
+         if (m_visual_debug && search) {
+             cv::Mat input_clone = patch.clone();
+             cv::resize(input_clone, input_clone, cv::Size(p_debug_image_size, p_debug_image_size), 0., 0., cv::INTER_LINEAR);
+
+             std::string angle_string = std::to_string(p_current_angle + angle);
+             if (p_count%5 == 0) {
+                 std::string scale_string = std::to_string(scale);
+                 scale_string.erase ( scale_string.find_last_not_of('0') + 1, std::string::npos );
+                 scale_string.erase ( scale_string.find_last_not_of('.') + 1, std::string::npos );
+                 cv::putText(input_clone, scale_string,  cv::Point(0, 10), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5, cv::Scalar(0,255,0),1,cv::LINE_AA);
+             }
+
+             cv::putText(input_clone, angle_string,  cv::Point(1, input_clone.rows-5), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5, cv::Scalar(0,255,0),1,cv::LINE_AA);
+
+             p_debug_subwindows.push_back(input_clone);
+             p_count += 1;
          }
      }
  }
