@@ -1,28 +1,33 @@
 # KCF tracker – parallel and PREM implementations
 
 The goal of this project is modify KCF tracker for use in the
-[HERCULES](http://hercules2020.eu/) project, where it will run on
-NVIDIA TX2 board. To achieve the needed performance we try various
-ways of parallelization of the algorithm including execution on the
-GPU. The aim is also to modify the code according to the PRedictable
-Execution Model (PREM).
+[HERCULES][1] project, where it will run on NVIDIA TX2 board. To
+achieve the needed performance we try various ways of parallelization
+of the algorithm including execution on the GPU. The aim is also to
+modify the code according to the PRedictable Execution Model (PREM).
 
-Stable version of the tracker is available from [CTU
-server](http://rtime.felk.cvut.cz/gitweb/hercules2020/kcf.git.),
-development happens at [Github](https://github.com/Shanigen/kcf.).
+Stable version of the tracker is available from [CTU server][2],
+development happens at [Github][3].
+
+[1]: http://hercules2020.eu/
+[2]: http://rtime.felk.cvut.cz/gitweb/hercules2020/kcf.git
+[3]: https://github.com/Shanigen/kcf
 
 ## Prerequisites
 
 The code depends on OpenCV 2.4 (3.0+ for CUDA-based version) library
 and cmake is used for building. Depending on the version to be
-compiled you have to have [FFTW](http://www.fftw.org/),
-[CUDA](https://developer.nvidia.com/cuda-downloads) or
-[OpenMP](http://www.openmp.org/) installed.
+compiled you have to have [FFTW][4], [CUDA][5] or [OpenMP][6]
+installed.
 
 SSE instructions were used in the original code and these are only
-supported on x86 architecture. Thanks to the
-[SSE2NEON](https://github.com/jratcliff63367/sse2neon) code, we now
-support both ARM and x86 architectures.
+supported on x86 architecture. Thanks to the [SSE2NEON][7] code, we
+now support both ARM and x86 architectures.
+
+[4]: http://www.fftw.org/
+[5]: https://developer.nvidia.com/cuda-downloads
+[6]: http://www.openmp.org/
+[7]: https://github.com/jratcliff63367/sse2neon
 
 ## Compilation
 
@@ -37,16 +42,17 @@ $ make -k
 
 This will create several `build-*` directories and compile different
 versions in them. If prerequisites of some builds are missing, the
-`-k` option ensures that the errors are ignored. This uses
-[Ninja](https://ninja-build.org/) build system, which is useful when
-building naively on TX2, because builds with `ninja` are faster
-(better parallelized) than with `make`.
+`-k` option ensures that the errors are ignored. This uses [Ninja][8]
+build system, which is useful when building naively on TX2, because
+builds with `ninja` are faster (better parallelized) than with `make`.
 
 To build only a specific version run `make <version>`, for example:
 
 ``` shellsession
 make cufft
 ```
+
+[8]: https://ninja-build.org/
 
 ### Using cmake gui
 
@@ -107,7 +113,9 @@ The CuFFT version is set up to run on NVIDIA Jetson TX2. If you want
 to run it on different architecture, change the `--gpu-architecture
 sm_62` NVCC flag in **/src/CMakeLists.txt** to your architecture of
 NVIDIA GPU. To find what SM variation you architecture has look
-[here](http://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/).
+[here][9].
+
+[9]: http://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/
 
 ## Running
 
@@ -115,9 +123,8 @@ No matter which method is used to compile the code, the results will
 be `kcf_vot` binary.
 
 It operates on an image sequence created according to [VOT 2014
-methodology](http://www.votchallenge.net/). You can find some image
-sequences in [vot2016
-datatset](http://www.votchallenge.net/vot2016/dataset.html).
+methodology][10]. You can find some image sequences in [vot2016
+datatset][11].
 
 The binary can be run as follows:
 
@@ -147,6 +154,9 @@ By default the program generates file `output.txt` containing the
 bounding boxes of the tracked object in the format "top_left_x,
 top_left_y, width, height".
 
+[10]: http://www.votchallenge.net/
+[11]: http://www.votchallenge.net/vot2016/dataset.html
+
 ### Options
 
 | Options | Description |
@@ -161,9 +171,10 @@ top_left_y, width, height".
 * Vít Karafiát, Michal Sojka
 
 Original C++ implementation of KCF tracker was written by Tomas Vojir
-[here](https://github.com/vojirt/kcf/blob/master/README.md) and is
-reimplementation of algorithm presented in "High-Speed Tracking with
-Kernelized Correlation Filters" paper [1].
+[here][12] and is reimplementation of algorithm presented in
+"High-Speed Tracking with Kernelized Correlation Filters" paper [1].
+
+[12]: https://github.com/vojirt/kcf/blob/master/README.md
 
 ## References
 
