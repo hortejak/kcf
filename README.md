@@ -16,18 +16,14 @@ development happens at [Github][3].
 ## Prerequisites
 
 The code depends on OpenCV 2.4 (3.0+ for CUDA-based version) library
-and cmake is used for building. Depending on the version to be
-compiled you have to have [FFTW][4], [CUDA][5] or [OpenMP][6]
-installed.
-
-SSE instructions were used in the original code and these are only
-supported on x86 architecture. Thanks to the [SSE2NEON][7] code, we
-now support both ARM and x86 architectures.
+and [CMake][13] is used for building. Depending on the version to be
+compiled you need to have development packages for [FFTW][4],
+[CUDA][5] or [OpenMP][6] installed.
 
 [4]: http://www.fftw.org/
 [5]: https://developer.nvidia.com/cuda-downloads
 [6]: http://www.openmp.org/
-[7]: https://github.com/jratcliff63367/sse2neon
+[13]: https://cmake.org/
 
 ## Compilation
 
@@ -46,7 +42,8 @@ versions in them. If prerequisites of some builds are missing, the
 build system, which is useful when building naively on TX2, because
 builds with `ninja` are faster (better parallelized) than with `make`.
 
-To build only a specific version run `make <version>`, for example:
+To build only a specific version run `make <version>`. For example,
+CUDA-based version can be compiled with:
 
 ``` shellsession
 $ make cufft
@@ -78,7 +75,8 @@ $ make -C build
 $ git submodule update --init
 $ mkdir build
 $ cd build
-$ cmake [options] ..
+$ cmake [options] ..  # see the tables below
+$ make
 ```
 
 The `cmake` options below allow to select, which version to build.
@@ -98,14 +96,11 @@ With all of these FFT version additional options can be added:
 |Option| Description |
 | --- | --- |
 | `-DASYNC=ON` | Use C++ `std::async` to run computations for different scales in parallel. This doesn't work with `BIG_BATCH` mode.|
-| `-DOPENMP=ON` | This option can only be used with CPU versions of the tracker. In normal mode it will run computations for differenct scales in parallel. In the case of the big batch mode it will parallelize the feature extraction  and the search for maximal response for differenct scales. If Fftw version is used with big batch mode it will also parallelize Ffftw's plans.|
-| `-DBIG_BATCH=ON` | Concatenate matrices of different scales to one big matrix and perform all computations on this matrix. This mode doesn't work for OpenCV FFT.|
-| `-DCUDA_DEBUG=ON` | This mode adds CUDA error checking for all kernels and CUDA runtime libraries. Only works with cuFFT version.|
+| `-DBIG_BATCH=ON` | Concatenate matrices of different scales to one big matrix and perform all computations on this matrix. This mode doesn't work with `OpenCV` FFT.|
+| `-DOPENMP=ON` | This option can only be used with `OpenCV` or `fftw` FFT implementations. In the default mode it will run computations for differenct scales in parallel. With `-DBIG_BATCH=ON` it will parallelize the feature extraction and the search for maximal response for differenct scales. In case of `fftw` Ffftw's plans will execute in parallel.|
+| `-DCUDA_DEBUG=ON` | This mode adds CUDA error checking for all kernels and CUDA runtime libraries. Only works with `cuFFT` version.|
+| `-DOpenCV_DIR=/opt/opencv-3.3/share/OpenCV` | Compile against a custom OpenCV version. |
 
-Finally call make:
-```
-$ make
-```
 
 ### Compilation for non-TX2 CUDA
 
