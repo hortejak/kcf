@@ -195,12 +195,12 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     int size_y_scaled = floor(p_windows_size[1]);
 
     cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
-    geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1], 1, 0, false);
+    geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1], 0, false);
 
     cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
     if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
         patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
-        geometric_transformations(patch_rgb,  p_windows_size[0], p_windows_size[1], 1, 0, false);
+        geometric_transformations(patch_rgb,  p_windows_size[0], p_windows_size[1], 0, false);
     }
     std::vector<cv::Mat> path_feat = get_features(patch_rgb, patch_gray);
     p_model_xf = fft.forward_window(path_feat);
@@ -309,12 +309,12 @@ void KCF_Tracker::track(cv::Mat &img)
                                           int size_y_scaled = floor(p_windows_size[1]*p_current_scale * this->p_scales[i]);
 
                                           cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
-                                          geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1], p_current_scale * this->p_scales[i]);
+                                          geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1]);
 
                                           cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
                                           if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
                                               patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
-                                              geometric_transformations(patch_rgb, p_windows_size[0], p_windows_size[1], p_current_scale * this->p_scales[i]);
+                                              geometric_transformations(patch_rgb, p_windows_size[0], p_windows_size[1]);
                                           }
 
                                           std::vector<cv::Mat> patch_feat_async = get_features(patch_rgb, patch_gray);
@@ -353,12 +353,12 @@ void KCF_Tracker::track(cv::Mat &img)
             int size_y_scaled = floor(p_windows_size[1]*p_current_scale * this->p_scales[i]);
 
             cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
-            geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1], p_current_scale * this->p_scales[i]);
+            geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1]);
 
             cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
             if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
                 patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
-                geometric_transformations(patch_rgb, p_windows_size[0], p_windows_size[1],  p_current_scale * this->p_scales[i]);
+                geometric_transformations(patch_rgb, p_windows_size[0], p_windows_size[1]);
             }
             std::vector<cv::Mat> tmp = get_features(input_rgb, input_gray);
 #pragma omp ordered
@@ -407,13 +407,24 @@ void KCF_Tracker::track(cv::Mat &img)
                     int size_x_scaled = floor(p_windows_size[0]*p_current_scale * p_scales[i]);
                     int size_y_scaled = floor(p_windows_size[1]*p_current_scale * p_scales[i]);
 
+                    std:: cout << "REAL scale: " << p_scales[i] << " CALCULATED scale from X: " << float(size_x_scaled/p_windows_size[0]) << " from Y: " << float(size_y_scaled/p_windows_size[1]) << std::endl;
+
                     cv::Mat patch_gray = get_subwindow(input_gray, p_pose.cx, p_pose.cy, size_x_scaled, size_y_scaled);
-                    geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i], p_current_angle + p_angles[j]);
+                    geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1], p_current_angle + p_angles[j]);
 
                     cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
                     if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
                         patch_rgb = get_subwindow(input_rgb, p_pose.cx, p_pose.cy, size_x_scaled, size_y_scaled);
-                        geometric_transformations(patch_rgb, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i],  p_current_angle + p_angles[j]);
+                        geometric_transformations(patch_rgb, p_windows_size[0], p_windows_size[1],  p_current_angle + p_angles[j]);
+
+                        if (m_visual_debug) {
+                            if (p_count%5 == 0) {
+                                std::string scale_string = std::to_string(p_current_scale * p_scales[i]);
+                                scale_string.erase ( scale_string.find_last_not_of('0') + 1, std::string::npos );
+                                scale_string.erase ( scale_string.find_last_not_of('.') + 1, std::string::npos );
+                                cv::putText(p_debug_subwindows.back(), scale_string,  cv::Point(0, 10), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5, cv::Scalar(0,255,0),1,cv::LINE_AA);
+                            }
+                        }
                     }
 
                     patch_feat = get_features(patch_rgb, patch_gray);
@@ -442,7 +453,7 @@ void KCF_Tracker::track(cv::Mat &img)
 
                     double weight = p_scales[i] < 1. ? p_scales[i] : 1./p_scales[i];
                     if (m_visual_debug){
-                        std::string scale = std::to_string(p_scales[i]);
+                        std::string scale = std::to_string(p_current_scale * p_scales[i]);
                         scale.erase ( scale.find_last_not_of('0') + 1, std::string::npos );
                         scale.erase ( scale.find_last_not_of('.') + 1, std::string::npos );
 
@@ -475,9 +486,9 @@ void KCF_Tracker::track(cv::Mat &img)
 
                         cv::resize(copy_response, copy_response, cv::Size(p_debug_image_size, p_debug_image_size), 0., 0., cv::INTER_LINEAR);
                         cv::putText(copy_response, angle,  cv::Point(0, copy_response.rows-1), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5, cv::Scalar(255,255,255),1,cv::LINE_AA);
-                        if ((p_count-1)%5 == 0)
+                        if (p_count%5 == 0)
                             cv::putText(copy_response, scale,  cv::Point(0, 10), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5, cv::Scalar(255,255,255),1,cv::LINE_AA);
-
+                        p_count++;
                         p_debug_scale_responses.push_back(copy_response);
                     }
 #pragma omp critical
@@ -571,12 +582,12 @@ void KCF_Tracker::track(cv::Mat &img)
     int size_y_scaled = floor(p_windows_size[1]*p_current_scale);
 
     cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
-    geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1],  p_current_scale, p_current_angle,  false);
+    geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1],  p_current_angle, false);
 
     cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
     if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
         patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
-        geometric_transformations(patch_rgb, p_windows_size[0], p_windows_size[1],  p_current_scale, p_current_angle,  false);
+        geometric_transformations(patch_rgb, p_windows_size[0], p_windows_size[1], p_current_angle, false);
     }
     patch_feat = get_features(patch_rgb, patch_gray);
     ComplexMat xf = fft.forward_window(patch_feat);
@@ -791,7 +802,7 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     return patch;
 }
 
-void KCF_Tracker::geometric_transformations(cv::Mat& patch, int size_x, int size_y, double scale,int angle, bool allow_debug)
+void KCF_Tracker::geometric_transformations(cv::Mat& patch, int size_x, int size_y, int angle, bool allow_debug)
 {
      if (m_use_angle) {
          cv::Point2f center((patch.cols-1)/2., (patch.rows-1)/2.);
@@ -802,14 +813,14 @@ void KCF_Tracker::geometric_transformations(cv::Mat& patch, int size_x, int size
 
      //resize to default size
      if (patch.channels() != 3){
-        if (scale > 1.){
+         if (patch.cols/size_x > 1.){
             //if we downsample use  INTER_AREA interpolation
             cv::resize(patch, patch, cv::Size(size_x, size_y), 0., 0., cv::INTER_AREA);
         }else {
             cv::resize(patch, patch, cv::Size(size_x, size_y), 0., 0., cv::INTER_LINEAR);
         }
      } else {
-         if (scale > 1.){
+         if (patch.cols/size_x > 1.){
              //if we downsample use  INTER_AREA interpolation
              cv::resize(patch, patch, cv::Size(size_x/p_cell_size, size_y/p_cell_size), 0., 0., cv::INTER_AREA);
          }else {
@@ -820,17 +831,10 @@ void KCF_Tracker::geometric_transformations(cv::Mat& patch, int size_x, int size
              cv::resize(input_clone, input_clone, cv::Size(p_debug_image_size, p_debug_image_size), 0., 0., cv::INTER_LINEAR);
 
              std::string angle_string = std::to_string(p_current_angle + angle);
-             if (p_count%5 == 0) {
-                 std::string scale_string = std::to_string(scale);
-                 scale_string.erase ( scale_string.find_last_not_of('0') + 1, std::string::npos );
-                 scale_string.erase ( scale_string.find_last_not_of('.') + 1, std::string::npos );
-                 cv::putText(input_clone, scale_string,  cv::Point(0, 10), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5, cv::Scalar(0,255,0),1,cv::LINE_AA);
-             }
 
              cv::putText(input_clone, angle_string,  cv::Point(1, input_clone.rows-5), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5, cv::Scalar(0,255,0),1,cv::LINE_AA);
 
              p_debug_subwindows.push_back(input_clone);
-             p_count += 1;
          }
      }
  }

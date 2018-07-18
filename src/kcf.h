@@ -53,7 +53,7 @@ class KCF_Tracker
 public:
     bool m_debug {false};
 	bool m_visual_debug {false};
-    bool m_use_scale {false};
+    bool m_use_scale {true};
     bool m_use_angle {true}; //Currently only works when m_use_scale is off and m_use_subpixel_localization too and used on RotatingBox dataset.
     bool m_use_color {true};
 #ifdef ASYNC
@@ -156,7 +156,7 @@ private:
     cv::Mat circshift(const cv::Mat & patch, int x_rot, int y_rot);
     cv::Mat cosine_window_function(int dim1, int dim2);
     std::vector<cv::Mat> get_features(cv::Mat & input_rgb, cv::Mat & input_gray);
-    void geometric_transformations(cv::Mat & patch, int size_x, int size_y, double scale = 1, int angle = 0, bool allow_debug = true);
+    void geometric_transformations(cv::Mat & patch, int size_x, int size_y, int angle = 0, bool allow_debug= true);
     cv::Point2f sub_pixel_peak(cv::Point & max_loc, cv::Mat & response);
     double sub_grid_scale(std::vector<double> & responses, int index = -1);
 
