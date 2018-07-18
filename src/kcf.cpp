@@ -791,7 +791,7 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     return patch;
 }
 
-void KCF_Tracker::geometric_transformations(cv::Mat& patch, int size_x, int size_y, double scale,int angle, bool search)
+void KCF_Tracker::geometric_transformations(cv::Mat& patch, int size_x, int size_y, double scale,int angle, bool allow_debug)
 {
      if (m_use_angle) {
          cv::Point2f center((patch.cols-1)/2., (patch.rows-1)/2.);
@@ -815,7 +815,7 @@ void KCF_Tracker::geometric_transformations(cv::Mat& patch, int size_x, int size
          }else {
              cv::resize(patch, patch, cv::Size(size_x/p_cell_size, size_y/p_cell_size), 0., 0., cv::INTER_LINEAR);
          }
-         if (m_visual_debug && search) {
+         if (m_visual_debug && allow_debug) {
              cv::Mat input_clone = patch.clone();
              cv::resize(input_clone, input_clone, cv::Size(p_debug_image_size, p_debug_image_size), 0., 0., cv::INTER_LINEAR);
 
