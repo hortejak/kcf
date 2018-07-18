@@ -10,11 +10,6 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
 
     std::cout << "FFT: cuFFT" << std::endl;
 
-    if(m_height*(m_width/2+1) > 1024){
-        std::cerr << "Image dimension after forward FFT are too big for CUDA kernels." << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-    
     //FFT forward one scale
     {
         CudaSafeCall(cudaMalloc(&data_f, m_height*m_width*sizeof(cufftReal)));
