@@ -7,8 +7,11 @@
 #define CudaSafeCall( err ) __cudaSafeCall( err, __FILE__, __LINE__ )
 #define CudaCheckError()    __cudaCheckError( __FILE__, __LINE__ )
 
-inline void __cudaSafeCall( cudaError err, const char *file, const int line )
+static inline void __cudaSafeCall( cudaError err, const char *file, const int line )
 {
+    (void)err;
+    (void)file;
+    (void)line;
 #ifdef CUDA_DEBUG
     if ( cudaSuccess != err )
     {
@@ -21,8 +24,10 @@ inline void __cudaSafeCall( cudaError err, const char *file, const int line )
     return;
 }
 
-inline void __cudaCheckError( const char *file, const int line )
+static inline void __cudaCheckError( const char *file, const int line )
 {
+    (void)file;
+    (void)line;
 #ifdef CUDA_DEBUG
     cudaError err = cudaGetLastError();
     if ( cudaSuccess != err )
@@ -48,7 +53,7 @@ inline void __cudaCheckError( const char *file, const int line )
 //##############################################################################
 #ifdef _CUFFT_H_
 // cuFFT API errors
-static const char *_cudaGetErrorEnum(cufftResult error)
+static inline const char *_cudaGetErrorEnum(cufftResult error)
 {
     switch (error)
     {
@@ -109,8 +114,11 @@ static const char *_cudaGetErrorEnum(cufftResult error)
 
 #define CufftErrorCheck(call) __cufftErrorCheck(call, __FILE__, __LINE__ )
 
-inline void __cufftErrorCheck(cufftResult_t call, const char *file, const int line )
+static inline void __cufftErrorCheck(cufftResult_t call, const char *file, const int line )
 {
+    (void)call;
+    (void)file;
+    (void)line;
 #ifdef CUDA_DEBUG
     if (call != CUFFT_SUCCESS) { 
         fprintf(stderr, "cuFFT error %d:%s at %s:%d\n", call, _cudaGetErrorEnum(call), file, line);
