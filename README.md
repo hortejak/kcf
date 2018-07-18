@@ -7,7 +7,7 @@ of the algorithm including execution on the GPU. The aim is also to
 modify the code according to the PRedictable Execution Model (PREM).
 
 Stable version of the tracker is available from [CTU server][2],
-development happens at [Github][3].
+development happens at [GitHub][3].
 
 [1]: http://hercules2020.eu/
 [2]: http://rtime.felk.cvut.cz/gitweb/hercules2020/kcf.git
@@ -16,9 +16,14 @@ development happens at [Github][3].
 ## Prerequisites
 
 The code depends on OpenCV 2.4 (3.0+ for CUDA-based version) library
-and [CMake][13] is used for building. Depending on the version to be
-compiled you need to have development packages for [FFTW][4],
-[CUDA][5] or [OpenMP][6] installed.
+and [CMake][13] (optionally with [Ninja][8]) is used for building.
+Depending on the version to be compiled you need to have development
+packages for [FFTW][4], [CUDA][5] or [OpenMP][6] installed.
+
+On TX2, the following command should install what's needed:
+``` shellsession
+$ apt install cmake ninja-build libopencv-dev libfftw3-dev
+```
 
 [4]: http://www.fftw.org/
 [5]: https://developer.nvidia.com/cuda-downloads
