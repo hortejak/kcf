@@ -15,7 +15,7 @@ development happens at [GitHub][3].
 
 ## Prerequisites
 
-The code depends on OpenCV 2.4 (3.0+ for CUDA-based version) library
+The code depends on OpenCV 2.4 library
 and [CMake][13] (optionally with [Ninja][8]) is used for building.
 Depending on the version to be compiled you need to have development
 packages for [FFTW][4], [CUDA][5] or [OpenMP][6] installed.
