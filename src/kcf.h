@@ -160,7 +160,7 @@ class KCF_Tracker {
     cv::Mat circshift(const cv::Mat &patch, int x_rot, int y_rot);
     cv::Mat cosine_window_function(int dim1, int dim2);
     void get_features(cv::Mat &patch_rgb, cv::Mat &patch_gray, ThreadCtx &vars);
-    void geometric_transformations(cv::Mat &patch, int size_x, int size_y, double scale = 1, int angle = 0,
+    void geometric_transformations(cv::Mat &patch, int size_x, int size_y, int angle = 0,
                                    bool allow_debug = true);
     cv::Point2f sub_pixel_peak(cv::Point &max_loc, cv::Mat &response);
     double sub_grid_scale(int index = -1);
