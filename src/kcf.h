@@ -51,7 +51,7 @@ class KCF_Tracker {
     bool m_debug{false};
     bool m_visual_debug{false};
     bool m_use_scale{true};
-    bool m_use_angle{true}; //Doesn't work with FFTW-BIG version
+    bool m_use_angle{true}; // Doesn't work with FFTW-BIG version
     bool m_use_color{true};
 #ifdef ASYNC
     bool m_use_multithreading{true};
@@ -161,7 +161,7 @@ class KCF_Tracker {
     cv::Mat cosine_window_function(int dim1, int dim2);
     void get_features(cv::Mat &patch_rgb, cv::Mat &patch_gray, ThreadCtx &vars);
     void geometric_transformations(cv::Mat &patch, int size_x, int size_y, double scale = 1, int angle = 0,
-                                   bool search = true);
+                                   bool allow_debug = true);
     cv::Point2f sub_pixel_peak(cv::Point &max_loc, cv::Mat &response);
     double sub_grid_scale(int index = -1);
 };
