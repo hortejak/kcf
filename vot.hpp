@@ -100,11 +100,11 @@ public:
         p_output_stream.open(ouput.c_str());
         if (!p_output_stream.is_open())
             std::cerr << "Error opening output file " << ouput << "!" << std::endl;
+        p_region_stream.close();
     }
 
     ~VOT()
     {
-        p_region_stream.close();
         p_images_stream.close();
         p_output_stream.close();
     }
@@ -157,7 +157,7 @@ public:
         std::getline (p_images_stream, line);
     	if (line.empty() && p_images_stream.eof()) return -1;
         img = cv::imread(line, CV_LOAD_IMAGE_COLOR);
-     
+
         return 1;
     }
 

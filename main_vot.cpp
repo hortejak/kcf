@@ -95,6 +95,17 @@ int main(int argc, char *argv[])
     }
     VOT vot_io(region, images, output);
 
+// if groundtruth.txt is used use intersection over union (IOU) to calculate tracker accuracy
+    bool use_iou = false;
+    std::ifstream groundtruth_stream;
+    if (region.compare("groundtruth.txt") == 0) {
+        std::cout << region << std::endl;
+        use_iou = true;
+        groundtruth_stream.open(region.c_str());
+        std::string line;
+        std::getline(groundtruth_stream, line);
+    }
+
     cv::Mat image;
 
     //img = firts frame, initPos = initial position in the first frame
@@ -105,7 +116,8 @@ int main(int argc, char *argv[])
     tracker.init(image, init_rect, fit_size_x, fit_size_y);
 
     BBox_c bb;
-    double avg_time = 0.;
+    cv::Rect bb_rect, groundtruth_rect;
+    double avg_time = 0., avg_inter = 0.;
     int frames = 0;
     while (vot_io.getNextImage(image) == 1){
         double time_profile_counter = cv::getCPUTickCount();
@@ -116,10 +128,37 @@ int main(int argc, char *argv[])
         frames++;
 
         bb = tracker.getBBox();
-        vot_io.outputBoundingBox(cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h));
+        bb_rect = cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h);
+        vot_io.outputBoundingBox(bb_rect);
+
+        if (use_iou) {
+            std::string line;
+            std::getline(groundtruth_stream, line);
+            std::vector<float> numbers;
+            std::istringstream s( line );
+            float x;
+            char ch;
+            while (s >> x){
+                numbers.push_back(x);
+                s >> ch;
+            }
+            double x1 = std::min(numbers[0], std::min(numbers[2], std::min(numbers[4], numbers[6])));
+            double x2 = std::max(numbers[0], std::max(numbers[2], std::max(numbers[4], numbers[6])));
+            double y1 = std::min(numbers[1], std::min(numbers[3], std::min(numbers[5], numbers[7])));
+            double y2 = std::max(numbers[1], std::max(numbers[3], std::max(numbers[5], numbers[7])));
+
+            groundtruth_rect = cv::Rect(x1, y1, x2-x1, y2-y1);
+//             cv::rectangle(image, groundtruth_rect, CV_RGB(255,0,0), 2);
+
+            double rects_intersection = (groundtruth_rect & bb_rect).area();
+            double rects_union = (groundtruth_rect | bb_rect).area();
+            double union_over_inter = rects_intersection/rects_union;
+            std::cout << "   ->intersection ratio " << union_over_inter << std::endl;
+            avg_inter +=union_over_inter;
+        }
 
         if (visualize_delay >= 0) {
-            cv::rectangle(image, cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h), CV_RGB(0,255,0), 2);
+            cv::rectangle(image, bb_rect, CV_RGB(0,255,0), 2);
             cv::imshow("output", image);
             int ret = cv::waitKey(visualize_delay);
             if (visualize_delay > 0 && ret != -1 && ret != 255)
@@ -148,6 +187,10 @@ int main(int argc, char *argv[])
     }
 
     std::cout << "Average processing speed " << avg_time/frames <<  "ms. (" << 1./(avg_time/frames)*1000 << " fps)" << std::endl;
+    if (use_iou) {
+        std::cout << "Average intersection ratio " << avg_inter/frames << std::endl;
+        groundtruth_stream.close();
+    }
 
     return EXIT_SUCCESS;
 }
