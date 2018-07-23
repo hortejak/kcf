@@ -103,6 +103,7 @@ With all of these FFT version additional options can be added:
 | `-DASYNC=ON` | Use C++ `std::async` to run computations for different scales in parallel. This doesn't work with `BIG_BATCH` mode.|
 | `-DBIG_BATCH=ON` | Concatenate matrices of different scales to one big matrix and perform all computations on this matrix. This mode doesn't work with `OpenCV` FFT.|
 | `-DOPENMP=ON` | Parallelize certain operation with OpenMP. This can only be used with `OpenCV` or `fftw` FFT implementations. By default it runs computations for differenct scales in parallel. With `-DBIG_BATCH=ON` it parallelizes the feature extraction and the search for maximal response for differenct scales. With `fftw`, Ffftw's plans will execute in parallel.|
+| `-DCUDA_DEBUG=ON` | This mode adds CUDA error checking for all kernels and CUDA runtime libraries. Only works with `cuFFT` version.|
 | `-DOpenCV_DIR=/opt/opencv-3.3/share/OpenCV` | Compile against a custom OpenCV version. |
 
 

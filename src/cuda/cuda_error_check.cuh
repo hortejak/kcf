@@ -29,8 +29,8 @@ static inline void __cudaCheckError( const char *file, const int line )
         exit( -1 );
     }
 
+#ifdef CUDA_DEBUG
     // More careful checking. However, this will affect performance.
-    // Comment away if needed.
     err = cudaDeviceSynchronize();
     if( cudaSuccess != err )
     {
@@ -38,6 +38,7 @@ static inline void __cudaCheckError( const char *file, const int line )
                  file, line, cudaGetErrorString( err ) );
         exit( -1 );
     }
+#endif
 
     return;
 }
