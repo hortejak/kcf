@@ -417,8 +417,8 @@ void KCF_Tracker::track(cv::Mat &img)
 
                         if (m_visual_debug) {
                             if (p_count%5 == 0) {
-                                char scale[20];
-                                sprintf(scale, "%.5f", p_current_scale * p_scales[i]);
+                                char scale[10];
+                                snprintf(scale, sizeof(scale), "%.5f", p_current_scale * p_scales[i]);
                                 cv::putText(p_debug_subwindows.back(), scale,  cv::Point(0, 10), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5, cv::Scalar(0,255,0),1,cv::LINE_AA);
                             }
                         }
@@ -450,8 +450,8 @@ void KCF_Tracker::track(cv::Mat &img)
 
                     double weight = p_scales[i] < 1. ? p_scales[i] : 1./p_scales[i];
                     if (m_visual_debug){
-                        char scale[20];
-                        sprintf(scale, "%.5f", p_current_scale * p_scales[i]);
+                        char scale[10];
+                        snprintf(scale, sizeof(scale), "%.5f", p_current_scale * p_scales[i]);
 
                         std::string angle = std::to_string(p_current_angle + p_angles[j]);
 
