@@ -407,8 +407,6 @@ void KCF_Tracker::track(cv::Mat &img)
                     int size_x_scaled = floor(p_windows_size[0]*p_current_scale * p_scales[i]);
                     int size_y_scaled = floor(p_windows_size[1]*p_current_scale * p_scales[i]);
 
-                    std:: cout << "REAL scale: " << p_scales[i] << " CALCULATED scale from X: " << float(size_x_scaled/p_windows_size[0]) << " from Y: " << float(size_y_scaled/p_windows_size[1]) << std::endl;
-
                     cv::Mat patch_gray = get_subwindow(input_gray, p_pose.cx, p_pose.cy, size_x_scaled, size_y_scaled);
                     geometric_transformations(patch_gray, p_windows_size[0], p_windows_size[1], p_current_angle + p_angles[j]);
 
@@ -419,10 +417,9 @@ void KCF_Tracker::track(cv::Mat &img)
 
                         if (m_visual_debug) {
                             if (p_count%5 == 0) {
-                                std::string scale_string = std::to_string(p_current_scale * p_scales[i]);
-                                scale_string.erase ( scale_string.find_last_not_of('0') + 1, std::string::npos );
-                                scale_string.erase ( scale_string.find_last_not_of('.') + 1, std::string::npos );
-                                cv::putText(p_debug_subwindows.back(), scale_string,  cv::Point(0, 10), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5, cv::Scalar(0,255,0),1,cv::LINE_AA);
+                                char scale[20];
+                                sprintf(scale, "%.5f", p_current_scale * p_scales[i]);
+                                cv::putText(p_debug_subwindows.back(), scale,  cv::Point(0, 10), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5, cv::Scalar(0,255,0),1,cv::LINE_AA);
                             }
                         }
                     }
@@ -453,13 +450,11 @@ void KCF_Tracker::track(cv::Mat &img)
 
                     double weight = p_scales[i] < 1. ? p_scales[i] : 1./p_scales[i];
                     if (m_visual_debug){
-                        std::string scale = std::to_string(p_current_scale * p_scales[i]);
-                        scale.erase ( scale.find_last_not_of('0') + 1, std::string::npos );
-                        scale.erase ( scale.find_last_not_of('.') + 1, std::string::npos );
+                        char scale[20];
+                        sprintf(scale, "%.5f", p_current_scale * p_scales[i]);
 
                         std::string angle = std::to_string(p_current_angle + p_angles[j]);
-                        angle.erase ( angle.find_last_not_of('0') + 1, std::string::npos );
-                        angle.erase ( angle.find_last_not_of('.') + 1, std::string::npos );
+
                         std::cout << "Max value for scale: " << scale << " and angle:" << angle <<  " is: " << std::to_string(max_val*weight) << std::endl;
                         cv::Mat copy_response = response.clone();
 

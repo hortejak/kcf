@@ -123,11 +123,10 @@ private:
     double p_current_scale = 1.;
     double p_min_max_scale[2];
     std::vector<double> p_scales;
-    int p_num_angles {5};
     int p_current_angle = 0;
     int p_angle_min  = -20, p_angle_max = 20;
     int p_angle_step = 10;
-    std::vector<double> p_angles;
+    std::vector<int> p_angles;
 
     //for visual debug
     int p_debug_image_size = 100;
