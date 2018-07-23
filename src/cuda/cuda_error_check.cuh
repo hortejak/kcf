@@ -9,26 +9,18 @@
 
 static inline void __cudaSafeCall( cudaError err, const char *file, const int line )
 {
-    (void)err;
-    (void)file;
-    (void)line;
-#ifdef CUDA_DEBUG
     if ( cudaSuccess != err )
     {
         fprintf( stderr, "cudaSafeCall() failed at %s:%i : %s\n",
                  file, line, cudaGetErrorString( err ) );
         exit( -1 );
     }
-#endif
 
     return;
 }
 
 static inline void __cudaCheckError( const char *file, const int line )
 {
-    (void)file;
-    (void)line;
-#ifdef CUDA_DEBUG
     cudaError err = cudaGetLastError();
     if ( cudaSuccess != err )
     {
@@ -46,7 +38,6 @@ static inline void __cudaCheckError( const char *file, const int line )
                  file, line, cudaGetErrorString( err ) );
         exit( -1 );
     }
-#endif
 
     return;
 }
@@ -116,15 +107,10 @@ static inline const char *_cudaGetErrorEnum(cufftResult error)
 
 static inline void __cufftErrorCheck(cufftResult_t call, const char *file, const int line )
 {
-    (void)call;
-    (void)file;
-    (void)line;
-#ifdef CUDA_DEBUG
-    if (call != CUFFT_SUCCESS) { 
+    if (call != CUFFT_SUCCESS) {
         fprintf(stderr, "cuFFT error %d:%s at %s:%d\n", call, _cudaGetErrorEnum(call), file, line);
         exit(-1);
     }
-#endif
 
     return;
 }
