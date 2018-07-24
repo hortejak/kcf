@@ -766,6 +766,7 @@ cv::Point2f KCF_Tracker::sub_pixel_peak(cv::Point & max_loc, cv::Mat & response)
     cv::Point2i p4(max_loc.x-1, max_loc.y), p5(max_loc.x+1, max_loc.y);
     cv::Point2i p6(max_loc.x-1, max_loc.y+1), p7(max_loc.x, max_loc.y+1), p8(max_loc.x+1, max_loc.y+1);
 
+    // clang-format off
     // fit 2d quadratic function f(x, y) = a*x^2 + b*x*y + c*y^2 + d*x + e*y + f
     cv::Mat A = (cv::Mat_<float>(9, 6) <<
                  p1.x*p1.x, p1.x*p1.y, p1.y*p1.y, p1.x, p1.y, 1.f,
@@ -787,6 +788,7 @@ cv::Point2f KCF_Tracker::sub_pixel_peak(cv::Point & max_loc, cv::Mat & response)
                     get_response_circular(p7, response),
                     get_response_circular(p8, response),
                     get_response_circular(max_loc, response));
+    // clang-format on
     cv::Mat x;
     cv::solve(A, fval, x, cv::DECOMP_SVD);
 
