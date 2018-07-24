@@ -23,17 +23,17 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
     {
         CudaSafeCall(cudaMalloc(&data_f_all_scales, m_height*m_num_of_scales*m_width*sizeof(cufftReal)));
 
-	int rank = 2;
-	int n[] = {(int)m_height, (int)m_width};
-	int howmany = m_num_of_scales;
-	int idist = m_height*m_width, odist = m_height*(m_width/2+1);
-	int istride = 1, ostride = 1;
-	int *inembed = n, onembed[] = {(int)m_height, (int)m_width/2+1};
+        int rank = 2;
+        int n[] = {(int)m_height, (int)m_width};
+        int howmany = m_num_of_scales;
+        int idist = m_height*m_width, odist = m_height*(m_width/2+1);
+        int istride = 1, ostride = 1;
+        int *inembed = n, onembed[] = {(int)m_height, (int)m_width/2+1};
 
-	CufftErrorCheck(cufftPlanMany(&plan_f_all_scales, rank, n,
-		      inembed, istride, idist,
-		      onembed, ostride, odist,
-		      CUFFT_R2C, howmany));
+        CufftErrorCheck(cufftPlanMany(&plan_f_all_scales, rank, n,
+		  inembed, istride, idist,
+		  onembed, ostride, odist,
+		  CUFFT_R2C, howmany));
     }
     //FFT forward window one scale
     {
