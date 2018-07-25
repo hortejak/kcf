@@ -6,6 +6,33 @@
 #include "kcf.h"
 #include "vot.hpp"
 
+double calcAccuracy(std::string line, cv::Rect bb_rect)
+{
+    cv::Rect groundtruth_rect;
+    std::vector<float> numbers;
+    std::istringstream s( line );
+    float x;
+    char ch;
+
+    while (s >> x){
+        numbers.push_back(x);
+        s >> ch;
+    }
+    double x1 = std::min(numbers[0], std::min(numbers[2], std::min(numbers[4], numbers[6])));
+    double x2 = std::max(numbers[0], std::max(numbers[2], std::max(numbers[4], numbers[6])));
+    double y1 = std::min(numbers[1], std::min(numbers[3], std::min(numbers[5], numbers[7])));
+    double y2 = std::max(numbers[1], std::max(numbers[3], std::max(numbers[5], numbers[7])));
+
+    groundtruth_rect = cv::Rect(x1, y1, x2-x1, y2-y1);
+//             cv::rectangle(image, groundtruth_rect, CV_RGB(255,0,0), 2);
+
+    double rects_intersection = (groundtruth_rect & bb_rect).area();
+    double rects_union = (groundtruth_rect | bb_rect).area();
+    double accuracy = rects_intersection/rects_union;
+
+    return accuracy;
+}
+
 int main(int argc, char *argv[])
 {
     //load region, images and prepare for output
@@ -114,14 +141,14 @@ int main(int argc, char *argv[])
     tracker.init(image, init_rect, fit_size_x, fit_size_y);
 
     BBox_c bb;
-    cv::Rect bb_rect, groundtruth_rect;
-    double avg_time = 0., avg_inter = 0.;
+    cv::Rect bb_rect;
+    double avg_time = 0., sum_accuracy = 0.;
     int frames = 0;
     while (vot_io.getNextImage(image) == 1){
         double time_profile_counter = cv::getCPUTickCount();
         tracker.track(image);
         time_profile_counter = cv::getCPUTickCount() - time_profile_counter;
-         std::cout << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms. per frame" << std::endl;
+         std::cout << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms. per frame";
         avg_time += time_profile_counter/((double)cvGetTickFrequency()*1000);
         frames++;
 
@@ -132,28 +159,12 @@ int main(int argc, char *argv[])
         if (groundtruth_stream.is_open()) {
             std::string line;
             std::getline(groundtruth_stream, line);
-            std::vector<float> numbers;
-            std::istringstream s( line );
-            float x;
-            char ch;
-            while (s >> x){
-                numbers.push_back(x);
-                s >> ch;
-            }
-            double x1 = std::min(numbers[0], std::min(numbers[2], std::min(numbers[4], numbers[6])));
-            double x2 = std::max(numbers[0], std::max(numbers[2], std::max(numbers[4], numbers[6])));
-            double y1 = std::min(numbers[1], std::min(numbers[3], std::min(numbers[5], numbers[7])));
-            double y2 = std::max(numbers[1], std::max(numbers[3], std::max(numbers[5], numbers[7])));
-
-            groundtruth_rect = cv::Rect(x1, y1, x2-x1, y2-y1);
-//             cv::rectangle(image, groundtruth_rect, CV_RGB(255,0,0), 2);
-
-            double rects_intersection = (groundtruth_rect & bb_rect).area();
-            double rects_union = (groundtruth_rect | bb_rect).area();
-            double union_over_inter = rects_intersection/rects_union;
-            std::cout << "   ->intersection ratio " << union_over_inter << std::endl;
-            avg_inter +=union_over_inter;
+            double accuracy = calcAccuracy(line, bb_rect);
+            std::cout << ", accuracy: " << accuracy;
+            sum_accuracy += accuracy;
         }
+
+        std::cout << std::endl;
 
         if (visualize_delay >= 0) {
             cv::rectangle(image, bb_rect, CV_RGB(0,255,0), 2);
@@ -186,7 +197,7 @@ int main(int argc, char *argv[])
 
     std::cout << "Average processing speed " << avg_time/frames <<  "ms. (" << 1./(avg_time/frames)*1000 << " fps)" << std::endl;
     if (groundtruth_stream.is_open()) {
-        std::cout << "Average intersection ratio " << avg_inter/frames << std::endl;
+        std::cout << "Average accuracy: " << sum_accuracy/frames << std::endl;
         groundtruth_stream.close();
     }
 
