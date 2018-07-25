@@ -95,12 +95,10 @@ int main(int argc, char *argv[])
     }
     VOT vot_io(region, images, output);
 
-// if groundtruth.txt is used use intersection over union (IOU) to calculate tracker accuracy
-    bool use_iou = false;
+    // if groundtruth.txt is used use intersection over union (IOU) to calculate tracker accuracy
     std::ifstream groundtruth_stream;
     if (region.compare("groundtruth.txt") == 0) {
         std::cout << region << std::endl;
-        use_iou = true;
         groundtruth_stream.open(region.c_str());
         std::string line;
         std::getline(groundtruth_stream, line);
@@ -131,7 +129,7 @@ int main(int argc, char *argv[])
         bb_rect = cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h);
         vot_io.outputBoundingBox(bb_rect);
 
-        if (use_iou) {
+        if (groundtruth_stream.is_open()) {
             std::string line;
             std::getline(groundtruth_stream, line);
             std::vector<float> numbers;
@@ -187,7 +185,7 @@ int main(int argc, char *argv[])
     }
 
     std::cout << "Average processing speed " << avg_time/frames <<  "ms. (" << 1./(avg_time/frames)*1000 << " fps)" << std::endl;
-    if (use_iou) {
+    if (groundtruth_stream.is_open()) {
         std::cout << "Average intersection ratio " << avg_inter/frames << std::endl;
         groundtruth_stream.close();
     }
