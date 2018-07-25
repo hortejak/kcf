@@ -33,6 +33,7 @@ KCF_Tracker::KCF_Tracker()
 KCF_Tracker::~KCF_Tracker()
 {
     delete &fft;
+#ifdef BIG_BATCH
 #ifdef CUFFT
     CudaSafeCall(cudaFreeHost(xf_sqr_norm));
     CudaSafeCall(cudaFreeHost(yf_sqr_norm));
@@ -40,6 +41,7 @@ KCF_Tracker::~KCF_Tracker()
 #else
     free(xf_sqr_norm);
     free(yf_sqr_norm);
+#endif
 #endif
 }
 
@@ -132,6 +134,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     else
         p_scales.push_back(1.);
 
+#ifdef BIG_BATCH
 #ifdef CUFFT
     if (p_windows_size[1]/p_cell_size*(p_windows_size[0]/p_cell_size/2+1) > 1024) {
         std::cerr << "Window after forward FFT is too big for CUDA kernels. Plese use -f to set "
@@ -155,7 +158,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     xf_sqr_norm = (float*) malloc(p_num_scales*sizeof(float));
     yf_sqr_norm = (float*) malloc(sizeof(float));
 #endif
-
+#endif
     p_current_scale = 1.;
 
     double min_size_ratio = std::max(5.*p_cell_size/p_windows_size[0], 5.*p_cell_size/p_windows_size[1]);
@@ -361,18 +364,18 @@ void KCF_Tracker::track(cv::Mat &img)
     } else {
 #pragma omp parallel for ordered  private(patch_feat) schedule(dynamic)
         for (size_t i = 0; i < p_scales.size(); ++i) {
-            patch_feat = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_current_scale * p_scales[i]);
+            patch_feat = get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size[0], this->p_windows_size[1], this->p_current_scale * this->p_scales[i]);
             ComplexMat zf = fft.forward_window(patch_feat);
             DEBUG_PRINTM(zf);
             cv::Mat response;
             if (m_use_linearkernel)
                 response = fft.inverse((p_model_alphaf * zf).sum_over_channels());
             else {
-                ComplexMat kzf = gaussian_correlation(zf, p_model_xf, p_kernel_sigma);
+                ComplexMat kzf = gaussian_correlation(zf, this->p_model_xf, this->p_kernel_sigma);
                 DEBUG_PRINTM(p_model_alphaf);
                 DEBUG_PRINTM(kzf);
                 DEBUG_PRINTM(p_model_alphaf * kzf);
-                response = fft.inverse(p_model_alphaf * kzf);
+                response = fft.inverse(this->p_model_alphaf * kzf);
             }
             DEBUG_PRINTM(response);
 
@@ -385,7 +388,7 @@ void KCF_Tracker::track(cv::Mat &img)
             cv::minMaxLoc(response, &min_val, &max_val, &min_loc, &max_loc);
             DEBUG_PRINT(max_loc);
 
-            double weight = p_scales[i] < 1. ? p_scales[i] : 1./p_scales[i];
+            double weight = this->p_scales[i] < 1. ? this->p_scales[i] : 1./this->p_scales[i];
 #pragma omp critical
             {
                 if (max_val*weight > max_response) {
@@ -681,6 +684,7 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
 
 ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const ComplexMat &yf, double sigma, bool auto_correlation)
 {
+#ifdef BIG_BATCH
 #ifdef CUFFT
     xf.sqr_norm(xf_sqr_norm_d);
     if (!auto_correlation)
@@ -692,6 +696,10 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     } else {
        yf.sqr_norm(yf_sqr_norm);
     }
+#endif
+#else
+    float xf_sqr_norm = xf.sqr_norm();
+    float yf_sqr_norm =auto_correlation ? xf_sqr_norm : yf.sqr_norm();
 #endif
     ComplexMat xyf;
     xyf = auto_correlation ? xf.sqr_mag() : xf.mul2(yf.conj());
@@ -729,11 +737,15 @@ ComplexMat KCF_Tracker::gaussian_correlation(const ComplexMat &xf, const Complex
     cv::Mat in_all(scales[0].rows * xf.n_scales, scales[0].cols, CV_32F);
 
     float numel_xf_inv = 1.f/(xf.cols * xf.rows * (xf.channels()/xf.n_scales));
+#ifdef BIG_BATCH
     for (int i = 0; i < xf.n_scales; ++i){
         cv::Mat in_roi(in_all, cv::Rect(0, i*scales[0].rows, scales[0].cols, scales[0].rows));
         cv::exp(- 1.f / (sigma * sigma) * cv::max((xf_sqr_norm[i] + yf_sqr_norm[0] - 2 * scales[i]) * numel_xf_inv, 0), in_roi);
         DEBUG_PRINTM(in_roi);
     }
+#else
+    cv::exp(- 1.f / (sigma * sigma) * cv::max((xf_sqr_norm + yf_sqr_norm - 2 * xy_sum) * numel_xf_inv, 0), in_all);
+#endif
 
     DEBUG_PRINTM(in_all);
     return fft.forward(in_all);

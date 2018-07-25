@@ -60,6 +60,17 @@ public:
         }
     }
 
+    T sqr_norm() const
+    {
+        int n_channels_per_scale = n_channels/n_scales;
+        T sum_sqr_norm = 0;
+         for (int i = 0; i < n_channels_per_scale; ++i) {
+             for (auto lhs = p_data.begin()+i*rows*cols; lhs != p_data.begin()+(i+1)*rows*cols; ++lhs)
+                 sum_sqr_norm += lhs->real()*lhs->real() + lhs->imag()*lhs->imag();
+         }
+        sum_sqr_norm = sum_sqr_norm/static_cast<T>(cols*rows);
+        return sum_sqr_norm;
+    }
 
     void sqr_norm(T *sums_sqr_norms) const
     {
@@ -290,7 +301,7 @@ public:
     //assuming that mat has 2 channels (real, imag)
     void set_channel(int idx, const cv::Mat & mat);
 
-
+    float sqr_norm();
     void sqr_norm(float *sums_sqr_norms) const;
 
     ComplexMat sqr_mag() const;

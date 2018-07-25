@@ -125,9 +125,11 @@ private:
     //for big batch
     int p_num_of_feats;
     int p_roi_height, p_roi_width;
+#ifdef BIG_BATCH
     float *xf_sqr_norm = nullptr, *yf_sqr_norm = nullptr;
 #ifdef CUFFT
     float *xf_sqr_norm_d = nullptr, *yf_sqr_norm_d = nullptr, *gauss_corr_res = nullptr;
+#endif
 #endif
 
     //model
