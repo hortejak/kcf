@@ -6,9 +6,8 @@
 #include "kcf.h"
 #include "vot.hpp"
 
-double calcAccuracy(std::string line, cv::Rect bb_rect)
+double calcAccuracy(std::string line, cv::Rect bb_rect, cv::Rect &groundtruth_rect)
 {
-    cv::Rect groundtruth_rect;
     std::vector<float> numbers;
     std::istringstream s( line );
     float x;
@@ -24,7 +23,6 @@ double calcAccuracy(std::string line, cv::Rect bb_rect)
     double y2 = std::max(numbers[1], std::max(numbers[3], std::max(numbers[5], numbers[7])));
 
     groundtruth_rect = cv::Rect(x1, y1, x2-x1, y2-y1);
-//             cv::rectangle(image, groundtruth_rect, CV_RGB(255,0,0), 2);
 
     double rects_intersection = (groundtruth_rect & bb_rect).area();
     double rects_union = (groundtruth_rect | bb_rect).area();
@@ -159,7 +157,11 @@ int main(int argc, char *argv[])
         if (groundtruth_stream.is_open()) {
             std::string line;
             std::getline(groundtruth_stream, line);
-            double accuracy = calcAccuracy(line, bb_rect);
+
+            cv::Rect groundtruthRect;
+            double accuracy = calcAccuracy(line, bb_rect, groundtruthRect);
+            if (visualize_delay >= 0)
+                cv::rectangle(image, groundtruthRect, CV_RGB(255, 0,0), 1);
             std::cout << ", accuracy: " << accuracy;
             sum_accuracy += accuracy;
         }
