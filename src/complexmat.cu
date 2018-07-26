@@ -27,6 +27,20 @@ __global__ void sqr_norm_kernel(int n, float* out, float* data, float rows, floa
     }
 }
 
+float ComplexMat::sqr_norm() const
+{
+    float result;
+    CudaSafeCall(cudaMemset(result, 0, n_scales*sizeof(float)));
+
+    dim3 threadsPerBlock(rows, cols);
+    dim3 numBlocks(n_channels, 1);
+
+    sqr_norm_kernel<<<numBlocks, threadsPerBlock, rows*cols*sizeof(float)>>>(n_channels, result, p_data, rows, cols);
+    CudaCheckError();
+
+    return result;
+}
+
 void ComplexMat::sqr_norm(float *result) const
 {
     CudaSafeCall(cudaMemset(result, 0, n_scales*sizeof(float)));
