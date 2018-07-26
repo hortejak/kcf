@@ -68,7 +68,6 @@ public:
     int channels() { return n_channels; }
     int channels() const { return n_channels; }
 
-    float sqr_norm() const;
     void sqr_norm(float *result) const;
     
     ComplexMat sqr_mag() const;

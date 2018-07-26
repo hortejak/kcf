@@ -48,6 +48,14 @@ struct BBox_c
 
 };
 
+struct Scale_var
+{
+    float *xf_sqr_norm = nullptr, *yf_sqr_norm = nullptr;
+#ifdef CUFFT
+    float *xf_sqr_norm_d = nullptr, *yf_sqr_norm_d = nullptr, *gauss_corr_res = nullptr;
+#endif
+};
+
 class KCF_Tracker
 {
 public:
@@ -125,12 +133,8 @@ private:
     //for big batch
     int p_num_of_feats;
     int p_roi_height, p_roi_width;
-#ifdef BIG_BATCH
-    float *xf_sqr_norm = nullptr, *yf_sqr_norm = nullptr;
-#ifdef CUFFT
-    float *xf_sqr_norm_d = nullptr, *yf_sqr_norm_d = nullptr, *gauss_corr_res = nullptr;
-#endif
-#endif
+
+    std::vector<Scale_var> scale_vars;
 
     //model
     ComplexMat p_yf;
@@ -141,7 +145,7 @@ private:
     //helping functions
     cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y);
     cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);
-    ComplexMat gaussian_correlation(const ComplexMat & xf, const ComplexMat & yf, double sigma, bool auto_correlation = false);
+    ComplexMat gaussian_correlation(struct Scale_var &vars, const ComplexMat & xf, const ComplexMat & yf, double sigma, bool auto_correlation = false);
     cv::Mat circshift(const cv::Mat & patch, int x_rot, int y_rot);
     cv::Mat cosine_window_function(int dim1, int dim2);
     std::vector<cv::Mat> get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx, int cy, int size_x, int size_y, double scale = 1.);
