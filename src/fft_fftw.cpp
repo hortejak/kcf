@@ -188,7 +188,7 @@ void Fftw::set_window(const cv::Mat &window)
     m_window = window;
 }
 
-ComplexMat Fftw::forward(const cv::Mat &input)
+ComplexMat Fftw::forward(const cv::Mat & input)
 {
     ComplexMat complex_result;
     if(m_big_batch_mode && input.rows == (int)(m_height*m_num_of_scales)){
@@ -203,13 +203,18 @@ ComplexMat Fftw::forward(const cv::Mat &input)
     return complex_result;
 }
 
+void Fftw::forward(Scale_var & vars)
+{
+    return;
+}
+
 ComplexMat Fftw::forward_raw(float *input, bool all_scales)
 {
     ComplexMat dummy;
     return dummy;
 }
 
-ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
+ComplexMat Fftw::forward_window(const std::vector<cv::Mat> & input)
 {
     int n_channels = input.size();
     cv::Mat in_all(m_height * n_channels, m_width, CV_32F);
@@ -234,6 +239,11 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> &input)
     return result;
 }
 
+void Fftw::forward_window(Scale_var & vars)
+{
+    return;
+}
+
 cv::Mat Fftw::inverse(const ComplexMat &input)
 {
     int n_channels = input.n_channels;
@@ -251,6 +261,11 @@ cv::Mat Fftw::inverse(const ComplexMat &input)
         fftwf_execute_dft_c2r(plan_i_features, in, out);
 
     return real_result/(m_width*m_height);
+}
+
+void Fftw::inverse(Scale_var & vars)
+{
+    return;
 }
 
 float* Fftw::inverse_raw(const ComplexMat &input)

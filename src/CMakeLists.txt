@@ -61,7 +61,7 @@ IF((FFT STREQUAL "OpenCV") AND BIG_BATCH)
   message(SEND_ERROR "OpenCV version does not support big batch mode.")
 ENDIF()
 
-IF((FFT STREQUAL "cuFFT") AND (ASYNC))
+IF((FFT STREQUAL "cuFFT") AND (ASYNC OR (OPENMP AND NOT BIG_BATCH)))
   message(SEND_ERROR "cuFFT version does not support ASYNC and OpenMP only if used with big batch mode.")
 ENDIF()
 

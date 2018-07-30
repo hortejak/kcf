@@ -23,17 +23,17 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
     {
         CudaSafeCall(cudaMalloc(&data_f_all_scales, m_height*m_num_of_scales*m_width*sizeof(cufftReal)));
 
-        int rank = 2;
-        int n[] = {(int)m_height, (int)m_width};
-        int howmany = m_num_of_scales;
-        int idist = m_height*m_width, odist = m_height*(m_width/2+1);
-        int istride = 1, ostride = 1;
-        int *inembed = n, onembed[] = {(int)m_height, (int)m_width/2+1};
+	int rank = 2;
+	int n[] = {(int)m_height, (int)m_width};
+	int howmany = m_num_of_scales;
+	int idist = m_height*m_width, odist = m_height*(m_width/2+1);
+	int istride = 1, ostride = 1;
+	int *inembed = n, onembed[] = {(int)m_height, (int)m_width/2+1};
 
-        CufftErrorCheck(cufftPlanMany(&plan_f_all_scales, rank, n,
-		  inembed, istride, idist,
-		  onembed, ostride, odist,
-		  CUFFT_R2C, howmany));
+	CufftErrorCheck(cufftPlanMany(&plan_f_all_scales, rank, n,
+		      inembed, istride, idist,
+		      onembed, ostride, odist,
+		      CUFFT_R2C, howmany));
     }
     //FFT forward window one scale
     {
@@ -144,12 +144,12 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
     }
 }
 
-void cuFFT::set_window(const cv::Mat &window)
+void cuFFT::set_window(const cv::Mat & window)
 {
      m_window = window;
 }
 
-ComplexMat cuFFT::forward(const cv::Mat &input)
+ComplexMat cuFFT::forward(const cv::Mat & input)
 {
     ComplexMat complex_result;
     if(m_big_batch_mode && input.rows == (int)(m_height*m_num_of_scales)){
@@ -167,6 +167,11 @@ ComplexMat cuFFT::forward(const cv::Mat &input)
     return complex_result;
 }
 
+void cuFFT::forward(Scale_var & vars)
+{
+    return;
+}
+
 ComplexMat cuFFT::forward_raw(float *input, bool all_scales)
 {
     ComplexMat complex_result;
@@ -182,7 +187,7 @@ ComplexMat cuFFT::forward_raw(float *input, bool all_scales)
     return complex_result;
 }
 
-ComplexMat cuFFT::forward_window(const std::vector<cv::Mat> &input)
+ComplexMat cuFFT::forward_window(const std::vector<cv::Mat> & input)
 {
     int n_channels = input.size();
     ComplexMat result;
@@ -210,7 +215,12 @@ ComplexMat cuFFT::forward_window(const std::vector<cv::Mat> &input)
     return result;
 }
 
-cv::Mat cuFFT::inverse(const ComplexMat &input)
+void cuFFT::forward_window(Scale_var & vars)
+{
+    return;
+}
+
+cv::Mat cuFFT::inverse(const ComplexMat & input)
 {
     int n_channels = input.n_channels;
     cufftComplex *in = reinterpret_cast<cufftComplex*>(input.get_p_data());
@@ -246,7 +256,12 @@ cv::Mat cuFFT::inverse(const ComplexMat &input)
     return real_result/(m_width*m_height);
 }
 
-float* cuFFT::inverse_raw(const ComplexMat &input)
+void cuFFT::inverse(Scale_var & vars)
+{
+    return;
+}
+
+float* cuFFT::inverse_raw(const ComplexMat & input)
 {
     int n_channels = input.n_channels;
     cufftComplex *in = reinterpret_cast<cufftComplex*>(input.get_p_data());
