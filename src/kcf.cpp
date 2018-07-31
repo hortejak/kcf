@@ -385,23 +385,24 @@ void KCF_Tracker::scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & 
 {
     get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size[0], this->p_windows_size[1],
                                 vars, this->p_current_scale * scale);
-    for (size_t i = 0; i<vars.patch_feats.size();i++) {
-        DEBUG_PRINTM(vars.patch_feats[i]);
-    }
-    fft.forward_window(vars);
 
+    fft.forward_window(vars);
     DEBUG_PRINTM(vars.zf);
 
-    vars.flag = Track_flags::CROSS_CORRELATION;
-    gaussian_correlation(vars, vars.zf, this->p_model_xf, this->p_kernel_sigma);
-
-    DEBUG_PRINTM(p_model_alphaf);
-    DEBUG_PRINTM(vars.kzf);
-    DEBUG_PRINTM(p_model_alphaf * vars.kzf);
-
-    vars.flag = Track_flags::RESPONSE;
-    vars.kzf = p_model_alphaf * vars.kzf;
-    fft.inverse(vars);
+    if (m_use_linearkernel) {
+                vars.kzf = (vars.zf.mul2(p_model_alphaf)).sum_over_channels();
+                vars.flag = Track_flags::RESPONSE;
+                fft.inverse(vars);
+    } else {
+        vars.flag = Track_flags::CROSS_CORRELATION;
+        gaussian_correlation(vars, vars.zf, this->p_model_xf, this->p_kernel_sigma);
+        DEBUG_PRINTM(p_model_alphaf);
+        DEBUG_PRINTM(vars.kzf);
+        DEBUG_PRINTM(p_model_alphaf * vars.kzf);
+        vars.flag = Track_flags::RESPONSE;
+        vars.kzf = p_model_alphaf * vars.kzf;
+        fft.inverse(vars);
+    }
 
     DEBUG_PRINTM(vars.response);
 
