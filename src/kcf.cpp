@@ -300,7 +300,7 @@ void KCF_Tracker::track(cv::Mat &img)
     cv::Mat *max_response_map = nullptr;
 
     for (size_t i = 0; i < p_scales.size(); ++i) {
-        scale_track(this->scale_vars[i], input_rgb, input_gray, this->p_current_scale * this->p_scales[i]);
+        scale_track(this->scale_vars[i], input_rgb, input_gray, this->p_scales[i]);
 
         if (this->scale_vars[i].max_response > max_response) {
             max_response = this->scale_vars[i].max_response;
@@ -384,7 +384,7 @@ void KCF_Tracker::track(cv::Mat &img)
 void KCF_Tracker::scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & input_gray, double scale)
 {
     get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size[0], this->p_windows_size[1],
-                                vars, scale);
+                                vars, this->p_current_scale * scale);
     for (size_t i = 0; i<vars.patch_feats.size();i++) {
         DEBUG_PRINTM(vars.patch_feats[i]);
     }
