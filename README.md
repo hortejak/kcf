@@ -172,13 +172,13 @@ top_left_y, width, height".
 
 Original C++ implementation of KCF tracker was written by Tomas Vojir
 [here][12] and is reimplementation of algorithm presented in
-"High-Speed Tracking with Kernelized Correlation Filters" paper [1].
+"High-Speed Tracking with Kernelized Correlation Filters" paper \[1].
 
 [12]: https://github.com/vojirt/kcf/blob/master/README.md
 
 ## References
 
-[1] João F. Henriques, Rui Caseiro, Pedro Martins, Jorge Batista,
+\[1] João F. Henriques, Rui Caseiro, Pedro Martins, Jorge Batista,
 “High-Speed Tracking with Kernelized Correlation Filters“, IEEE
 Transactions on Pattern Analysis and Machine Intelligence, 2015
 
