@@ -167,24 +167,22 @@ ComplexMat cuFFT::forward(const cv::Mat & input)
     return complex_result;
 }
 
-void cuFFT::forward(Scale_var & vars)
+void cuFFT::forward(Scale_vars & vars)
 {
     return;
 }
 
-ComplexMat cuFFT::forward_raw(float *input, bool all_scales)
+void cuFFT::forward_raw(Scale_vars & vars, bool all_scales)
 {
-    ComplexMat complex_result;
+    ComplexMat *result = vars.flag & Track_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
     if (all_scales){
-        complex_result.create(m_height, m_width / 2 + 1, m_num_of_scales);
-        CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal*>(input),
-                                complex_result.get_p_data()));
+        CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal*>(vars.gauss_corr_res),
+                                result->get_p_data()));
     } else {
-        complex_result.create(m_height, m_width/ 2 + 1, 1);
-        CufftErrorCheck(cufftExecR2C(plan_f, reinterpret_cast<cufftReal*>(input),
-                                complex_result.get_p_data()));
+        CufftErrorCheck(cufftExecR2C(plan_f, reinterpret_cast<cufftReal*>(vars.gauss_corr_res),
+                                result->get_p_data()));
     }
-    return complex_result;
+    return;
 }
 
 ComplexMat cuFFT::forward_window(const std::vector<cv::Mat> & input)
@@ -215,8 +213,27 @@ ComplexMat cuFFT::forward_window(const std::vector<cv::Mat> & input)
     return result;
 }
 
-void cuFFT::forward_window(Scale_var & vars)
+void cuFFT::forward_window(Scale_vars & vars)
 {
+    int n_channels = vars.patch_feats.size();
+    ComplexMat *result = vars.flag & Track_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
+    if(n_channels > (int) m_num_of_feats){
+        cv::Mat in_all(m_height * n_channels, m_width, CV_32F, data_fw_all_scales);
+        for (int i = 0; i < n_channels; ++i) {
+            cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
+            in_roi = vars.patch_feats[i].mul(m_window);
+        }
+
+        CufftErrorCheck(cufftExecR2C(plan_fw_all_scales, reinterpret_cast<cufftReal*>(data_fw_all_scales_d), result->get_p_data()));
+    } else {
+        cv::Mat in_all(m_height * n_channels, m_width, CV_32F, data_fw);
+        for (int i = 0; i < n_channels; ++i) {
+            cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
+            in_roi = vars.patch_feats[i].mul(m_window);
+        }
+
+        CufftErrorCheck(cufftExecR2C(plan_fw, reinterpret_cast<cufftReal*>(data_fw_d), result->get_p_data()));
+    }
     return;
 }
 
@@ -256,7 +273,7 @@ cv::Mat cuFFT::inverse(const ComplexMat & input)
     return real_result/(m_width*m_height);
 }
 
-void cuFFT::inverse(Scale_var & vars)
+void cuFFT::inverse(Scale_vars & vars)
 {
     return;
 }

@@ -164,6 +164,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     //window weights, i.e. labels
     fft.init(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size, p_num_of_feats, p_num_scales, m_use_big_batch);
     p_yf = fft.forward(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
+    DEBUG_PRINTM(p_yf);
     fft.set_window(cosine_window_function(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
 
     //obtain a sub-window for training initial model
@@ -171,6 +172,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     p_model_xf = fft.forward_window(scale_vars[0].patch_feats);
     DEBUG_PRINTM(p_model_xf);
     scale_vars[0].flag = Track_flags::AUTO_CORRELATION;
+
 
     if (m_use_linearkernel) {
         ComplexMat xfconj = p_model_xf.conj();
@@ -214,6 +216,16 @@ void KCF_Tracker::init_scale_vars()
     cudaSetDeviceFlags(cudaDeviceMapHost);
 
     for (int i = 0;i<p_num_scales;++i) {
+        scale_vars[i].ifft2_res = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC(p_num_of_feats));
+        scale_vars[i].response = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC1);
+
+        scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
+        scale_vars[i].kzf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
+        scale_vars[i].kf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
+
+        if (i==0)
+            scale_vars[i].xf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
+
         CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].xf_sqr_norm, alloc_size*sizeof(float), cudaHostAllocMapped));
         CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].xf_sqr_norm_d, (void*)scale_vars[i].xf_sqr_norm, 0));
 
@@ -233,8 +245,8 @@ void KCF_Tracker::init_scale_vars()
         scale_vars[i].response = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC1);
 
         scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
-        scale_vars[i].kzf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
-        scale_vars[i].kf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
+        scale_vars[i].kzf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
+        scale_vars[i].kf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
         //We use scale_vars[0] for updating the tracker, so we only allocate memory for  its xf only.
         if (i==0)
             scale_vars[i].xf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
@@ -442,7 +454,12 @@ void KCF_Tracker::scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & 
         DEBUG_PRINTM(this->p_model_alphaf * vars.kzf);
         vars.flag = Track_flags::RESPONSE;
         vars.kzf = this->p_model_alphaf * vars.kzf;
+        //TODO Add support for fft.inverse(vars) for CUFFT
+#ifdef CUFFT
+        vars.response = fft.inverse(vars.kzf);
+#else
         fft.inverse(vars);
+#endif
     }
 
     DEBUG_PRINTM(vars.response);
@@ -690,11 +707,12 @@ void KCF_Tracker::gaussian_correlation(struct Scale_vars & vars, const ComplexMa
     DEBUG_PRINTM(vars.xyf);
 #ifdef CUFFT
     if(auto_correlation)
-        cuda_gaussian_correlation(fft.inverse_raw(xyf), vars.gauss_corr_res, vars.xf_sqr_norm_d, vars.xf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
+        cuda_gaussian_correlation(fft.inverse_raw(vars.xyf), vars.gauss_corr_res, vars.xf_sqr_norm_d, vars.xf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
     else
-        cuda_gaussian_correlation(fft.inverse_raw(xyf), vars.gauss_corr_res, vars.xf_sqr_norm_d, vars.yf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
+        cuda_gaussian_correlation(fft.inverse_raw(vars.xyf), vars.gauss_corr_res, vars.xf_sqr_norm_d, vars.yf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
 
-    return fft.forward_raw(vars.gauss_corr_res, xf.n_scales==p_num_scales);
+    fft.forward_raw(vars, xf.n_scales==p_num_scales);
+    return;
 #else
     //ifft2 and sum over 3rd dimension, we dont care about individual channels
     fft.inverse(vars);

@@ -216,10 +216,9 @@ void Fftw::forward(Scale_vars & vars)
     return;
 }
 
-ComplexMat Fftw::forward_raw(float *input, bool all_scales)
+void Fftw::forward_raw(Scale_vars & vars, bool all_scales)
 {
-    ComplexMat dummy;
-    return dummy;
+    return;
 }
 
 ComplexMat Fftw::forward_window(const std::vector<cv::Mat> & input)
