@@ -19,8 +19,8 @@
 #include <omp.h>
 #endif //OPENMP
 
-#define DEBUG_PRINT(obj) if (m_debug) {std::cout << #obj << " @" /*<< __LINE__*/ << std::endl << (obj) << std::endl;}
-#define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" /*<< __LINE__ */<< " " << (obj).size() << " CH: " << (obj).channels() << std::endl << (obj) << std::endl;}
+#define DEBUG_PRINT(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;}
+#define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl << (obj) << std::endl;}
 
 KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor, double output_sigma_factor, int cell_size) :
     fft(*new FFT()),
@@ -182,11 +182,21 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
         scale_vars[i].yf_sqr_norm = (float*) malloc(sizeof(float));
 
         scale_vars[i].patch_feats.reserve(p_num_of_feats);
+#ifdef FFTW
+        scale_vars[i].ifft2_res = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC(p_num_of_feats));
+        scale_vars[i].response = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC1);
 
-        scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
+        scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
+        scale_vars[i].kzf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
+        scale_vars[i].kf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
         //We use scale_vars[0] for updating the tracker, so we only allocate memory for  its xf only.
         if (i==0)
+            scale_vars[i].xf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
+#else
+        scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
+        if (i==0)
             scale_vars[i].xf = ComplexMat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
+#endif
     }
 #endif
 

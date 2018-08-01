@@ -203,8 +203,16 @@ ComplexMat Fftw::forward(const cv::Mat & input)
     return complex_result;
 }
 
-void Fftw::forward(Scale_var & vars)
+void Fftw::forward(Scale_vars & vars)
 {
+    ComplexMat *complex_result = vars.flag & Track_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
+    if(m_big_batch_mode && vars.in_all.rows == (int)(m_height*m_num_of_scales)){
+        fftwf_execute_dft_r2c(plan_f_all_scales, reinterpret_cast<float*>(vars.in_all.data),
+                              reinterpret_cast<fftwf_complex*>(complex_result->get_p_data()));
+    } else {
+        fftwf_execute_dft_r2c(plan_f, reinterpret_cast<float*>(vars.in_all.data),
+                              reinterpret_cast<fftwf_complex*>(complex_result->get_p_data()));
+    }
     return;
 }
 
@@ -239,8 +247,23 @@ ComplexMat Fftw::forward_window(const std::vector<cv::Mat> & input)
     return result;
 }
 
-void Fftw::forward_window(Scale_var & vars)
+void Fftw::forward_window(Scale_vars & vars)
 {
+    int n_channels = vars.patch_feats.size();
+    cv::Mat in_all(m_height * n_channels, m_width, CV_32F);
+    for (int i = 0; i < n_channels; ++i) {
+        cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
+        in_roi = vars.patch_feats[i].mul(m_window);
+    }
+    ComplexMat *result = vars.flag & Track_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
+
+    float *in = reinterpret_cast<float*>(in_all.data);
+    fftwf_complex *out = reinterpret_cast<fftwf_complex*>(result->get_p_data());
+
+    if (n_channels <= (int) m_num_of_feats)
+        fftwf_execute_dft_r2c(plan_fw, in, out);
+    else
+        fftwf_execute_dft_r2c(plan_fw_all_scales, in, out);
     return;
 }
 
@@ -263,8 +286,25 @@ cv::Mat Fftw::inverse(const ComplexMat &input)
     return real_result/(m_width*m_height);
 }
 
-void Fftw::inverse(Scale_var & vars)
+void Fftw::inverse(Scale_vars & vars)
 {
+    ComplexMat *input = vars.flag & Track_flags::RESPONSE ? & vars.kzf : &  vars.xyf;
+    cv::Mat *real_result = vars.flag & Track_flags::RESPONSE ? & vars.response : & vars.ifft2_res;
+
+    int n_channels = input->n_channels;
+    fftwf_complex *in = reinterpret_cast<fftwf_complex*>(input->get_p_data());
+    float *out = reinterpret_cast<float*>(real_result->data);
+
+    if(n_channels == 1)
+        fftwf_execute_dft_c2r(plan_i_1ch, in, out);
+    else if(m_big_batch_mode && n_channels == (int) m_num_of_scales)
+        fftwf_execute_dft_c2r(plan_i_1ch_all_scales, in, out);
+    else if(m_big_batch_mode && n_channels == (int) m_num_of_feats * (int) m_num_of_scales)
+        fftwf_execute_dft_c2r(plan_i_features_all_scales, in, out);
+    else
+        fftwf_execute_dft_c2r(plan_i_features, in, out);
+
+    *real_result = *real_result/(m_width*m_height);
     return;
 }
 
