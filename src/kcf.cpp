@@ -146,6 +146,52 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     p_roi_width = p_windows_size[0]/p_cell_size;
     p_roi_height = p_windows_size[1]/p_cell_size;
 
+    init_scale_vars();
+
+    p_current_scale = 1.;
+
+    double min_size_ratio = std::max(5.*p_cell_size/p_windows_size[0], 5.*p_cell_size/p_windows_size[1]);
+    double max_size_ratio = std::min(floor((img.cols + p_windows_size[0]/3)/p_cell_size)*p_cell_size/p_windows_size[0], floor((img.rows + p_windows_size[1]/3)/p_cell_size)*p_cell_size/p_windows_size[1]);
+    p_min_max_scale[0] = std::pow(p_scale_step, std::ceil(std::log(min_size_ratio) / log(p_scale_step)));
+    p_min_max_scale[1] = std::pow(p_scale_step, std::floor(std::log(max_size_ratio) / log(p_scale_step)));
+
+    std::cout << "init: img size " << img.cols << " " << img.rows << std::endl;
+    std::cout << "init: win size. " << p_windows_size[0] << " " << p_windows_size[1] << std::endl;
+    std::cout << "init: min max scales factors: " << p_min_max_scale[0] << " " << p_min_max_scale[1] << std::endl;
+
+    p_output_sigma = std::sqrt(p_pose.w*p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
+
+    //window weights, i.e. labels
+    fft.init(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size, p_num_of_feats, p_num_scales, m_use_big_batch);
+    p_yf = fft.forward(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
+    fft.set_window(cosine_window_function(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
+
+    //obtain a sub-window for training initial model
+    get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], scale_vars[0]);
+    p_model_xf = fft.forward_window(scale_vars[0].patch_feats);
+    DEBUG_PRINTM(p_model_xf);
+    scale_vars[0].flag = Track_flags::AUTO_CORRELATION;
+
+    if (m_use_linearkernel) {
+        ComplexMat xfconj = p_model_xf.conj();
+        p_model_alphaf_num = xfconj.mul(p_yf);
+        p_model_alphaf_den = (p_model_xf * xfconj);
+    } else {
+        //Kernel Ridge Regression, calculate alphas (in Fourier domain)
+        gaussian_correlation(scale_vars[0], p_model_xf, p_model_xf, p_kernel_sigma, true);
+        DEBUG_PRINTM(scale_vars[0].kf);
+        p_model_alphaf_num = p_yf * scale_vars[0].kf;
+        DEBUG_PRINTM(p_model_alphaf_num);
+        p_model_alphaf_den = scale_vars[0].kf * (scale_vars[0].kf + p_lambda);
+        DEBUG_PRINTM(p_model_alphaf_den);
+    }
+    p_model_alphaf = p_model_alphaf_num / p_model_alphaf_den;
+    DEBUG_PRINTM(p_model_alphaf);
+//        p_model_alphaf = p_yf / (kf + p_lambda);   //equation for fast training
+}
+
+void KCF_Tracker::init_scale_vars()
+{
 #ifdef BIG_BATCH
     int alloc_size = p_num_scales;
 #else
@@ -199,47 +245,6 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
 #endif
     }
 #endif
-
-    p_current_scale = 1.;
-
-    double min_size_ratio = std::max(5.*p_cell_size/p_windows_size[0], 5.*p_cell_size/p_windows_size[1]);
-    double max_size_ratio = std::min(floor((img.cols + p_windows_size[0]/3)/p_cell_size)*p_cell_size/p_windows_size[0], floor((img.rows + p_windows_size[1]/3)/p_cell_size)*p_cell_size/p_windows_size[1]);
-    p_min_max_scale[0] = std::pow(p_scale_step, std::ceil(std::log(min_size_ratio) / log(p_scale_step)));
-    p_min_max_scale[1] = std::pow(p_scale_step, std::floor(std::log(max_size_ratio) / log(p_scale_step)));
-
-    std::cout << "init: img size " << img.cols << " " << img.rows << std::endl;
-    std::cout << "init: win size. " << p_windows_size[0] << " " << p_windows_size[1] << std::endl;
-    std::cout << "init: min max scales factors: " << p_min_max_scale[0] << " " << p_min_max_scale[1] << std::endl;
-
-    p_output_sigma = std::sqrt(p_pose.w*p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
-
-    //window weights, i.e. labels
-    fft.init(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size, p_num_of_feats, p_num_scales, m_use_big_batch);
-    p_yf = fft.forward(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
-    fft.set_window(cosine_window_function(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
-
-    //obtain a sub-window for training initial model
-    get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], scale_vars[0]);
-    p_model_xf = fft.forward_window(scale_vars[0].patch_feats);
-    DEBUG_PRINTM(p_model_xf);
-    scale_vars[0].flag = Track_flags::AUTO_CORRELATION;
-
-    if (m_use_linearkernel) {
-        ComplexMat xfconj = p_model_xf.conj();
-        p_model_alphaf_num = xfconj.mul(p_yf);
-        p_model_alphaf_den = (p_model_xf * xfconj);
-    } else {
-        //Kernel Ridge Regression, calculate alphas (in Fourier domain)
-        gaussian_correlation(scale_vars[0], p_model_xf, p_model_xf, p_kernel_sigma, true);
-        DEBUG_PRINTM(scale_vars[0].kf);
-        p_model_alphaf_num = p_yf * scale_vars[0].kf;
-        DEBUG_PRINTM(p_model_alphaf_num);
-        p_model_alphaf_den = scale_vars[0].kf * (scale_vars[0].kf + p_lambda);
-        DEBUG_PRINTM(p_model_alphaf_den);
-    }
-    p_model_alphaf = p_model_alphaf_num / p_model_alphaf_den;
-    DEBUG_PRINTM(p_model_alphaf);
-//        p_model_alphaf = p_yf / (kf + p_lambda);   //equation for fast training
 }
 
 void KCF_Tracker::setTrackerPose(BBox_c &bbox, cv::Mat & img, int fit_size_x, int fit_size_y)
