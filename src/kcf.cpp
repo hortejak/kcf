@@ -184,6 +184,9 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
         scale_vars[i].patch_feats.reserve(p_num_of_feats);
 
         scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
+        //We use scale_vars[0] for updating the tracker, so we only allocate memory for  its xf only.
+        if (i==0)
+            scale_vars[i].xf = ComplexMat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
     }
 #endif
 
@@ -353,21 +356,22 @@ void KCF_Tracker::track(cv::Mat &img)
         p_current_scale = p_min_max_scale[1];
     //obtain a subwindow for training at newly estimated target position
     get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], scale_vars[0], p_current_scale);
-    ComplexMat xf = fft.forward_window(scale_vars[0].patch_feats);
+    scale_vars[0].flag = Track_flags::TRACKER_UPDATE;
+    fft.forward_window(scale_vars[0]);
 
     //subsequent frames, interpolate model
-    p_model_xf = p_model_xf * (1. - p_interp_factor) + xf * p_interp_factor;
+    p_model_xf = p_model_xf * (1. - p_interp_factor) + scale_vars[0].xf * p_interp_factor;
 
     ComplexMat alphaf_num, alphaf_den;
-    scale_vars[0].flag = Track_flags::AUTO_CORRELATION;
 
     if (m_use_linearkernel) {
-        ComplexMat xfconj = xf.conj();
+        ComplexMat xfconj = scale_vars[0].xf.conj();
         alphaf_num = xfconj.mul(p_yf);
-        alphaf_den = (xf * xfconj);
+        alphaf_den = (scale_vars[0].xf * xfconj);
     } else {
+        scale_vars[0].flag = Track_flags::AUTO_CORRELATION;
         //Kernel Ridge Regression, calculate alphas (in Fourier domain)
-        gaussian_correlation(scale_vars[0], xf, xf, p_kernel_sigma, true);
+        gaussian_correlation(scale_vars[0], scale_vars[0].xf, scale_vars[0].xf, p_kernel_sigma, true);
 //        ComplexMat alphaf = p_yf / (kf + p_lambda); //equation for fast training
 //        p_model_alphaf = p_model_alphaf * (1. - p_interp_factor) + alphaf * p_interp_factor;
         alphaf_num = p_yf * scale_vars[0].kf;
@@ -386,6 +390,7 @@ void KCF_Tracker::scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & 
     get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size[0], this->p_windows_size[1],
                                 vars, this->p_current_scale * scale);
 
+    vars.flag = Track_flags::SCALE_RESPONSE;
     fft.forward_window(vars);
     DEBUG_PRINTM(vars.zf);
 

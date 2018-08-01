@@ -12,6 +12,8 @@ enum Track_flags
     RESPONSE = 1 << 0, // binary 0001
     AUTO_CORRELATION = 1 << 1, // binary 0010
     CROSS_CORRELATION = 1 << 2, // binary 0100
+    SCALE_RESPONSE = 1 << 3,// binary 1000
+    TRACKER_UPDATE = 1 << 4,// binary 0001 0000
 };
 
 struct Scale_vars
@@ -24,7 +26,7 @@ struct Scale_vars
     std::vector<cv::Mat> patch_feats;
 
     cv::Mat in_all, ifft2_res, response;
-    ComplexMat zf, kzf, kf, xyf;
+    ComplexMat zf, kzf, kf, xyf, xf;
 
     Track_flags flag;
 

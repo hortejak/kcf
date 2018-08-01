@@ -56,10 +56,12 @@ void FftOpencv::forward_window(Scale_vars & vars)
 {
     int n_channels = vars.patch_feats.size();
 
+    ComplexMat *result = vars.flag & Track_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
+
     for (int i = 0; i < n_channels; ++i) {
         cv::Mat complex_result;
         cv::dft(vars.patch_feats[i].mul(m_window), complex_result, cv::DFT_COMPLEX_OUTPUT);
-        vars.zf.set_channel(i, complex_result);
+        result->set_channel(i, complex_result);
     }
     return;
 }
