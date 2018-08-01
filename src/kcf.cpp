@@ -302,14 +302,35 @@ void KCF_Tracker::track(cv::Mat &img)
     cv::Point2i *max_response_pt = nullptr;
     cv::Mat *max_response_map = nullptr;
 
-    for (size_t i = 0; i < p_scales.size(); ++i) {
-        scale_track(this->scale_vars[i], input_rgb, input_gray, this->p_scales[i]);
-
-        if (this->scale_vars[i].max_response > max_response) {
-            max_response = this->scale_vars[i].max_response;
-            max_response_pt = & this->scale_vars[i].max_loc;
-            max_response_map = & this->scale_vars[i].response;
-            scale_index = i;
+    if(m_use_multithreading) {
+        std::vector<std::future<void>> async_res(p_scales.size());
+        for (size_t i = 0; i < scale_vars.size(); ++i) {
+            async_res[i] = std::async(std::launch::async,
+                                [this, &input_gray, &input_rgb, i]() -> void
+                                {return scale_track(this->scale_vars[i], input_rgb, input_gray, this->p_scales[i]);});
+        }
+        for (size_t i = 0; i < p_scales.size(); ++i) {
+            async_res[i].wait();
+            if (this->scale_vars[i].max_response > max_response) {
+                max_response = this->scale_vars[i].max_response;
+                max_response_pt = & this->scale_vars[i].max_loc;
+                max_response_map = & this->scale_vars[i].response;
+                scale_index = i;
+            }
+        }
+    } else {
+#pragma omp parallel for schedule(dynamic)
+        for (size_t i = 0; i < scale_vars.size(); ++i) {
+            scale_track(this->scale_vars[i], input_rgb, input_gray, this->p_scales[i]);
+#pragma omp critical
+            {
+                if (this->scale_vars[i].max_response > max_response) {
+                    max_response = this->scale_vars[i].max_response;
+                    max_response_pt = & this->scale_vars[i].max_loc;
+                    max_response_map = & this->scale_vars[i].response;
+                    scale_index = i;
+                }
+            }
         }
     }
 
@@ -395,17 +416,17 @@ void KCF_Tracker::scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & 
     DEBUG_PRINTM(vars.zf);
 
     if (m_use_linearkernel) {
-                vars.kzf = (vars.zf.mul2(p_model_alphaf)).sum_over_channels();
+                vars.kzf = (vars.zf.mul2(this->p_model_alphaf)).sum_over_channels();
                 vars.flag = Track_flags::RESPONSE;
                 fft.inverse(vars);
     } else {
         vars.flag = Track_flags::CROSS_CORRELATION;
         gaussian_correlation(vars, vars.zf, this->p_model_xf, this->p_kernel_sigma);
-        DEBUG_PRINTM(p_model_alphaf);
+        DEBUG_PRINTM(this->p_model_alphaf);
         DEBUG_PRINTM(vars.kzf);
-        DEBUG_PRINTM(p_model_alphaf * vars.kzf);
+        DEBUG_PRINTM(this->p_model_alphaf * vars.kzf);
         vars.flag = Track_flags::RESPONSE;
-        vars.kzf = p_model_alphaf * vars.kzf;
+        vars.kzf = this->p_model_alphaf * vars.kzf;
         fft.inverse(vars);
     }
 
