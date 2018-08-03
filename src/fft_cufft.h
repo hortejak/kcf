@@ -33,7 +33,8 @@ private:
     bool m_big_batch_mode;
     cufftHandle plan_f, plan_f_all_scales, plan_fw, plan_fw_all_scales, plan_i_features,
      plan_i_features_all_scales, plan_i_1ch, plan_i_1ch_all_scales;
-    float *data_f = nullptr, *data_f_all_scales = nullptr, *data_fw = nullptr, *data_fw_d = nullptr, *data_fw_all_scales = nullptr, *data_fw_all_scales_d = nullptr, *data_i_features = nullptr, *data_i_features_d = nullptr, *data_i_features_all_scales = nullptr, *data_i_features_all_scales_d = nullptr, *data_i_1ch = nullptr, *data_i_1ch_d = nullptr, *data_i_1ch_all_scales = nullptr, *data_i_1ch_all_scales_d = nullptr;
+    float *data_f_all_scales = nullptr, *data_fw_all_scales = nullptr, *data_fw_all_scales_d = nullptr, *data_i_features_all_scales = nullptr,
+               *data_i_features_all_scales_d = nullptr, *data_i_1ch_all_scales = nullptr, *data_i_1ch_all_scales_d = nullptr;
 };
 
 #endif // FFT_CUDA_H

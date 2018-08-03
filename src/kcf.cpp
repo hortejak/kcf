@@ -40,6 +40,8 @@ KCF_Tracker::~KCF_Tracker()
         CudaSafeCall(cudaFreeHost(scale_vars[i].data_i_1ch));
         CudaSafeCall(cudaFreeHost(scale_vars[i].data_i_features));
         CudaSafeCall(cudaFree(scale_vars[i].gauss_corr_res));
+        CudaSafeCall(cudaFreeHost(scale_vars[i].rot_labels_data));
+        CudaSafeCall(cudaFreeHost(scale_vars[i].data_features));
     }
 #else
     for (int i = 0;i < p_num_scales;++i) {
@@ -169,6 +171,8 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     scale_vars[0].flag = Tracker_flags::TRACKER_INIT;
     //window weights, i.e. labels
     gaussian_shaped_labels(scale_vars[0], p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size);
+    DEBUG_PRINTM(scale_vars[0].rot_labels);
+
     fft.forward(scale_vars[0]);
     DEBUG_PRINTM(p_yf);
 
@@ -232,9 +236,6 @@ void KCF_Tracker::init_scale_vars()
         scale_vars[i].kzf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
         scale_vars[i].kf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
 
-        if (i==0)
-            scale_vars[i].xf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
-
 #ifdef BIG_BATCH
         alloc_size = p_num_of_feats;
 #else
@@ -247,8 +248,19 @@ void KCF_Tracker::init_scale_vars()
         CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].yf_sqr_norm, sizeof(float), cudaHostAllocMapped));
         CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].yf_sqr_norm_d, (void*)scale_vars[i].yf_sqr_norm, 0));
 
-        CudaSafeCall(cudaMalloc((void**)&scale_vars[i].gauss_corr_res, (p_windows_size[0]/p_cell_size)*(p_windows_size[1]/p_cell_size)*alloc_size*sizeof(float)));
-        scale_vars[i].in_all = cv::Mat(p_windows_size[1], p_windows_size[0], CV_32F, scale_vars[i].gauss_corr_res);
+        alloc_size =(p_windows_size[0]/p_cell_size)*(p_windows_size[1]/p_cell_size)*alloc_size*sizeof(float);
+        CudaSafeCall(cudaMalloc((void**)&scale_vars[i].gauss_corr_res, alloc_size));
+        scale_vars[i].in_all = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC1, scale_vars[i].gauss_corr_res);
+
+        alloc_size = (p_windows_size[0]/p_cell_size)*(p_windows_size[1]/p_cell_size)*alloc_size*sizeof(float);
+        CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].rot_labels_data, alloc_size, cudaHostAllocMapped));
+        CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].rot_labels_data_d, (void*)scale_vars[i].rot_labels_data, 0));
+        scale_vars[i].rot_labels = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC1, scale_vars[i].rot_labels_data);
+
+        alloc_size = (p_windows_size[0]/p_cell_size)*((p_windows_size[1]/p_cell_size)*p_num_of_feats)*sizeof(cufftReal);
+        CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].data_features, alloc_size, cudaHostAllocMapped));
+        CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].data_features_d, (void*)scale_vars[i].data_features, 0));
+        scale_vars[i].fw_all = cv::Mat((p_windows_size[1]/p_cell_size)*p_num_of_feats, p_windows_size[0]/p_cell_size, CV_32F, scale_vars[i].data_features);
     }
 #else
 #ifdef BIG_BATCH
@@ -269,8 +281,6 @@ void KCF_Tracker::init_scale_vars()
         scale_vars[i].kzf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
         scale_vars[i].kf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
         //We use scale_vars[0] for updating the tracker, so we only allocate memory for  its xf only.
-        if (i==0)
-            scale_vars[i].xf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
 #else
         scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
         if (i==0)
@@ -281,6 +291,7 @@ void KCF_Tracker::init_scale_vars()
 #if defined(FFTW) || defined(CUFFT)
     p_model_xf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
     p_yf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
+    scale_vars[0].xf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
 #else
     p_model_xf.create(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
     p_yf.create(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, 1);
@@ -573,7 +584,8 @@ void KCF_Tracker::gaussian_shaped_labels(Scale_vars & vars, double sigma, int di
     }
 
     //rotate so that 1 is at top-left corner (see KCF paper for explanation)
-    vars.rot_labels = circshift(labels, range_x[0], range_y[0]);
+    cv::Mat tmp = circshift(labels, range_x[0], range_y[0]);
+    tmp.copyTo(vars.rot_labels);
     //sanity check, 1 at top left corner
     assert(vars.rot_labels.at<float>(0,0) >= 1.f - 1e-10f);
 

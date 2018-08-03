@@ -21,7 +21,8 @@ struct Scale_vars
 {
     float *xf_sqr_norm = nullptr, *yf_sqr_norm = nullptr;
 #ifdef CUFFT
-    float *xf_sqr_norm_d = nullptr, *yf_sqr_norm_d = nullptr, *gauss_corr_res = nullptr;
+    float *xf_sqr_norm_d = nullptr, *yf_sqr_norm_d = nullptr, *gauss_corr_res = nullptr, *gauss_corr_res_d = nullptr, *rot_labels_data = nullptr,
+              *rot_labels_data_d = nullptr, *data_features = nullptr, *data_features_d = nullptr;
     float *data_f = nullptr, *data_fw = nullptr, *data_fw_d = nullptr,  *data_i_features = nullptr,
               *data_i_features_d = nullptr, *data_i_1ch = nullptr, *data_i_1ch_d = nullptr;
 #ifdef BIG_BATCH
@@ -33,7 +34,7 @@ struct Scale_vars
 
     std::vector<cv::Mat> patch_feats;
 
-    cv::Mat in_all, ifft2_res, response;
+    cv::Mat in_all, fw_all, ifft2_res, response;
     ComplexMat zf, kzf, kf, xyf, xf;
 
     //Used only for the initialization of the KCF tracker

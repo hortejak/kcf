@@ -12,12 +12,9 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
 
     //FFT forward one scale
     {
-        CudaSafeCall(cudaMalloc(&data_f, m_height*m_width*sizeof(cufftReal)));
-
        CufftErrorCheck(cufftPlan2d(&plan_f, m_height, m_width, CUFFT_R2C));
-
-
     }
+#ifdef BIG_BATCH
     //FFT forward all scales
     if(m_num_of_scales > 1 && m_big_batch_mode)
     {
@@ -35,11 +32,9 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
 		  onembed, ostride, odist,
 		  CUFFT_R2C, howmany));
     }
+#endif
     //FFT forward window one scale
     {
-        CudaSafeCall(cudaHostAlloc(&data_fw, m_height*m_num_of_feats*m_width*sizeof(cufftReal), cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer(&data_fw_d, data_fw, 0));
-
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
         int howmany = m_num_of_feats;
@@ -52,6 +47,7 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
 		  onembed, ostride, odist,
 		  CUFFT_R2C, howmany));
     }
+#ifdef BIG_BATCH
     //FFT forward window all scales all feats
     if(m_num_of_scales > 1 && m_big_batch_mode)
     {
@@ -69,9 +65,8 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
 		  inembed, istride, idist,
 		  onembed, ostride, odist,
 		  CUFFT_R2C, howmany));
-
-
     }
+#endif
     //FFT inverse one scale
     {
         int rank = 2;
@@ -88,7 +83,7 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
     }
     //FFT inverse all scales
 #ifdef BIG_BATCH
-    if(m_num_of_scales > 1)
+    if(m_num_of_scales > 1 && m_big_batch_mode)
     {
         CudaSafeCall(cudaHostAlloc(&data_i_features_all_scales, m_height*m_num_of_feats*m_num_of_scales*m_width*sizeof(cufftReal), cudaHostAllocMapped));
         CudaSafeCall(cudaHostGetDevicePointer(&data_i_features_all_scales_d, data_i_features_all_scales, 0));
@@ -151,15 +146,13 @@ void cuFFT::forward(Scale_vars & vars)
 {
     ComplexMat *complex_result = vars.flag & Tracker_flags::TRACKER_INIT ? vars.p_yf_ptr :
                                                   vars.flag & Tracker_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
-    cv::Mat *input = vars.flag & Tracker_flags::TRACKER_INIT ? & vars.rot_labels : & vars.in_all;
+    cufftReal *input = vars.flag & Tracker_flags::TRACKER_INIT ? vars.rot_labels_data : vars.gauss_corr_res;
 
     if(m_big_batch_mode && vars.in_all.rows == (int)(m_height*m_num_of_scales)){
-        CudaSafeCall(cudaMemcpy(data_f_all_scales, input->ptr<cufftReal>(), m_height*m_num_of_scales*m_width*sizeof(cufftReal), cudaMemcpyHostToDevice));
         CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal*>(data_f_all_scales),
                                 complex_result->get_p_data()));
     } else {
-        CudaSafeCall(cudaMemcpy(data_f, input->ptr<cufftReal>(), m_height*m_width*sizeof(cufftReal), cudaMemcpyHostToDevice));
-        CufftErrorCheck(cufftExecR2C(plan_f, reinterpret_cast<cufftReal*>(data_f),
+                CufftErrorCheck(cufftExecR2C(plan_f, input,
                                 complex_result->get_p_data()));
     }
     return;
@@ -181,13 +174,12 @@ void cuFFT::forward_window(Scale_vars & vars)
 
         CufftErrorCheck(cufftExecR2C(plan_fw_all_scales, reinterpret_cast<cufftReal*>(data_fw_all_scales_d), result->get_p_data()));
     } else {
-        cv::Mat in_all(m_height * n_channels, m_width, CV_32F, data_fw);
         for (int i = 0; i < n_channels; ++i) {
-            cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
+            cv::Mat in_roi(vars.fw_all, cv::Rect(0, i*m_height, m_width, m_height));
             in_roi = vars.patch_feats[i].mul(m_window);
         }
 
-        CufftErrorCheck(cufftExecR2C(plan_fw, reinterpret_cast<cufftReal*>(data_fw_d), result->get_p_data()));
+        CufftErrorCheck(cufftExecR2C(plan_fw, reinterpret_cast<cufftReal*>(vars.data_features_d), result->get_p_data()));
     }
     return;
 }
@@ -242,9 +234,6 @@ cuFFT::~cuFFT()
   CufftErrorCheck(cufftDestroy(plan_fw));
   CufftErrorCheck(cufftDestroy(plan_i_1ch));
   CufftErrorCheck(cufftDestroy(plan_i_features));
-
-  CudaSafeCall(cudaFree(data_f));
-  CudaSafeCall(cudaFreeHost(data_fw));
   
   if (m_big_batch_mode) {
       CufftErrorCheck(cufftDestroy(plan_f_all_scales));
