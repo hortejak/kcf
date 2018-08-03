@@ -167,13 +167,16 @@ ComplexMat cuFFT::forward(const cv::Mat & input)
 
 void cuFFT::forward(Scale_vars & vars)
 {
-    ComplexMat *complex_result = vars.flag & Track_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
+    ComplexMat *complex_result = vars.flag & Tracker_flags::TRACKER_INIT ? vars.p_yf_ptr :
+                                                  vars.flag & Tracker_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
+    cv::Mat *input = vars.flag & Tracker_flags::TRACKER_INIT ? & vars.rot_labels : & vars.in_all;
+
     if(m_big_batch_mode && vars.in_all.rows == (int)(m_height*m_num_of_scales)){
-        CudaSafeCall(cudaMemcpy(data_f_all_scales, vars.in_all.ptr<cufftReal>(), m_height*m_num_of_scales*m_width*sizeof(cufftReal), cudaMemcpyHostToDevice));
+        CudaSafeCall(cudaMemcpy(data_f_all_scales, input->ptr<cufftReal>(), m_height*m_num_of_scales*m_width*sizeof(cufftReal), cudaMemcpyHostToDevice));
         CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal*>(data_f_all_scales),
                                 complex_result->get_p_data()));
     } else {
-        CudaSafeCall(cudaMemcpy(data_f, vars.in_all.ptr<cufftReal>(), m_height*m_width*sizeof(cufftReal), cudaMemcpyHostToDevice));
+        CudaSafeCall(cudaMemcpy(data_f, input->ptr<cufftReal>(), m_height*m_width*sizeof(cufftReal), cudaMemcpyHostToDevice));
         CufftErrorCheck(cufftExecR2C(plan_f, reinterpret_cast<cufftReal*>(data_f),
                                 complex_result->get_p_data()));
     }
@@ -182,7 +185,7 @@ void cuFFT::forward(Scale_vars & vars)
 
 void cuFFT::forward_raw(Scale_vars & vars, bool all_scales)
 {
-    ComplexMat *result = vars.flag & Track_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
+    ComplexMat *result = vars.flag & Tracker_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
     if (all_scales){
         CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal*>(vars.gauss_corr_res),
                                 result->get_p_data()));
@@ -224,7 +227,10 @@ ComplexMat cuFFT::forward_window(const std::vector<cv::Mat> & input)
 void cuFFT::forward_window(Scale_vars & vars)
 {
     int n_channels = vars.patch_feats.size();
-    ComplexMat *result = vars.flag & Track_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
+
+    ComplexMat *result = vars.flag & Tracker_flags::TRACKER_INIT ? vars.p_model_xf_ptr :
+                                                  vars.flag & Tracker_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
+
     if(n_channels > (int) m_num_of_feats){
         cv::Mat in_all(m_height * n_channels, m_width, CV_32F, data_fw_all_scales);
         for (int i = 0; i < n_channels; ++i) {
@@ -247,8 +253,8 @@ void cuFFT::forward_window(Scale_vars & vars)
 
 void cuFFT::inverse(Scale_vars & vars)
 {
-    ComplexMat *input = vars.flag & Track_flags::RESPONSE ? & vars.kzf : &  vars.xyf;
-    cv::Mat *real_result = vars.flag & Track_flags::RESPONSE ? & vars.response : & vars.ifft2_res;
+    ComplexMat *input = vars.flag & Tracker_flags::RESPONSE ? & vars.kzf : &  vars.xyf;
+    cv::Mat *real_result = vars.flag & Tracker_flags::RESPONSE ? & vars.response : & vars.ifft2_res;
 
     int n_channels = input->n_channels;
     cufftComplex *in = reinterpret_cast<cufftComplex*>(input->get_p_data());

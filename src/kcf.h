@@ -139,7 +139,7 @@ private:
     //helping functions
     void scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & input_gray, double scale);
     cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y);
-    cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);
+    void gaussian_shaped_labels(Scale_vars & vars, double sigma, int dim1, int dim2);
     void gaussian_correlation(struct Scale_vars &vars, const ComplexMat & xf, const ComplexMat & yf, double sigma, bool auto_correlation = false);
     cv::Mat circshift(const cv::Mat & patch, int x_rot, int y_rot);
     cv::Mat cosine_window_function(int dim1, int dim2);

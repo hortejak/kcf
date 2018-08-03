@@ -26,7 +26,7 @@ void FftOpencv::forward(Scale_vars & vars)
 {
     cv::Mat complex_result;
     cv::dft(vars.in_all, complex_result, cv::DFT_COMPLEX_OUTPUT);
-    if (vars.flag & Track_flags::AUTO_CORRELATION)
+    if (vars.flag & Tracker_flags::AUTO_CORRELATION)
        vars.kf = ComplexMat(complex_result);
     else
         vars.kzf = ComplexMat(complex_result);
@@ -56,7 +56,7 @@ void FftOpencv::forward_window(Scale_vars & vars)
 {
     int n_channels = vars.patch_feats.size();
 
-    ComplexMat *result = vars.flag & Track_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
+    ComplexMat *result = vars.flag & Tracker_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
 
     for (int i = 0; i < n_channels; ++i) {
         cv::Mat complex_result;
@@ -84,8 +84,8 @@ cv::Mat FftOpencv::inverse(const ComplexMat & input)
 
 void FftOpencv::inverse(Scale_vars & vars)
 {
-    ComplexMat *input = vars.flag & Track_flags::RESPONSE ? & vars.kzf : & vars.xyf;
-    cv::Mat *result = vars.flag & Track_flags::RESPONSE ? & vars.response : & vars.ifft2_res;
+    ComplexMat *input = vars.flag & Tracker_flags::RESPONSE ? & vars.kzf : & vars.xyf;
+    cv::Mat *result = vars.flag & Tracker_flags::RESPONSE ? & vars.response : & vars.ifft2_res;
 
     if (input->n_channels == 1) {
         cv::dft(input->to_cv_mat(), *result, cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);

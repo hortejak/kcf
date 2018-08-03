@@ -205,7 +205,7 @@ ComplexMat Fftw::forward(const cv::Mat & input)
 
 void Fftw::forward(Scale_vars & vars)
 {
-    ComplexMat *complex_result = vars.flag & Track_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
+    ComplexMat *complex_result = vars.flag & Tracker_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
     if(m_big_batch_mode && vars.in_all.rows == (int)(m_height*m_num_of_scales)){
         fftwf_execute_dft_r2c(plan_f_all_scales, reinterpret_cast<float*>(vars.in_all.data),
                               reinterpret_cast<fftwf_complex*>(complex_result->get_p_data()));
@@ -254,7 +254,7 @@ void Fftw::forward_window(Scale_vars & vars)
         cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
         in_roi = vars.patch_feats[i].mul(m_window);
     }
-    ComplexMat *result = vars.flag & Track_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
+    ComplexMat *result = vars.flag & Tracker_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
 
     float *in = reinterpret_cast<float*>(in_all.data);
     fftwf_complex *out = reinterpret_cast<fftwf_complex*>(result->get_p_data());
@@ -287,8 +287,8 @@ cv::Mat Fftw::inverse(const ComplexMat &input)
 
 void Fftw::inverse(Scale_vars & vars)
 {
-    ComplexMat *input = vars.flag & Track_flags::RESPONSE ? & vars.kzf : &  vars.xyf;
-    cv::Mat *real_result = vars.flag & Track_flags::RESPONSE ? & vars.response : & vars.ifft2_res;
+    ComplexMat *input = vars.flag & Tracker_flags::RESPONSE ? & vars.kzf : &  vars.xyf;
+    cv::Mat *real_result = vars.flag & Tracker_flags::RESPONSE ? & vars.response : & vars.ifft2_res;
 
     int n_channels = input->n_channels;
     fftwf_complex *in = reinterpret_cast<fftwf_complex*>(input->get_p_data());

@@ -7,7 +7,7 @@
   #include "complexmat.hpp"
 #endif
 
-enum Track_flags
+enum Tracker_flags
 {
     RESPONSE = 1 << 0, // binary 0001
     AUTO_CORRELATION = 1 << 1, // binary 0010
@@ -36,7 +36,12 @@ struct Scale_vars
     cv::Mat in_all, ifft2_res, response;
     ComplexMat zf, kzf, kf, xyf, xf;
 
-    Track_flags flag;
+    //Used only for the initialization of the KCF tracker
+    ComplexMat * p_model_xf_ptr, *p_yf_ptr;
+    cv::Mat rot_labels;
+
+
+    Tracker_flags flag;
 
     cv::Point2i max_loc;
     double max_val, max_response;
