@@ -21,6 +21,12 @@ struct Scale_vars
     float *xf_sqr_norm = nullptr, *yf_sqr_norm = nullptr;
 #ifdef CUFFT
     float *xf_sqr_norm_d = nullptr, *yf_sqr_norm_d = nullptr, *gauss_corr_res = nullptr;
+    float *data_f = nullptr, *data_fw = nullptr, *data_fw_d = nullptr,  *data_i_features = nullptr,
+    *data_i_features_d = nullptr, *data_i_1ch = nullptr, *data_i_1ch_d = nullptr;
+#ifdef BIG_BATCH
+    float *data_f_all_scales = nullptr, *data_fw_all_scales = nullptr, *data_fw_all_scales_d = nullptr,
+    *data_i_features_all_scales = nullptr, *data_i_features_all_scales_d = nullptr, *data_i_1ch_all_scales = nullptr, *data_i_1ch_all_scales_d = nullptr
+#endif
 #endif
 
     std::vector<cv::Mat> patch_feats;

@@ -275,6 +275,41 @@ cv::Mat cuFFT::inverse(const ComplexMat & input)
 
 void cuFFT::inverse(Scale_vars & vars)
 {
+    ComplexMat *input = vars.flag & Track_flags::RESPONSE ? & vars.kzf : &  vars.xyf;
+    cv::Mat *real_result = vars.flag & Track_flags::RESPONSE ? & vars.response : & vars.ifft2_res;
+
+    int n_channels = input->n_channels;
+    cufftComplex *in = reinterpret_cast<cufftComplex*>(input->get_p_data());
+
+    if(n_channels == 1){
+
+        CufftErrorCheck(cufftExecC2R(plan_i_1ch, in, reinterpret_cast<cufftReal*>(vars.data_i_1ch_d)));
+        cudaDeviceSynchronize();
+        *real_result = *real_result/(m_width*m_height);
+        return;
+    }
+#ifdef BIG_BATCH
+    else if(n_channels == (int) m_num_of_scales){
+        cv::Mat real_result(m_height, m_width, CV_32FC(n_channels), vars.data_i_1ch_all_scales);
+
+        CufftErrorCheck(cufftExecC2R(plan_i_1ch_all_scales, in, reinterpret_cast<cufftReal*>(vars.data_i_1ch_all_scales_d)));
+        cudaDeviceSynchronize();
+
+        return real_result/(m_width*m_height);
+    } else if(n_channels == (int) m_num_of_feats * (int) m_num_of_scales){
+        cv::Mat real_result(m_height, m_width, CV_32FC(n_channels), data_i_features_all_scales);
+
+        CufftErrorCheck(cufftExecC2R(plan_i_features_all_scales, in, reinterpret_cast<cufftReal*>(vars.data_i_features_all_scales_d)));
+        cudaDeviceSynchronize();
+
+        return real_result/(m_width*m_height);
+    }
+#endif
+
+    CufftErrorCheck(cufftExecC2R(plan_i_features, in, reinterpret_cast<cufftReal*>(vars.data_i_features_d)));
+    cudaDeviceSynchronize();
+
+    *real_result = *real_result/(m_width*m_height);
     return;
 }
 

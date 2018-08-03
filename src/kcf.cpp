@@ -194,11 +194,6 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
 
 void KCF_Tracker::init_scale_vars()
 {
-#ifdef BIG_BATCH
-    int alloc_size = p_num_scales;
-#else
-    int alloc_size = 1;
-#endif
 
 #ifdef CUFFT
     if (p_windows_size[1]/p_cell_size*(p_windows_size[0]/p_cell_size/2+1) > 1024) {
@@ -216,8 +211,16 @@ void KCF_Tracker::init_scale_vars()
     cudaSetDeviceFlags(cudaDeviceMapHost);
 
     for (int i = 0;i<p_num_scales;++i) {
-        scale_vars[i].ifft2_res = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC(p_num_of_feats));
-        scale_vars[i].response = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC1);
+        double alloc_size = p_windows_size[0]/p_cell_size*p_windows_size[1]/p_cell_size*sizeof(cufftReal);
+        CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].data_i_1ch, alloc_size, cudaHostAllocMapped));
+        CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].data_i_1ch_d, (void*)scale_vars[i].data_i_1ch, 0));
+        alloc_size = p_windows_size[0]/p_cell_size*p_windows_size[1]/p_cell_size*p_num_of_feats*sizeof(cufftReal);
+        CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].data_i_features, alloc_size, cudaHostAllocMapped));
+        CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].data_i_features_d, (void*)scale_vars[i].data_i_features, 0));
+
+
+        scale_vars[i].ifft2_res = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC(p_num_of_feats), scale_vars[i].data_i_features);
+        scale_vars[i].response = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC1, scale_vars[i].data_i_1ch);
 
         scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
         scale_vars[i].kzf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
@@ -225,6 +228,12 @@ void KCF_Tracker::init_scale_vars()
 
         if (i==0)
             scale_vars[i].xf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
+
+#ifdef BIG_BATCH
+        alloc_size = p_num_of_feats;
+#else
+        alloc_size = 1;
+#endif
 
         CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].xf_sqr_norm, alloc_size*sizeof(float), cudaHostAllocMapped));
         CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].xf_sqr_norm_d, (void*)scale_vars[i].xf_sqr_norm, 0));
@@ -455,11 +464,7 @@ void KCF_Tracker::scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & 
         vars.flag = Track_flags::RESPONSE;
         vars.kzf = this->p_model_alphaf * vars.kzf;
         //TODO Add support for fft.inverse(vars) for CUFFT
-#ifdef CUFFT
-        vars.response = fft.inverse(vars.kzf);
-#else
         fft.inverse(vars);
-#endif
     }
 
     DEBUG_PRINTM(vars.response);
