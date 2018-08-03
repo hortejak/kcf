@@ -69,11 +69,6 @@ public:
 #else
     bool m_use_big_batch {false};
 #endif
-#ifdef BIG_BATCH
-    bool m_use_cuda {true};
-#else
-    bool m_use_cuda {false};
-#endif
 
     /*
     padding             ... extra area surrounding the target           (1.5)
