@@ -224,6 +224,7 @@ void KCF_Tracker::init_scale_vars()
         alloc_size = p_windows_size[0]/p_cell_size*p_windows_size[1]/p_cell_size*sizeof(cufftReal);
         CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].data_i_1ch, alloc_size, cudaHostAllocMapped));
         CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].data_i_1ch_d, (void*)scale_vars[i].data_i_1ch, 0));
+
         alloc_size = p_windows_size[0]/p_cell_size*p_windows_size[1]/p_cell_size*p_num_of_feats*sizeof(cufftReal);
         CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].data_i_features, alloc_size, cudaHostAllocMapped));
         CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].data_i_features_d, (void*)scale_vars[i].data_i_features, 0));
@@ -263,11 +264,11 @@ void KCF_Tracker::init_scale_vars()
         scale_vars[i].fw_all = cv::Mat((p_windows_size[1]/p_cell_size)*p_num_of_feats, p_windows_size[0]/p_cell_size, CV_32F, scale_vars[i].data_features);
     }
 #else
-#ifdef BIG_BATCH
+if(m_use_big_batch)
         alloc_size = p_num_of_feats;
-#else
+else
         alloc_size = 1;
-#endif
+
     for (int i = 0;i<p_num_scales;++i) {
         scale_vars[i].xf_sqr_norm = (float*) malloc(alloc_size*sizeof(float));
         scale_vars[i].yf_sqr_norm = (float*) malloc(sizeof(float));
@@ -280,9 +281,12 @@ void KCF_Tracker::init_scale_vars()
         scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
         scale_vars[i].kzf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
         scale_vars[i].kf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
-        //We use scale_vars[0] for updating the tracker, so we only allocate memory for  its xf only.
+
+        scale_vars[i].in_all = cv::Mat((p_windows_size[1]/p_cell_size)*p_num_of_feats, p_windows_size[0]/p_cell_size, CV_32F);
+        scale_vars[i].fw_all = cv::Mat((p_windows_size[1]/p_cell_size)*p_num_of_feats, p_windows_size[0]/p_cell_size, CV_32F);
 #else
         scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
+        //We use scale_vars[0] for updating the tracker, so we only allocate memory for  its xf only.
         if (i==0)
             scale_vars[i].xf = ComplexMat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
 #endif
@@ -291,6 +295,7 @@ void KCF_Tracker::init_scale_vars()
 #if defined(FFTW) || defined(CUFFT)
     p_model_xf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
     p_yf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
+    //We use scale_vars[0] for updating the tracker, so we only allocate memory for  its xf only.
     scale_vars[0].xf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
 #else
     p_model_xf.create(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
@@ -773,7 +778,6 @@ void KCF_Tracker::gaussian_correlation(struct Scale_vars & vars, const ComplexMa
 
     std::vector<cv::Mat> scales;
     cv::split(xy_sum,scales);
-    vars.in_all = cv::Mat(scales[0].rows * xf.n_scales, scales[0].cols, CV_32F);
 
     float numel_xf_inv = 1.f/(xf.cols * xf.rows * (xf.channels()/xf.n_scales));
     for (int i = 0; i < xf.n_scales; ++i){

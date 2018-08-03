@@ -48,6 +48,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                        reinterpret_cast<fftwf_complex*>(out_f.get_p_data()),
                                        FFTW_PATIENT);
     }
+#ifdef BIG_BATCH
     //FFT forward all scales
     if (m_num_of_scales > 1 && m_big_batch_mode) {
         cv::Mat in_f_all = cv::Mat::zeros(m_height*m_num_of_scales, m_width, CV_32F);
@@ -67,6 +68,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                                     out, onembed, ostride, odist,
                                                     FFTW_PATIENT);
     }
+#endif
     //FFT forward window one scale
     {
         cv::Mat in_fw = cv::Mat::zeros(m_height * m_num_of_feats, m_width, CV_32F);
@@ -86,6 +88,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                           out, onembed, ostride, odist,
                                           FFTW_PATIENT);
     }
+#ifdef BIG_BATCH
     //FFT forward window all scales all feats
     if (m_num_of_scales > 1 && m_big_batch_mode) {
         cv::Mat in_all = cv::Mat::zeros(m_height * (m_num_of_scales*m_num_of_feats), m_width, CV_32F);
@@ -105,6 +108,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                                      out, onembed, ostride, odist,
                                                      FFTW_PATIENT);
     }
+#endif
     //FFT inverse one scale
     {
         ComplexMat in_i(m_height,m_width,m_num_of_feats);
@@ -125,6 +129,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                                   FFTW_PATIENT);
     }
     //FFT inverse all scales
+#ifdef BIG_BATCH
     if (m_num_of_scales > 1 && m_big_batch_mode) {
         ComplexMat in_i_all(m_height,m_width,m_num_of_feats*m_num_of_scales);
         cv::Mat out_i_all = cv::Mat::zeros(m_height, m_width, CV_32FC(m_num_of_feats*m_num_of_scales));
@@ -143,8 +148,9 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                                              out, onembed, ostride, odist,
                                                              FFTW_PATIENT);
     }
+#endif
     //FFT inver one channel one scale
-    if(!m_big_batch_mode) {
+    {
         ComplexMat in_i1(m_height,m_width,1);
         cv::Mat out_i1 = cv::Mat::zeros(m_height, m_width, CV_32FC1);
         fftwf_complex *in = reinterpret_cast<fftwf_complex*>(in_i1.get_p_data());
@@ -162,6 +168,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                              out, onembed, ostride, odist,
                                              FFTW_PATIENT);
     }
+#ifdef BIG_BATCH
     //FFT inver one channel all scales
     if (m_num_of_scales > 1 && m_big_batch_mode) {
         ComplexMat in_i1_all(m_height,m_width,m_num_of_scales);
@@ -181,6 +188,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                                         out, onembed, ostride, odist,
                                                         FFTW_PATIENT);
     }
+#endif
 }
 
 void Fftw::set_window(const cv::Mat &window)
@@ -188,75 +196,35 @@ void Fftw::set_window(const cv::Mat &window)
     m_window = window;
 }
 
-ComplexMat Fftw::forward(const cv::Mat & input)
-{
-    ComplexMat complex_result;
-    if(m_big_batch_mode && input.rows == (int)(m_height*m_num_of_scales)){
-        complex_result.create(m_height, m_width / 2 + 1, m_num_of_scales);
-        fftwf_execute_dft_r2c(plan_f_all_scales, reinterpret_cast<float*>(input.data),
-                              reinterpret_cast<fftwf_complex*>(complex_result.get_p_data()));
-    } else {
-        complex_result.create(m_height, m_width / 2 + 1, 1);
-        fftwf_execute_dft_r2c(plan_f, reinterpret_cast<float*>(input.data),
-                              reinterpret_cast<fftwf_complex*>(complex_result.get_p_data()));
-    }
-    return complex_result;
-}
-
 void Fftw::forward(Scale_vars & vars)
 {
-    ComplexMat *complex_result = vars.flag & Tracker_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
+    ComplexMat *complex_result = vars.flag & Tracker_flags::TRACKER_INIT ? vars.p_yf_ptr :
+                                                  vars.flag & Tracker_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
+    cv::Mat *input = vars.flag & Tracker_flags::TRACKER_INIT ? & vars.rot_labels : & vars.in_all;
+
     if(m_big_batch_mode && vars.in_all.rows == (int)(m_height*m_num_of_scales)){
         fftwf_execute_dft_r2c(plan_f_all_scales, reinterpret_cast<float*>(vars.in_all.data),
                               reinterpret_cast<fftwf_complex*>(complex_result->get_p_data()));
     } else {
-        fftwf_execute_dft_r2c(plan_f, reinterpret_cast<float*>(vars.in_all.data),
+        fftwf_execute_dft_r2c(plan_f, reinterpret_cast<float*>(input->data),
                               reinterpret_cast<fftwf_complex*>(complex_result->get_p_data()));
     }
     return;
-}
-
-void Fftw::forward_raw(Scale_vars & vars, bool all_scales)
-{
-    return;
-}
-
-ComplexMat Fftw::forward_window(const std::vector<cv::Mat> & input)
-{
-    int n_channels = input.size();
-    cv::Mat in_all(m_height * n_channels, m_width, CV_32F);
-    for (int i = 0; i < n_channels; ++i) {
-        cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
-        in_roi = input[i].mul(m_window);
-    }
-    ComplexMat result;
-    if(n_channels > (int) m_num_of_feats)
-        result.create(m_height, m_width/2 + 1, n_channels,m_num_of_scales);
-    else
-        result.create(m_height, m_width/2 + 1, n_channels);
-
-    float *in = reinterpret_cast<float*>(in_all.data);
-    fftwf_complex *out = reinterpret_cast<fftwf_complex*>(result.get_p_data());
-
-    if (n_channels <= (int) m_num_of_feats)
-        fftwf_execute_dft_r2c(plan_fw, in, out);
-    else
-        fftwf_execute_dft_r2c(plan_fw_all_scales, in, out);
-
-    return result;
 }
 
 void Fftw::forward_window(Scale_vars & vars)
 {
     int n_channels = vars.patch_feats.size();
-    cv::Mat in_all(m_height * n_channels, m_width, CV_32F);
+
+    ComplexMat *result = vars.flag & Tracker_flags::TRACKER_INIT ? vars.p_model_xf_ptr :
+                                                  vars.flag & Tracker_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
+
     for (int i = 0; i < n_channels; ++i) {
-        cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
+        cv::Mat in_roi(vars.fw_all, cv::Rect(0, i*m_height, m_width, m_height));
         in_roi = vars.patch_feats[i].mul(m_window);
     }
-    ComplexMat *result = vars.flag & Tracker_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
 
-    float *in = reinterpret_cast<float*>(in_all.data);
+    float *in = reinterpret_cast<float*>(vars.fw_all.data);
     fftwf_complex *out = reinterpret_cast<fftwf_complex*>(result->get_p_data());
 
     if (n_channels <= (int) m_num_of_feats)
@@ -264,25 +232,6 @@ void Fftw::forward_window(Scale_vars & vars)
     else
         fftwf_execute_dft_r2c(plan_fw_all_scales, in, out);
     return;
-}
-
-cv::Mat Fftw::inverse(const ComplexMat &input)
-{
-    int n_channels = input.n_channels;
-    cv::Mat real_result(m_height, m_width, CV_32FC(n_channels));
-    fftwf_complex *in = reinterpret_cast<fftwf_complex*>(input.get_p_data());
-    float *out = reinterpret_cast<float*>(real_result.data);
-
-    if(n_channels == 1)
-        fftwf_execute_dft_c2r(plan_i_1ch, in, out);
-    else if(m_big_batch_mode && n_channels == (int) m_num_of_scales)
-        fftwf_execute_dft_c2r(plan_i_1ch_all_scales, in, out);
-    else if(m_big_batch_mode && n_channels == (int) m_num_of_feats * (int) m_num_of_scales)
-        fftwf_execute_dft_c2r(plan_i_features_all_scales, in, out);
-    else
-        fftwf_execute_dft_c2r(plan_i_features, in, out);
-
-    return real_result/(m_width*m_height);
 }
 
 void Fftw::inverse(Scale_vars & vars)
@@ -305,11 +254,6 @@ void Fftw::inverse(Scale_vars & vars)
 
     *real_result = *real_result/(m_width*m_height);
     return;
-}
-
-float* Fftw::inverse_raw(const ComplexMat &input)
-{
-    return nullptr;
 }
 
 Fftw::~Fftw()
