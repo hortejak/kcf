@@ -20,7 +20,7 @@
 #endif //OPENMP
 
 #define DEBUG_PRINT(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;}
-#define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl << (obj) << std::endl;}
+#define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl /*<< (obj) << std::endl*/;}
 
 KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor, double output_sigma_factor, int cell_size) :
     fft(*new FFT()),
@@ -171,7 +171,6 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     scale_vars[0].flag = Tracker_flags::TRACKER_INIT;
     //window weights, i.e. labels
     gaussian_shaped_labels(scale_vars[0], p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size);
-    DEBUG_PRINTM(scale_vars[0].rot_labels);
 
     fft.forward(scale_vars[0]);
     DEBUG_PRINTM(p_yf);
@@ -274,21 +273,26 @@ else
         scale_vars[i].yf_sqr_norm = (float*) malloc(sizeof(float));
 
         scale_vars[i].patch_feats.reserve(p_num_of_feats);
+
+        int height = p_windows_size[1]/p_cell_size;
 #ifdef FFTW
-        scale_vars[i].ifft2_res = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC(p_num_of_feats));
-        scale_vars[i].response = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC1);
+        int width = (p_windows_size[0]/p_cell_size)/2+1;
+#else
+        int width = p_windows_size[0]/p_cell_size;
+#endif
 
-        scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
-        scale_vars[i].kzf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
-        scale_vars[i].kf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
+        scale_vars[i].ifft2_res = cv::Mat(height, p_windows_size[0]/p_cell_size, CV_32FC(p_num_of_feats));
+        scale_vars[i].response = cv::Mat(height, p_windows_size[0]/p_cell_size, CV_32FC1);
 
+        scale_vars[i].zf = ComplexMat(height, width, p_num_of_feats);
+        scale_vars[i].kzf = ComplexMat(height, width, 1);
+        scale_vars[i].kf = ComplexMat(height, width, 1);
+        scale_vars[i].rot_labels = cv::Mat(height, p_windows_size[0]/p_cell_size, CV_32FC1);
+#ifdef FFTW
         scale_vars[i].in_all = cv::Mat((p_windows_size[1]/p_cell_size)*p_num_of_feats, p_windows_size[0]/p_cell_size, CV_32F);
         scale_vars[i].fw_all = cv::Mat((p_windows_size[1]/p_cell_size)*p_num_of_feats, p_windows_size[0]/p_cell_size, CV_32F);
 #else
-        scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
-        //We use scale_vars[0] for updating the tracker, so we only allocate memory for  its xf only.
-        if (i==0)
-            scale_vars[i].xf = ComplexMat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
+        scale_vars[i].in_all = cv::Mat((p_windows_size[1]/p_cell_size), p_windows_size[0]/p_cell_size, CV_32F);
 #endif
     }
 #endif
@@ -300,6 +304,7 @@ else
 #else
     p_model_xf.create(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
     p_yf.create(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, 1);
+    scale_vars[0].xf = ComplexMat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
 #endif
     scale_vars[0].p_model_xf_ptr = & p_model_xf;
     scale_vars[0].p_yf_ptr = & p_yf;
