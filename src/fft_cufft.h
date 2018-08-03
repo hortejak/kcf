@@ -28,9 +28,7 @@ public:
     void forward_raw(Scale_vars & vars, bool all_scales) override;
     ComplexMat forward_window(const std::vector<cv::Mat> & input) override;
     void forward_window(Scale_vars & vars) override;
-    cv::Mat inverse(const ComplexMat & input) override;
     void inverse(Scale_vars & vars) override;
-    float* inverse_raw(const ComplexMat & input) override;
     ~cuFFT() override;
 private:
     cv::Mat m_window;

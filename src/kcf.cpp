@@ -711,10 +711,11 @@ void KCF_Tracker::gaussian_correlation(struct Scale_vars & vars, const ComplexMa
     vars.xyf = auto_correlation ? xf.sqr_mag() : xf.mul2(yf.conj());
     DEBUG_PRINTM(vars.xyf);
 #ifdef CUFFT
+    fft.inverse(vars);
     if(auto_correlation)
-        cuda_gaussian_correlation(fft.inverse_raw(vars.xyf), vars.gauss_corr_res, vars.xf_sqr_norm_d, vars.xf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
+        cuda_gaussian_correlation(vars.data_i_features, vars.gauss_corr_res, vars.xf_sqr_norm_d, vars.xf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
     else
-        cuda_gaussian_correlation(fft.inverse_raw(vars.xyf), vars.gauss_corr_res, vars.xf_sqr_norm_d, vars.yf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
+        cuda_gaussian_correlation(vars.data_i_features, vars.gauss_corr_res, vars.xf_sqr_norm_d, vars.yf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
 
     fft.forward_raw(vars, xf.n_scales==p_num_scales);
     return;
