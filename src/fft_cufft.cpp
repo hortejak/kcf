@@ -147,24 +147,6 @@ void cuFFT::set_window(const cv::Mat & window)
      m_window = window;
 }
 
-ComplexMat cuFFT::forward(const cv::Mat & input)
-{
-    ComplexMat complex_result;
-    if(m_big_batch_mode && input.rows == (int)(m_height*m_num_of_scales)){
-        CudaSafeCall(cudaMemcpy(data_f_all_scales, input.ptr<cufftReal>(), m_height*m_num_of_scales*m_width*sizeof(cufftReal), cudaMemcpyHostToDevice));
-        complex_result.create(m_height, m_width / 2 + 1, m_num_of_scales);
-        CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal*>(data_f_all_scales),
-                                complex_result.get_p_data()));
-    } else {
-        CudaSafeCall(cudaMemcpy(data_f, input.ptr<cufftReal>(), m_height*m_width*sizeof(cufftReal), cudaMemcpyHostToDevice));
-        complex_result.create(m_height, m_width/ 2 + 1, 1);
-        CufftErrorCheck(cufftExecR2C(plan_f, reinterpret_cast<cufftReal*>(data_f),
-                                complex_result.get_p_data()));
-    }
-
-    return complex_result;
-}
-
 void cuFFT::forward(Scale_vars & vars)
 {
     ComplexMat *complex_result = vars.flag & Tracker_flags::TRACKER_INIT ? vars.p_yf_ptr :
@@ -181,47 +163,6 @@ void cuFFT::forward(Scale_vars & vars)
                                 complex_result->get_p_data()));
     }
     return;
-}
-
-void cuFFT::forward_raw(Scale_vars & vars, bool all_scales)
-{
-    ComplexMat *result = vars.flag & Tracker_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
-    if (all_scales){
-        CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal*>(vars.gauss_corr_res),
-                                result->get_p_data()));
-    } else {
-        CufftErrorCheck(cufftExecR2C(plan_f, reinterpret_cast<cufftReal*>(vars.gauss_corr_res),
-                                result->get_p_data()));
-    }
-    return;
-}
-
-ComplexMat cuFFT::forward_window(const std::vector<cv::Mat> & input)
-{
-    int n_channels = input.size();
-    ComplexMat result;
-    if(n_channels > (int) m_num_of_feats){
-        cv::Mat in_all(m_height * n_channels, m_width, CV_32F, data_fw_all_scales);
-        for (int i = 0; i < n_channels; ++i) {
-            cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
-            in_roi = input[i].mul(m_window);
-        }
-
-        result.create(m_height, m_width/2 + 1, n_channels,m_num_of_scales);
-
-        CufftErrorCheck(cufftExecR2C(plan_fw_all_scales, reinterpret_cast<cufftReal*>(data_fw_all_scales_d), result.get_p_data()));
-    } else {
-        cv::Mat in_all(m_height * n_channels, m_width, CV_32F, data_fw);
-        for (int i = 0; i < n_channels; ++i) {
-            cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
-            in_roi = input[i].mul(m_window);
-        }
-
-        result.create(m_height, m_width/2 + 1, n_channels);
-
-        CufftErrorCheck(cufftExecR2C(plan_fw, reinterpret_cast<cufftReal*>(data_fw_d), result.get_p_data()));
-    }
-    return result;
 }
 
 void cuFFT::forward_window(Scale_vars & vars)
@@ -304,8 +245,6 @@ cuFFT::~cuFFT()
 
   CudaSafeCall(cudaFree(data_f));
   CudaSafeCall(cudaFreeHost(data_fw));
-  CudaSafeCall(cudaFreeHost(data_i_1ch));
-  CudaSafeCall(cudaFreeHost(data_i_features));
   
   if (m_big_batch_mode) {
       CufftErrorCheck(cufftDestroy(plan_f_all_scales));

@@ -37,6 +37,8 @@ KCF_Tracker::~KCF_Tracker()
     for (int i = 0;i < p_num_scales;++i) {
         CudaSafeCall(cudaFreeHost(scale_vars[i].xf_sqr_norm));
         CudaSafeCall(cudaFreeHost(scale_vars[i].yf_sqr_norm));
+        CudaSafeCall(cudaFreeHost(scale_vars[i].data_i_1ch));
+        CudaSafeCall(cudaFreeHost(scale_vars[i].data_i_features));
         CudaSafeCall(cudaFree(scale_vars[i].gauss_corr_res));
     }
 #else
@@ -165,15 +167,6 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     fft.set_window(cosine_window_function(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
 
     scale_vars[0].flag = Tracker_flags::TRACKER_INIT;
-#if defined(FFTW) || defined(CUFFT)
-    p_model_xf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
-    p_yf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
-#else
-    p_model_xf.create(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
-    p_yf.create(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, 1);
-#endif
-    scale_vars[0].p_model_xf_ptr = & p_model_xf;
-    scale_vars[0].p_yf_ptr = & p_yf;
     //window weights, i.e. labels
     gaussian_shaped_labels(scale_vars[0], p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size);
     fft.forward(scale_vars[0]);
@@ -255,6 +248,7 @@ void KCF_Tracker::init_scale_vars()
         CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].yf_sqr_norm_d, (void*)scale_vars[i].yf_sqr_norm, 0));
 
         CudaSafeCall(cudaMalloc((void**)&scale_vars[i].gauss_corr_res, (p_windows_size[0]/p_cell_size)*(p_windows_size[1]/p_cell_size)*alloc_size*sizeof(float)));
+        scale_vars[i].in_all = cv::Mat(p_windows_size[1], p_windows_size[0], CV_32F, scale_vars[i].gauss_corr_res);
     }
 #else
 #ifdef BIG_BATCH
@@ -284,6 +278,15 @@ void KCF_Tracker::init_scale_vars()
 #endif
     }
 #endif
+#if defined(FFTW) || defined(CUFFT)
+    p_model_xf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
+    p_yf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
+#else
+    p_model_xf.create(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
+    p_yf.create(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, 1);
+#endif
+    scale_vars[0].p_model_xf_ptr = & p_model_xf;
+    scale_vars[0].p_yf_ptr = & p_yf;
 }
 
 void KCF_Tracker::setTrackerPose(BBox_c &bbox, cv::Mat & img, int fit_size_x, int fit_size_y)
@@ -458,8 +461,6 @@ void KCF_Tracker::track(cv::Mat &img)
     p_model_alphaf = p_model_alphaf_num / p_model_alphaf_den;
 }
 
-// ****************************************************************************
-
 void KCF_Tracker::scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & input_gray, double scale)
 {
     get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size[0], this->p_windows_size[1],
@@ -500,6 +501,8 @@ void KCF_Tracker::scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & 
     double weight = scale < 1. ? scale : 1./scale;
     vars.max_response = vars.max_val*weight;
 }
+
+// ****************************************************************************
 
 void KCF_Tracker::get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx, int cy, int size_x, int size_y, Scale_vars &vars, double scale)
 {
@@ -734,8 +737,6 @@ void KCF_Tracker::gaussian_correlation(struct Scale_vars & vars, const ComplexMa
         cuda_gaussian_correlation(vars.data_i_features, vars.gauss_corr_res, vars.xf_sqr_norm_d, vars.xf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
     else
         cuda_gaussian_correlation(vars.data_i_features, vars.gauss_corr_res, vars.xf_sqr_norm_d, vars.yf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
-        fft.forward_raw(vars, xf.n_scales==p_num_scales);
-        return;
 #else
     //ifft2 and sum over 3rd dimension, we dont care about individual channels
     fft.inverse(vars);
@@ -769,7 +770,7 @@ void KCF_Tracker::gaussian_correlation(struct Scale_vars & vars, const ComplexMa
         DEBUG_PRINTM(in_roi);
     }
 #endif
-    DEBUG_PRINTM(vars.in_all );
+    DEBUG_PRINTM(vars.in_all);
     fft.forward(vars);
     return;
 }

@@ -19,10 +19,7 @@ class Fft
 public:
     virtual void init(unsigned width, unsigned height,unsigned num_of_feats, unsigned num_of_scales, bool big_batch_mode) = 0;
     virtual void set_window(const cv::Mat & window) = 0;
-    virtual ComplexMat forward(const cv::Mat & input) = 0;
     virtual void forward(Scale_vars & vars) = 0;
-    virtual void forward_raw(Scale_vars & vars, bool all_scales) = 0;
-    virtual ComplexMat forward_window(const std::vector<cv::Mat> & input) = 0;
     virtual void forward_window(Scale_vars & vars) = 0;
     virtual void inverse(Scale_vars & vars) = 0;
     virtual ~Fft() = 0;
