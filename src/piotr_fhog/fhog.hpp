@@ -72,7 +72,6 @@ public:
 
         //convert, assuming row-by-row-by-channel storage
         int n_res_channels = (use_hog == 2) ? n_chns-1 : n_chns;    //last channel all zeros for fhog
-        vars.patch_feats.clear();
         for (int i = 0; i < n_res_channels; ++i) {
             //output rows-by-rows
 //            cv::Mat desc(hb, wb, CV_32F, (H+hb*wb*i));

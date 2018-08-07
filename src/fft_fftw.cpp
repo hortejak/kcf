@@ -13,7 +13,7 @@
 #endif
 
 Fftw::Fftw()
-    : m_num_threads(2)
+    : m_num_threads(4)
 {
 }
 
@@ -215,7 +215,6 @@ void Fftw::forward_window(std::vector<cv::Mat> patch_feats, ComplexMat & complex
     (void) real_input_arr;
 
     int n_channels = patch_feats.size();
-
     for (int i = 0; i < n_channels; ++i) {
         cv::Mat in_roi(fw_all, cv::Rect(0, i*m_height, m_width, m_height));
         in_roi = patch_feats[i].mul(m_window);
@@ -233,7 +232,7 @@ void Fftw::forward_window(std::vector<cv::Mat> patch_feats, ComplexMat & complex
 
 void Fftw::inverse(ComplexMat &  complex_input, cv::Mat & real_result, float *real_result_arr)
 {
-    (void) real_input_arr;
+    (void) real_result_arr;
 
     int n_channels = complex_input.n_channels;
     fftwf_complex *in = reinterpret_cast<fftwf_complex*>(complex_input.get_p_data());
