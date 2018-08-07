@@ -15,47 +15,43 @@ void FftOpencv::set_window(const cv::Mat & window)
      m_window = window;
 }
 
-void FftOpencv::forward(Scale_vars & vars)
+void FftOpencv::forward(const cv::Mat & real_input, ComplexMat & complex_result, float *real_input_arr)
 {
-    ComplexMat *complex_result = vars.flag & Tracker_flags::TRACKER_INIT ? vars.p_yf_ptr :
-                                                  vars.flag & Tracker_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
-    cv::Mat *input = vars.flag & Tracker_flags::TRACKER_INIT ? & vars.rot_labels : & vars.in_all;
+    (void) real_input_arr;
 
     cv::Mat tmp;
-    cv::dft(*input, tmp, cv::DFT_COMPLEX_OUTPUT);
-    *complex_result = ComplexMat(tmp);
+    cv::dft(real_input, tmp, cv::DFT_COMPLEX_OUTPUT);
+    complex_result = ComplexMat(tmp);
     return;
 }
 
-void FftOpencv::forward_window(Scale_vars & vars)
+void FftOpencv::forward_window(std::vector<cv::Mat> patch_feats, ComplexMat & complex_result, cv::Mat & fw_all, float *real_input_arr)
 {
-    int n_channels = vars.patch_feats.size();
+    (void) real_input_arr;
+    (void) fw_all;
 
-    ComplexMat *result = vars.flag & Tracker_flags::TRACKER_INIT ? vars.p_model_xf_ptr :
-                                                  vars.flag & Tracker_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
-
+    int n_channels = patch_feats.size();
     for (int i = 0; i < n_channels; ++i) {
-        cv::Mat complex_result;
-        cv::dft(vars.patch_feats[i].mul(m_window), complex_result, cv::DFT_COMPLEX_OUTPUT);
-        result->set_channel(i, complex_result);
+        cv::Mat complex_res;
+        cv::dft(patch_feats[i].mul(m_window), complex_res, cv::DFT_COMPLEX_OUTPUT);
+        complex_result.set_channel(i, complex_res);
     }
     return;
 }
 
-void FftOpencv::inverse(Scale_vars & vars)
+void FftOpencv::inverse(ComplexMat &  complex_input, cv::Mat & real_result, float *real_result_arr)
 {
-    ComplexMat *input = vars.flag & Tracker_flags::RESPONSE ? & vars.kzf : & vars.xyf;
-    cv::Mat *result = vars.flag & Tracker_flags::RESPONSE ? & vars.response : & vars.ifft2_res;
+    (void) real_result_arr;
 
-    if (input->n_channels == 1) {
-        cv::dft(input->to_cv_mat(), *result, cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
+    if (complex_input.n_channels == 1) {
+        cv::dft(complex_input.to_cv_mat(), real_result, cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
     } else {
-        std::vector<cv::Mat> mat_channels = input->to_cv_mat_vector();
-        std::vector<cv::Mat> ifft_mats(input->n_channels);
-        for (int i = 0; i < input->n_channels; ++i) {
+        std::vector<cv::Mat> mat_channels = complex_input.to_cv_mat_vector();
+        std::vector<cv::Mat> ifft_mats(complex_input.n_channels);
+        for (int i = 0; i < complex_input.n_channels; ++i) {
             cv::dft(mat_channels[i], ifft_mats[i], cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
         }
-        cv::merge(ifft_mats, *result);
+        cv::merge(ifft_mats, real_result);
     }
     return;
 }

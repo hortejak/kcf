@@ -142,61 +142,52 @@ void cuFFT::set_window(const cv::Mat & window)
      m_window = window;
 }
 
-void cuFFT::forward(Scale_vars & vars)
+void cuFFT::forward(const cv::Mat & real_input, ComplexMat & complex_result, float *real_input_arr)
 {
-    ComplexMat *complex_result = vars.flag & Tracker_flags::TRACKER_INIT ? vars.p_yf_ptr :
-                                                  vars.flag & Tracker_flags::AUTO_CORRELATION ? & vars.kf : & vars.kzf;
-    cufftReal *input = vars.flag & Tracker_flags::TRACKER_INIT ? vars.rot_labels_data : vars.gauss_corr_res;
-
-    if(m_big_batch_mode && vars.in_all.rows == (int)(m_height*m_num_of_scales)){
+    //TODO WRONG real_input.data
+    if(m_big_batch_mode && real_input.rows == (int)(m_height*m_num_of_scales)){
         CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal*>(data_f_all_scales),
-                                complex_result->get_p_data()));
+                                complex_result.get_p_data()));
     } else {
-                CufftErrorCheck(cufftExecR2C(plan_f, input,
-                                complex_result->get_p_data()));
+                CufftErrorCheck(cufftExecR2C(plan_f, reinterpret_cast<cufftReal*>(real_input_arr),
+                                complex_result.get_p_data()));
     }
     return;
 }
 
-void cuFFT::forward_window(Scale_vars & vars)
+void cuFFT::forward_window(std::vector<cv::Mat> patch_feats, ComplexMat & complex_result, cv::Mat & fw_all, float *real_input_arr)
 {
-    int n_channels = vars.patch_feats.size();
-
-    ComplexMat *result = vars.flag & Tracker_flags::TRACKER_INIT ? vars.p_model_xf_ptr :
-                                                  vars.flag & Tracker_flags::TRACKER_UPDATE ? & vars.xf : & vars.zf;
+    int n_channels = patch_feats.size();
 
     if(n_channels > (int) m_num_of_feats){
         cv::Mat in_all(m_height * n_channels, m_width, CV_32F, data_fw_all_scales);
         for (int i = 0; i < n_channels; ++i) {
             cv::Mat in_roi(in_all, cv::Rect(0, i*m_height, m_width, m_height));
-            in_roi = vars.patch_feats[i].mul(m_window);
+            in_roi = patch_feats[i].mul(m_window);
         }
 
-        CufftErrorCheck(cufftExecR2C(plan_fw_all_scales, reinterpret_cast<cufftReal*>(data_fw_all_scales_d), result->get_p_data()));
+        CufftErrorCheck(cufftExecR2C(plan_fw_all_scales, reinterpret_cast<cufftReal*>(data_fw_all_scales_d), complex_result.get_p_data()));
     } else {
         for (int i = 0; i < n_channels; ++i) {
-            cv::Mat in_roi(vars.fw_all, cv::Rect(0, i*m_height, m_width, m_height));
-            in_roi = vars.patch_feats[i].mul(m_window);
+            cv::Mat in_roi(fw_all, cv::Rect(0, i*m_height, m_width, m_height));
+            in_roi = patch_feats[i].mul(m_window);
         }
-
-        CufftErrorCheck(cufftExecR2C(plan_fw, reinterpret_cast<cufftReal*>(vars.data_features_d), result->get_p_data()));
+//TODO WRONG
+        CufftErrorCheck(cufftExecR2C(plan_fw, reinterpret_cast<cufftReal*>(real_input_arr), complex_result.get_p_data()));
     }
     return;
 }
 
-void cuFFT::inverse(Scale_vars & vars)
+void cuFFT::inverse(ComplexMat &  complex_input, cv::Mat & real_result, float *real_result_arr)
 {
-    ComplexMat *input = vars.flag & Tracker_flags::RESPONSE ? & vars.kzf : &  vars.xyf;
-    cv::Mat *real_result = vars.flag & Tracker_flags::RESPONSE ? & vars.response : & vars.ifft2_res;
-
-    int n_channels = input->n_channels;
-    cufftComplex *in = reinterpret_cast<cufftComplex*>(input->get_p_data());
+    int n_channels = complex_input.n_channels;
+    cufftComplex *in = reinterpret_cast<cufftComplex*>(complex_input.get_p_data());
 
     if(n_channels == 1){
 
-        CufftErrorCheck(cufftExecC2R(plan_i_1ch, in, reinterpret_cast<cufftReal*>(vars.data_i_1ch_d)));
+        CufftErrorCheck(cufftExecC2R(plan_i_1ch, in, reinterpret_cast<cufftReal*>(real_result_arr)));
         cudaDeviceSynchronize();
-        *real_result = *real_result/(m_width*m_height);
+        real_result = real_result/(m_width*m_height);
         return;
     }
 #ifdef BIG_BATCH
@@ -217,13 +208,13 @@ void cuFFT::inverse(Scale_vars & vars)
     }
 #endif
 
-    CufftErrorCheck(cufftExecC2R(plan_i_features, in, reinterpret_cast<cufftReal*>(vars.data_i_features_d)));
+    CufftErrorCheck(cufftExecC2R(plan_i_features, in, reinterpret_cast<cufftReal*>(real_result_arr)));
 
-    if (vars.cuda_gauss)
+    if (true)
         return;
     else {
         cudaDeviceSynchronize();
-        *real_result = *real_result/(m_width*m_height);
+        real_result = real_result/(m_width*m_height);
     }
     return;
 }

@@ -20,7 +20,7 @@
 #endif //OPENMP
 
 #define DEBUG_PRINT(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;}
-#define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl /*<< (obj) << std::endl*/;}
+#define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl << (obj) << std::endl;}
 
 KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor, double output_sigma_factor, int cell_size) :
     fft(*new FFT()),
@@ -35,18 +35,18 @@ KCF_Tracker::~KCF_Tracker()
     delete &fft;
 #ifdef CUFFT
     for (int i = 0;i < p_num_scales;++i) {
-        CudaSafeCall(cudaFreeHost(scale_vars[i].xf_sqr_norm));
-        CudaSafeCall(cudaFreeHost(scale_vars[i].yf_sqr_norm));
-        CudaSafeCall(cudaFreeHost(scale_vars[i].data_i_1ch));
-        CudaSafeCall(cudaFreeHost(scale_vars[i].data_i_features));
-        CudaSafeCall(cudaFree(scale_vars[i].gauss_corr_res));
-        CudaSafeCall(cudaFreeHost(scale_vars[i].rot_labels_data));
-        CudaSafeCall(cudaFreeHost(scale_vars[i].data_features));
+        CudaSafeCall(cudaFreeHost(p_scale_vars[i].xf_sqr_norm));
+        CudaSafeCall(cudaFreeHost(p_scale_vars[i].yf_sqr_norm));
+        CudaSafeCall(cudaFreeHost(p_scale_vars[i].data_i_1ch));
+        CudaSafeCall(cudaFreeHost(p_scale_vars[i].data_i_features));
+        CudaSafeCall(cudaFree(p_scale_vars[i].gauss_corr_res_d));
+        CudaSafeCall(cudaFreeHost(p_scale_vars[i].rot_labels_data));
+        CudaSafeCall(cudaFreeHost(p_scale_vars[i].data_features));
     }
 #else
     for (int i = 0;i < p_num_scales;++i) {
-        free(scale_vars[i].xf_sqr_norm);
-        free(scale_vars[i].yf_sqr_norm);
+        free(p_scale_vars[i].xf_sqr_norm);
+        free(p_scale_vars[i].yf_sqr_norm);
     }
 #endif
 }
@@ -140,9 +140,20 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     else
         p_scales.push_back(1.);
 
-    for (int i = 0;i<p_num_scales;++i) {
-        scale_vars.push_back(Scale_vars());
+#ifdef CUFFT
+    if (p_windows_size[1]/p_cell_size*(p_windows_size[0]/p_cell_size/2+1) > 1024) {
+        std::cerr << "Window after forward FFT is too big for CUDA kernels. Plese use -f to set "
+        "the window dimensions so its size is less or equal to " << 1024*p_cell_size*p_cell_size*2+1 <<
+        " pixels . Currently the size of the window is: " <<  p_windows_size[0] << "x" <<  p_windows_size[1] <<
+        " which is  " <<  p_windows_size[0]*p_windows_size[1] << " pixels. " << std::endl;
+        std::exit(EXIT_FAILURE);
     }
+
+    if (m_use_linearkernel){
+        std::cerr << "cuFFT supports only Gaussian kernel." << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+#endif
 
     p_num_of_feats = 31;
     if(m_use_color) p_num_of_feats += 3;
@@ -150,7 +161,12 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     p_roi_width = p_windows_size[0]/p_cell_size;
     p_roi_height = p_windows_size[1]/p_cell_size;
 
-    init_scale_vars();
+    for (int i = 0;i<p_num_scales;++i) {
+        if (i == 0)
+            p_scale_vars.push_back(Scale_vars(p_windows_size, p_cell_size, p_num_of_feats, &p_model_xf, &p_yf, true));
+        else
+            p_scale_vars.push_back(Scale_vars(p_windows_size, p_cell_size, p_num_of_feats));
+    }
 
     p_current_scale = 1.;
 
@@ -168,18 +184,15 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     fft.init(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size, p_num_of_feats, p_num_scales, m_use_big_batch);
     fft.set_window(cosine_window_function(p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size));
 
-    scale_vars[0].flag = Tracker_flags::TRACKER_INIT;
     //window weights, i.e. labels
-    gaussian_shaped_labels(scale_vars[0], p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size);
-
-    fft.forward(scale_vars[0]);
+     fft.forward(gaussian_shaped_labels(p_output_sigma, p_windows_size[0]/p_cell_size, p_windows_size[1]/p_cell_size), p_yf,
+                                                                                m_use_cuda ? p_scale_vars[0].rot_labels_data_d: nullptr);
     DEBUG_PRINTM(p_yf);
 
     //obtain a sub-window for training initial model
-    get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], scale_vars[0]);
-    fft.forward_window(scale_vars[0]);
+    get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_scale_vars[0]);
+    fft.forward_window(p_scale_vars[0].patch_feats, p_model_xf, p_scale_vars[0].fw_all, m_use_cuda ? p_scale_vars[0].data_features_d : nullptr);
     DEBUG_PRINTM(p_model_xf);
-    scale_vars[0].flag = Tracker_flags::AUTO_CORRELATION;
 
 
     if (m_use_linearkernel) {
@@ -188,126 +201,16 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
         p_model_alphaf_den = (p_model_xf * xfconj);
     } else {
         //Kernel Ridge Regression, calculate alphas (in Fourier domain)
-        gaussian_correlation(scale_vars[0], p_model_xf, p_model_xf, p_kernel_sigma, true);
-        DEBUG_PRINTM(scale_vars[0].kf);
-        p_model_alphaf_num = p_yf * scale_vars[0].kf;
+        gaussian_correlation(p_scale_vars[0], p_model_xf, p_model_xf, p_kernel_sigma, true);
+        DEBUG_PRINTM(p_scale_vars[0].kf);
+        p_model_alphaf_num = p_yf * p_scale_vars[0].kf;
         DEBUG_PRINTM(p_model_alphaf_num);
-        p_model_alphaf_den = scale_vars[0].kf * (scale_vars[0].kf + p_lambda);
+        p_model_alphaf_den = p_scale_vars[0].kf * (p_scale_vars[0].kf + p_lambda);
         DEBUG_PRINTM(p_model_alphaf_den);
     }
     p_model_alphaf = p_model_alphaf_num / p_model_alphaf_den;
     DEBUG_PRINTM(p_model_alphaf);
 //        p_model_alphaf = p_yf / (kf + p_lambda);   //equation for fast training
-}
-
-void KCF_Tracker::init_scale_vars()
-{
-    double alloc_size;
-
-#ifdef CUFFT
-    if (p_windows_size[1]/p_cell_size*(p_windows_size[0]/p_cell_size/2+1) > 1024) {
-        std::cerr << "Window after forward FFT is too big for CUDA kernels. Plese use -f to set "
-        "the window dimensions so its size is less or equal to " << 1024*p_cell_size*p_cell_size*2+1 <<
-        " pixels . Currently the size of the window is: " <<  p_windows_size[0] << "x" <<  p_windows_size[1] <<
-        " which is  " <<  p_windows_size[0]*p_windows_size[1] << " pixels. " << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-
-    if (m_use_linearkernel){
-        std::cerr << "cuFFT supports only Gaussian kernel." << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-    cudaSetDeviceFlags(cudaDeviceMapHost);
-
-    for (int i = 0;i<p_num_scales;++i) {
-        alloc_size = p_windows_size[0]/p_cell_size*p_windows_size[1]/p_cell_size*sizeof(cufftReal);
-        CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].data_i_1ch, alloc_size, cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].data_i_1ch_d, (void*)scale_vars[i].data_i_1ch, 0));
-
-        alloc_size = p_windows_size[0]/p_cell_size*p_windows_size[1]/p_cell_size*p_num_of_feats*sizeof(cufftReal);
-        CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].data_i_features, alloc_size, cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].data_i_features_d, (void*)scale_vars[i].data_i_features, 0));
-
-
-        scale_vars[i].ifft2_res = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC(p_num_of_feats), scale_vars[i].data_i_features);
-        scale_vars[i].response = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC1, scale_vars[i].data_i_1ch);
-
-        scale_vars[i].zf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
-        scale_vars[i].kzf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
-        scale_vars[i].kf = ComplexMat(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
-
-#ifdef BIG_BATCH
-        alloc_size = p_num_of_feats;
-#else
-        alloc_size = 1;
-#endif
-
-        CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].xf_sqr_norm, alloc_size*sizeof(float), cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].xf_sqr_norm_d, (void*)scale_vars[i].xf_sqr_norm, 0));
-
-        CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].yf_sqr_norm, sizeof(float), cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].yf_sqr_norm_d, (void*)scale_vars[i].yf_sqr_norm, 0));
-
-        alloc_size =(p_windows_size[0]/p_cell_size)*(p_windows_size[1]/p_cell_size)*alloc_size*sizeof(float);
-        CudaSafeCall(cudaMalloc((void**)&scale_vars[i].gauss_corr_res, alloc_size));
-        scale_vars[i].in_all = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC1, scale_vars[i].gauss_corr_res);
-
-        alloc_size = (p_windows_size[0]/p_cell_size)*(p_windows_size[1]/p_cell_size)*alloc_size*sizeof(float);
-        CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].rot_labels_data, alloc_size, cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].rot_labels_data_d, (void*)scale_vars[i].rot_labels_data, 0));
-        scale_vars[i].rot_labels = cv::Mat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, CV_32FC1, scale_vars[i].rot_labels_data);
-
-        alloc_size = (p_windows_size[0]/p_cell_size)*((p_windows_size[1]/p_cell_size)*p_num_of_feats)*sizeof(cufftReal);
-        CudaSafeCall(cudaHostAlloc((void**)&scale_vars[i].data_features, alloc_size, cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer((void**)&scale_vars[i].data_features_d, (void*)scale_vars[i].data_features, 0));
-        scale_vars[i].fw_all = cv::Mat((p_windows_size[1]/p_cell_size)*p_num_of_feats, p_windows_size[0]/p_cell_size, CV_32F, scale_vars[i].data_features);
-    }
-#else
-if(m_use_big_batch)
-        alloc_size = p_num_of_feats;
-else
-        alloc_size = 1;
-
-    for (int i = 0;i<p_num_scales;++i) {
-        scale_vars[i].xf_sqr_norm = (float*) malloc(alloc_size*sizeof(float));
-        scale_vars[i].yf_sqr_norm = (float*) malloc(sizeof(float));
-
-        scale_vars[i].patch_feats.reserve(p_num_of_feats);
-
-        int height = p_windows_size[1]/p_cell_size;
-#ifdef FFTW
-        int width = (p_windows_size[0]/p_cell_size)/2+1;
-#else
-        int width = p_windows_size[0]/p_cell_size;
-#endif
-
-        scale_vars[i].ifft2_res = cv::Mat(height, p_windows_size[0]/p_cell_size, CV_32FC(p_num_of_feats));
-        scale_vars[i].response = cv::Mat(height, p_windows_size[0]/p_cell_size, CV_32FC1);
-
-        scale_vars[i].zf = ComplexMat(height, width, p_num_of_feats);
-        scale_vars[i].kzf = ComplexMat(height, width, 1);
-        scale_vars[i].kf = ComplexMat(height, width, 1);
-        scale_vars[i].rot_labels = cv::Mat(height, p_windows_size[0]/p_cell_size, CV_32FC1);
-#ifdef FFTW
-        scale_vars[i].in_all = cv::Mat((p_windows_size[1]/p_cell_size)*p_num_of_feats, p_windows_size[0]/p_cell_size, CV_32F);
-        scale_vars[i].fw_all = cv::Mat((p_windows_size[1]/p_cell_size)*p_num_of_feats, p_windows_size[0]/p_cell_size, CV_32F);
-#else
-        scale_vars[i].in_all = cv::Mat((p_windows_size[1]/p_cell_size), p_windows_size[0]/p_cell_size, CV_32F);
-#endif
-    }
-#endif
-#if defined(FFTW) || defined(CUFFT)
-    p_model_xf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
-    p_yf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, 1);
-    //We use scale_vars[0] for updating the tracker, so we only allocate memory for  its xf only.
-    scale_vars[0].xf.create(p_windows_size[1]/p_cell_size, (p_windows_size[0]/p_cell_size)/2+1, p_num_of_feats);
-#else
-    p_model_xf.create(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
-    p_yf.create(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, 1);
-    scale_vars[0].xf = ComplexMat(p_windows_size[1]/p_cell_size, p_windows_size[0]/p_cell_size, p_num_of_feats);
-#endif
-    scale_vars[0].p_model_xf_ptr = & p_model_xf;
-    scale_vars[0].p_yf_ptr = & p_yf;
 }
 
 void KCF_Tracker::setTrackerPose(BBox_c &bbox, cv::Mat & img, int fit_size_x, int fit_size_y)
@@ -382,30 +285,30 @@ void KCF_Tracker::track(cv::Mat &img)
 
     if(m_use_multithreading) {
         std::vector<std::future<void>> async_res(p_scales.size());
-        for (size_t i = 0; i < scale_vars.size(); ++i) {
+        for (size_t i = 0; i < p_scale_vars.size(); ++i) {
             async_res[i] = std::async(std::launch::async,
                                 [this, &input_gray, &input_rgb, i]() -> void
-                                {return scale_track(this->scale_vars[i], input_rgb, input_gray, this->p_scales[i]);});
+                                {return scale_track(this->p_scale_vars[i], input_rgb, input_gray, this->p_scales[i]);});
         }
         for (size_t i = 0; i < p_scales.size(); ++i) {
             async_res[i].wait();
-            if (this->scale_vars[i].max_response > max_response) {
-                max_response = this->scale_vars[i].max_response;
-                max_response_pt = & this->scale_vars[i].max_loc;
-                max_response_map = & this->scale_vars[i].response;
+            if (this->p_scale_vars[i].max_response > max_response) {
+                max_response = this->p_scale_vars[i].max_response;
+                max_response_pt = & this->p_scale_vars[i].max_loc;
+                max_response_map = & this->p_scale_vars[i].response;
                 scale_index = i;
             }
         }
     } else {
 #pragma omp parallel for schedule(dynamic)
-        for (size_t i = 0; i < scale_vars.size(); ++i) {
-            scale_track(this->scale_vars[i], input_rgb, input_gray, this->p_scales[i]);
+        for (size_t i = 0; i < p_scale_vars.size(); ++i) {
+            scale_track(this->p_scale_vars[i], input_rgb, input_gray, this->p_scales[i]);
 #pragma omp critical
             {
-                if (this->scale_vars[i].max_response > max_response) {
-                    max_response = this->scale_vars[i].max_response;
-                    max_response_pt = & this->scale_vars[i].max_loc;
-                    max_response_map = & this->scale_vars[i].response;
+                if (this->p_scale_vars[i].max_response > max_response) {
+                    max_response = this->p_scale_vars[i].max_response;
+                    max_response_pt = & this->p_scale_vars[i].max_loc;
+                    max_response_map = & this->p_scale_vars[i].response;
                     scale_index = i;
                 }
             }
@@ -454,27 +357,26 @@ void KCF_Tracker::track(cv::Mat &img)
     if (p_current_scale > p_min_max_scale[1])
         p_current_scale = p_min_max_scale[1];
     //obtain a subwindow for training at newly estimated target position
-    get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], scale_vars[0], p_current_scale);
-    scale_vars[0].flag = Tracker_flags::TRACKER_UPDATE;
-    fft.forward_window(scale_vars[0]);
+    get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size[0], p_windows_size[1], p_scale_vars[0], p_current_scale);
+    fft.forward_window(p_scale_vars[0].patch_feats, p_scale_vars[0].xf, p_scale_vars[0].fw_all, m_use_cuda ? p_scale_vars[0].data_features_d : nullptr);
 
     //subsequent frames, interpolate model
-    p_model_xf = p_model_xf * (1. - p_interp_factor) + scale_vars[0].xf * p_interp_factor;
+    p_model_xf = p_model_xf * (1. - p_interp_factor) + p_scale_vars[0].xf * p_interp_factor;
 
     ComplexMat alphaf_num, alphaf_den;
 
     if (m_use_linearkernel) {
-        ComplexMat xfconj = scale_vars[0].xf.conj();
+        ComplexMat xfconj = p_scale_vars[0].xf.conj();
         alphaf_num = xfconj.mul(p_yf);
-        alphaf_den = (scale_vars[0].xf * xfconj);
+        alphaf_den = (p_scale_vars[0].xf * xfconj);
     } else {
-        scale_vars[0].flag = Tracker_flags::AUTO_CORRELATION;
+        p_scale_vars[0].flag = Tracker_flags::AUTO_CORRELATION;
         //Kernel Ridge Regression, calculate alphas (in Fourier domain)
-        gaussian_correlation(scale_vars[0], scale_vars[0].xf, scale_vars[0].xf, p_kernel_sigma, true);
+        gaussian_correlation(p_scale_vars[0], p_scale_vars[0].xf, p_scale_vars[0].xf, p_kernel_sigma, true);
 //        ComplexMat alphaf = p_yf / (kf + p_lambda); //equation for fast training
 //        p_model_alphaf = p_model_alphaf * (1. - p_interp_factor) + alphaf * p_interp_factor;
-        alphaf_num = p_yf * scale_vars[0].kf;
-        alphaf_den = scale_vars[0].kf * (scale_vars[0].kf + p_lambda);
+        alphaf_num = p_yf * p_scale_vars[0].kf;
+        alphaf_den = p_scale_vars[0].kf * (p_scale_vars[0].kf + p_lambda);
     }
 
     p_model_alphaf_num = p_model_alphaf_num * (1. - p_interp_factor) + alphaf_num * p_interp_factor;
@@ -487,24 +389,20 @@ void KCF_Tracker::scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & 
     get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size[0], this->p_windows_size[1],
                                 vars, this->p_current_scale * scale);
 
-    vars.flag = Tracker_flags::SCALE_RESPONSE;
-    fft.forward_window(vars);
+    fft.forward_window(vars.patch_feats, vars.zf, vars.fw_all, m_use_cuda ? vars.data_features_d : nullptr);
     DEBUG_PRINTM(vars.zf);
 
     if (m_use_linearkernel) {
                 vars.kzf = (vars.zf.mul2(this->p_model_alphaf)).sum_over_channels();
-                vars.flag = Tracker_flags::RESPONSE;
-                fft.inverse(vars);
+                fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch_d : nullptr);
     } else {
-        vars.flag = Tracker_flags::CROSS_CORRELATION;
         gaussian_correlation(vars, vars.zf, this->p_model_xf, this->p_kernel_sigma);
         DEBUG_PRINTM(this->p_model_alphaf);
         DEBUG_PRINTM(vars.kzf);
         DEBUG_PRINTM(this->p_model_alphaf * vars.kzf);
-        vars.flag = Tracker_flags::RESPONSE;
         vars.kzf = this->p_model_alphaf * vars.kzf;
         //TODO Add support for fft.inverse(vars) for CUFFT
-        fft.inverse(vars);
+        fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch_d : nullptr);
     }
 
     DEBUG_PRINTM(vars.response);
@@ -577,7 +475,7 @@ void KCF_Tracker::get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx
     return;
 }
 
-void KCF_Tracker::gaussian_shaped_labels(Scale_vars & vars, double sigma, int dim1, int dim2)
+cv::Mat KCF_Tracker::gaussian_shaped_labels(double sigma, int dim1, int dim2)
 {
     cv::Mat labels(dim2, dim1, CV_32FC1);
     int range_y[2] = {-dim2 / 2, dim2 - dim2 / 2};
@@ -594,12 +492,19 @@ void KCF_Tracker::gaussian_shaped_labels(Scale_vars & vars, double sigma, int di
     }
 
     //rotate so that 1 is at top-left corner (see KCF paper for explanation)
+#ifdef CUFFT
     cv::Mat tmp = circshift(labels, range_x[0], range_y[0]);
-    tmp.copyTo(vars.rot_labels);
-    //sanity check, 1 at top left corner
-    assert(vars.rot_labels.at<float>(0,0) >= 1.f - 1e-10f);
+    tmp.copyTo(p_scale_vars[0].rot_labels);
 
-    return;
+    assert(p_scale_vars[0].rot_labels.at<float>(0,0) >= 1.f - 1e-10f);
+    return tmp;
+#else
+    cv::Mat rot_labels = circshift(labels, range_x[0], range_y[0]);
+    //sanity check, 1 at top left corner
+    assert(rot_labels.at<float>(0,0) >= 1.f - 1e-10f);
+
+    return rot_labels;
+#endif
 }
 
 cv::Mat KCF_Tracker::circshift(const cv::Mat &patch, int x_rot, int y_rot)
@@ -753,15 +658,14 @@ void KCF_Tracker::gaussian_correlation(struct Scale_vars & vars, const ComplexMa
 #endif
     vars.xyf = auto_correlation ? xf.sqr_mag() : xf.mul2(yf.conj());
     DEBUG_PRINTM(vars.xyf);
+    fft.inverse(vars.xyf, vars.ifft2_res, m_use_cuda ? vars.data_i_features_d : nullptr);
 #ifdef CUFFT
-    fft.inverse(vars);
     if(auto_correlation)
-        cuda_gaussian_correlation(vars.data_i_features, vars.gauss_corr_res, vars.xf_sqr_norm_d, vars.xf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
+        cuda_gaussian_correlation(vars.data_i_features, vars.gauss_corr_res_d, vars.xf_sqr_norm_d, vars.xf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
     else
-        cuda_gaussian_correlation(vars.data_i_features, vars.gauss_corr_res, vars.xf_sqr_norm_d, vars.yf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
+        cuda_gaussian_correlation(vars.data_i_features, vars.gauss_corr_res_d, vars.xf_sqr_norm_d, vars.yf_sqr_norm_d, sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width);
 #else
     //ifft2 and sum over 3rd dimension, we dont care about individual channels
-    fft.inverse(vars);
     DEBUG_PRINTM(vars.ifft2_res);
     cv::Mat xy_sum;
     if (xf.channels() != p_num_scales*p_num_of_feats)
@@ -792,7 +696,7 @@ void KCF_Tracker::gaussian_correlation(struct Scale_vars & vars, const ComplexMa
     }
 #endif
     DEBUG_PRINTM(vars.in_all);
-    fft.forward(vars);
+    fft.forward(vars.in_all, auto_correlation ? vars.kf : vars.kzf, m_use_cuda ? vars.gauss_corr_res_d : nullptr);
     return;
 }
 
@@ -872,7 +776,7 @@ double KCF_Tracker::sub_grid_scale(int index)
             A.at<float>(i, 0) = p_scales[i] * p_scales[i];
             A.at<float>(i, 1) = p_scales[i];
             A.at<float>(i, 2) = 1;
-            fval.at<float>(i) = scale_vars[i].max_response;
+            fval.at<float>(i) = p_scale_vars[i].max_response;
         }
     } else {
         //only from neighbours
@@ -883,7 +787,7 @@ double KCF_Tracker::sub_grid_scale(int index)
              p_scales[index-1] * p_scales[index-1], p_scales[index-1], 1,
              p_scales[index] * p_scales[index], p_scales[index], 1,
              p_scales[index+1] * p_scales[index+1], p_scales[index+1], 1);
-        fval = (cv::Mat_<float>(3, 1) << scale_vars[index-1].max_response, scale_vars[index].max_response, scale_vars[index+1].max_response);
+        fval = (cv::Mat_<float>(3, 1) << p_scale_vars[index-1].max_response, p_scale_vars[index].max_response, p_scale_vars[index+1].max_response);
     }
 
     cv::Mat x;
