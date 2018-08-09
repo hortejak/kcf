@@ -12,7 +12,7 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
 
     //FFT forward one scale
     {
-       CufftErrorCheck(cufftPlan2d(&plan_f, m_height, m_width, CUFFT_R2C));
+       CufftErrorCheck(cufftPlan2d(&plan_f, int(m_height), int(m_width), CUFFT_R2C));
     }
 #ifdef BIG_BATCH
     //FFT forward all scales
@@ -34,11 +34,11 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
     //FFT forward window one scale
     {
         int rank = 2;
-        int n[] = {(int)m_height, (int)m_width};
-        int howmany = m_num_of_feats;
-        int idist = m_height*m_width, odist = m_height*(m_width/2+1);
+        int n[] = {int(m_height), int(m_width)};
+        int howmany = int(m_num_of_feats);
+        int idist = int(m_height*m_width), odist = int(m_height*(m_width/2+1));
         int istride = 1, ostride = 1;
-        int *inembed = n, onembed[] = {(int)m_height, (int)m_width/2+1};
+        int *inembed = n, onembed[] = {int(m_height), int(m_width/2+1)};
 
         CufftErrorCheck(cufftPlanMany(&plan_fw, rank, n,
 		  inembed, istride, idist,
@@ -65,11 +65,11 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
     //FFT inverse one scale
     {
         int rank = 2;
-        int n[] = {(int)m_height, (int)m_width};
-        int howmany = m_num_of_feats;
-        int idist = m_height*(m_width/2+1), odist = 1;
-        int istride = 1, ostride = m_num_of_feats;
-        int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
+        int n[] = {int(m_height), int(m_width)};
+        int howmany = int(m_num_of_feats);
+        int idist = int(m_height*(m_width/2+1)), odist = 1;
+        int istride = 1, ostride = int(m_num_of_feats);
+        int inembed[] = {int(m_height), int(m_width/2+1)}, *onembed = n;
 
         CufftErrorCheck(cufftPlanMany(&plan_i_features, rank, n,
 		  inembed, istride, idist,
@@ -96,11 +96,11 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
     //FFT inverse one channel one scale
     {
         int rank = 2;
-        int n[] = {(int)m_height, (int)m_width};
+        int n[] = {int(m_height), int(m_width)};
         int howmany = 1;
-        int idist = m_height*(m_width/2+1), odist = 1;
+        int idist = int(m_height*(m_width/2+1)), odist = 1;
         int istride = 1, ostride = 1;
-        int inembed[] = {(int)m_height, (int)m_width/2+1}, *onembed = n;
+        int inembed[] = {int(m_height), int(m_width/2+1)}, *onembed = n;
 
         CufftErrorCheck(cufftPlanMany(&plan_i_1ch, rank, n,
 		  inembed, istride, idist,
@@ -131,61 +131,64 @@ void cuFFT::set_window(const cv::Mat & window)
      m_window = window;
 }
 
-void cuFFT::forward(const cv::Mat & real_input, ComplexMat & complex_result, float *real_input_arr)
+void cuFFT::forward(const cv::Mat & real_input, ComplexMat & complex_result, float *real_input_arr, cudaStream_t stream)
 {
     (void) real_input;
 
-    if(m_big_batch_mode && real_input.rows == (int)(m_height*m_num_of_scales)){
+    if(m_big_batch_mode && real_input.rows == int(m_height*m_num_of_scales)){
         CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal*>(real_input_arr),
                                 complex_result.get_p_data()));
     } else {
-                CufftErrorCheck(cufftExecR2C(plan_f, reinterpret_cast<cufftReal*>(real_input_arr),
+        CufftErrorCheck(cufftSetStream(plan_f, stream));
+        CufftErrorCheck(cufftExecR2C(plan_f, reinterpret_cast<cufftReal*>(real_input_arr),
                                 complex_result.get_p_data()));
     }
     return;
 }
 
-void cuFFT::forward_window(std::vector<cv::Mat> patch_feats, ComplexMat & complex_result, cv::Mat & fw_all, float *real_input_arr)
+void cuFFT::forward_window(std::vector<cv::Mat> patch_feats, ComplexMat & complex_result, cv::Mat & fw_all, float *real_input_arr, cudaStream_t stream)
 {
-    int n_channels = patch_feats.size();
+    int n_channels = int(patch_feats.size());
 
-    if(n_channels > (int) m_num_of_feats){
-        for (int i = 0; i < n_channels; ++i) {
-            cv::Mat in_roi(fw_all, cv::Rect(0, i*m_height, m_width, m_height));
+    if(n_channels > int(m_num_of_feats)){
+        for (uint i = 0; i < uint(n_channels); ++i) {
+            cv::Mat in_roi(fw_all, cv::Rect(0, int(i*m_height), int(m_width), int(m_height)));
             in_roi = patch_feats[i].mul(m_window);
         }
-
         CufftErrorCheck(cufftExecR2C(plan_fw_all_scales, reinterpret_cast<cufftReal*>(real_input_arr), complex_result.get_p_data()));
     } else {
-        for (int i = 0; i < n_channels; ++i) {
-            cv::Mat in_roi(fw_all, cv::Rect(0, i*m_height, m_width, m_height));
+        for (uint i = 0; i < uint(n_channels); ++i) {
+            cv::Mat in_roi(fw_all, cv::Rect(0, int(i*m_height), int(m_width), int(m_height)));
             in_roi = patch_feats[i].mul(m_window);
         }
+        CufftErrorCheck(cufftSetStream(plan_fw, stream));
         CufftErrorCheck(cufftExecR2C(plan_fw, reinterpret_cast<cufftReal*>(real_input_arr), complex_result.get_p_data()));
     }
     return;
 }
 
-void cuFFT::inverse(ComplexMat &  complex_input, cv::Mat & real_result, float *real_result_arr)
+void cuFFT::inverse(ComplexMat &  complex_input, cv::Mat & real_result, float *real_result_arr, cudaStream_t stream)
 {
     int n_channels = complex_input.n_channels;
     cufftComplex *in = reinterpret_cast<cufftComplex*>(complex_input.get_p_data());
 
     if(n_channels == 1){
+        CufftErrorCheck(cufftSetStream(plan_i_1ch, stream));
         CufftErrorCheck(cufftExecC2R(plan_i_1ch, in, reinterpret_cast<cufftReal*>(real_result_arr)));
-        cudaDeviceSynchronize();
+        cudaStreamSynchronize(stream);
         real_result = real_result/(m_width*m_height);
         return;
-    } else if(n_channels == (int) m_num_of_scales){
+    } else if(n_channels == int(m_num_of_scales)){
         CufftErrorCheck(cufftExecC2R(plan_i_1ch_all_scales, in, reinterpret_cast<cufftReal*>(real_result_arr)));
-        cudaDeviceSynchronize();
+        cudaStreamSynchronize(stream);
 
         real_result = real_result/(m_width*m_height);
         return;
-    } else if(n_channels == (int) m_num_of_feats * (int) m_num_of_scales){
+    } else if(n_channels == int(m_num_of_feats) * int(m_num_of_scales)){
         CufftErrorCheck(cufftExecC2R(plan_i_features_all_scales, in, reinterpret_cast<cufftReal*>(real_result_arr)));
         return;
     }
+    CufftErrorCheck(cufftSetStream(plan_i_features, stream));
     CufftErrorCheck(cufftExecC2R(plan_i_features, in, reinterpret_cast<cufftReal*>(real_result_arr)));
     return;
 }

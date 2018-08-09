@@ -1,6 +1,6 @@
 # Makefile to build all the available variants
 
-BUILDS = opencvfft-st opencvfft-async fftw fftw-openmp fftw-async fftw-big fftw-big-openmp cufftw cufftw-big cufftw-big-openmp cufft cufft-big cufft-big-openmp
+BUILDS = opencvfft-st opencvfft-async opencvfft-openmp fftw fftw-async fftw-openmp fftw-big fftw-big-openmp cufftw cufftw-big cufftw-big-openmp cufft cufft-big cufft-big-openmp
 
 all: $(foreach build,$(BUILDS),build-$(build)/kcf_vot)
 
@@ -9,6 +9,7 @@ CMAKE_OPTS += -G Ninja
 
 CMAKE_OTPS_opencvfft-st      = -DFFT=OpenCV
 CMAKE_OTPS_opencvfft-async   = -DFFT=OpenCV -DASYNC=ON
+CMAKE_OTPS_opencvfft-openmp  = -DFFT=OpenCV -DOPENMP=ON
 CMAKE_OTPS_fftw              = -DFFT=fftw
 CMAKE_OTPS_fftw-openmp       = -DFFT=fftw -DOPENMP=ON
 CMAKE_OTPS_fftw-async        = -DFFT=fftw -DASYNC=ON

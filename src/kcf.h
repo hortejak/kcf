@@ -3,6 +3,7 @@
 
 #include <opencv2/opencv.hpp>
 #include <vector>
+#include <memory>
 #include "fhog.hpp"
 
 #ifdef CUFFT
@@ -44,7 +45,7 @@ struct BBox_c
 
     inline cv::Rect get_rect()
     {
-        return cv::Rect(cx-w/2., cy-h/2., w, h);
+        return cv::Rect(int(cx-w/2.), int(cy-h/2.), int(w), int(h));
     }
 
 };
@@ -108,6 +109,7 @@ private:
     const double p_downscale_factor = 0.5;
     double p_scale_factor_x = 1;
     double p_scale_factor_y = 1;
+    double p_floating_error = 0.0001;
 
     double p_padding = 1.5;
     double p_output_sigma_factor = 0.1;
@@ -127,7 +129,7 @@ private:
     int p_num_of_feats;
     int p_roi_height, p_roi_width;
 
-    std::vector<Scale_vars> p_scale_vars;
+    std::list<std::unique_ptr<Scale_vars>> p_scale_vars;
 
     //model
     ComplexMat p_yf;
