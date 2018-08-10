@@ -5,8 +5,12 @@
   #include "complexmat.cuh"
 #else
   #include "complexmat.hpp"
+#ifndef CUFFTW
 //For compatibility reasons between CuFFT and FFTW, OpenCVfft versions.
   typedef int* cudaStream_t;
+#else
+    #include "cuda_runtime.h"
+#endif
 #endif
 
 struct Scale_vars
@@ -16,7 +20,6 @@ public:
                            ComplexMat *yf = nullptr,bool zero_index = false)
     {
         uint alloc_size;
-        std::cout << __PRETTY_FUNCTION__ << std::endl;
 #ifdef CUFFT
         if (zero_index) {
             cudaSetDeviceFlags(cudaDeviceMapHost);
@@ -26,6 +29,8 @@ public:
 #if defined(ASYNC) || defined(OPENMP)
         CudaSafeCall(cudaStreamCreate(&this->stream));
 #endif
+
+        this->patch_feats.reserve(uint(num_of_feats));
 
         alloc_size = uint(windows_size[0]/cell_size*windows_size[1]/cell_size*num_of_scales)*sizeof(cufftReal);
         CudaSafeCall(cudaHostAlloc(reinterpret_cast<void**>(&this->data_i_1ch), alloc_size, cudaHostAllocMapped));
@@ -39,14 +44,8 @@ public:
         this->response = cv::Mat(windows_size[1]/cell_size, windows_size[0]/cell_size, CV_32FC(num_of_scales), this->data_i_1ch);
 
         this->zf.create(windows_size[1]/cell_size, (windows_size[0]/cell_size)/2+1, num_of_feats, num_of_scales, this->stream);
-        std::cout << this->zf.stream << std::endl;
-        std::cout << this->zf.n_scales << std::endl;
         this->kzf.create(windows_size[1]/cell_size, (windows_size[0]/cell_size)/2+1, num_of_scales, this->stream);
-        std::cout << this->kzf.stream << std::endl;
-        std::cout << this->kzf.n_scales << std::endl;
         this->kf.create(windows_size[1]/cell_size, (windows_size[0]/cell_size)/2+1, num_of_scales, this->stream);
-        std::cout << this->kf.stream << std::endl;
-        std::cout << this->kf.n_scales << std::endl << std::endl;
 
         alloc_size = uint(num_of_scales);
 
@@ -126,7 +125,6 @@ public:
 
     ~Scale_vars() {
 #ifdef CUFFT
-        std::cout << __PRETTY_FUNCTION__ << std::endl;
         CudaSafeCall(cudaFreeHost(this->xf_sqr_norm));
         CudaSafeCall(cudaFreeHost(this->yf_sqr_norm));
         CudaSafeCall(cudaFreeHost(this->data_i_1ch));

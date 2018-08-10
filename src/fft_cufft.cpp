@@ -139,9 +139,12 @@ void cuFFT::forward(const cv::Mat & real_input, ComplexMat & complex_result, flo
         CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal*>(real_input_arr),
                                 complex_result.get_p_data()));
     } else {
+#pragma omp critical
+        {
         CufftErrorCheck(cufftSetStream(plan_f, stream));
-        CufftErrorCheck(cufftExecR2C(plan_f, reinterpret_cast<cufftReal*>(real_input_arr),
-                                complex_result.get_p_data()));
+        CufftErrorCheck(cufftExecR2C(plan_f, reinterpret_cast<cufftReal*>(real_input_arr), complex_result.get_p_data()));
+        cudaStreamSynchronize(stream);
+        }
     }
     return;
 }
@@ -161,8 +164,12 @@ void cuFFT::forward_window(std::vector<cv::Mat> patch_feats, ComplexMat & comple
             cv::Mat in_roi(fw_all, cv::Rect(0, int(i*m_height), int(m_width), int(m_height)));
             in_roi = patch_feats[i].mul(m_window);
         }
+#pragma omp critical
+        {
         CufftErrorCheck(cufftSetStream(plan_fw, stream));
         CufftErrorCheck(cufftExecR2C(plan_fw, reinterpret_cast<cufftReal*>(real_input_arr), complex_result.get_p_data()));
+        cudaStreamSynchronize(stream);
+        }
     }
     return;
 }
@@ -173,9 +180,12 @@ void cuFFT::inverse(ComplexMat &  complex_input, cv::Mat & real_result, float *r
     cufftComplex *in = reinterpret_cast<cufftComplex*>(complex_input.get_p_data());
 
     if(n_channels == 1){
+#pragma omp critical
+        {
         CufftErrorCheck(cufftSetStream(plan_i_1ch, stream));
         CufftErrorCheck(cufftExecC2R(plan_i_1ch, in, reinterpret_cast<cufftReal*>(real_result_arr)));
         cudaStreamSynchronize(stream);
+        }
         real_result = real_result/(m_width*m_height);
         return;
     } else if(n_channels == int(m_num_of_scales)){
@@ -188,8 +198,14 @@ void cuFFT::inverse(ComplexMat &  complex_input, cv::Mat & real_result, float *r
         CufftErrorCheck(cufftExecC2R(plan_i_features_all_scales, in, reinterpret_cast<cufftReal*>(real_result_arr)));
         return;
     }
+#pragma omp critical
+    {
     CufftErrorCheck(cufftSetStream(plan_i_features, stream));
     CufftErrorCheck(cufftExecC2R(plan_i_features, in, reinterpret_cast<cufftReal*>(real_result_arr)));
+#if defined(OPENMP) && !defined(BIG_BATCH)
+    cudaStreamSynchronize(stream);
+#endif
+    }
     return;
 }
 

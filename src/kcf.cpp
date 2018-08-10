@@ -21,6 +21,8 @@
 
 #define DEBUG_PRINT(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;}
 #define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl << (obj) << std::endl;}
+#define DEBUG_PRINTD(obj) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl << (obj) << std::endl;}
+
 
 KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor, double output_sigma_factor, int cell_size) :
     fft(*new FFT()),
@@ -157,15 +159,6 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
         else {
             p_scale_vars.emplace_back(new Scale_vars(p_windows_size, p_cell_size, p_num_of_feats, 1));
         }
-#ifdef CUFFT
-        std::cout << p_scale_vars.back()->zf.stream << std::endl;
-        std::cout << p_scale_vars.back()->kzf.stream << std::endl;
-        std::cout << p_scale_vars.back()->kf.stream << std::endl << std::endl;
-
-        std::cout << p_scale_vars.back()->zf.n_scales << std::endl;
-        std::cout << p_scale_vars.back()->kzf.n_scales << std::endl;
-        std::cout << p_scale_vars.back()->kf.n_scales << std::endl << std::endl;
-#endif
     }
 
     p_current_scale = 1.;
@@ -199,6 +192,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect & bbox, int fit_size_x, int 
     p_scale_vars.front()->model_xf = p_model_xf;
     p_scale_vars.front()->model_xf.set_stream(p_scale_vars.front()->stream);
     p_yf.set_stream(p_scale_vars.front()->stream);
+    p_model_xf.set_stream(p_scale_vars.front()->stream);
 #endif
 
     if (m_use_linearkernel) {
@@ -393,6 +387,7 @@ void KCF_Tracker::track(cv::Mat &img)
         p_current_scale = p_min_max_scale[0];
     if (p_current_scale > p_min_max_scale[1])
         p_current_scale = p_min_max_scale[1];
+
     //obtain a subwindow for training at newly estimated target position
     p_scale_vars.front()->patch_feats.clear();
     get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size[0], p_windows_size[1], *p_scale_vars.front(), p_current_scale);

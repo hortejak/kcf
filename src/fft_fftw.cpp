@@ -30,7 +30,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
     m_num_of_scales = num_of_scales;
     m_big_batch_mode = big_batch_mode;
 
-#if (!defined(ASYNC) && !defined(CUFFTW))|| defined(OPENMP)
+#if (!defined(ASYNC) && !defined(CUFFTW)) && defined(OPENMP)
     fftw_init_threads();
 #endif //OPENMP
 
