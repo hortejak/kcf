@@ -13,6 +13,23 @@
 #endif
 #endif
 
+#if defined(BIG_BATCH) && defined(OPENMP)
+    #define BIG_BATCH_OMP_PARALLEL_FOR _Pragma("omp parallel for ordered")
+    #define BIG_BATCH_OMP_ORDERED _Pragma("omp ordered")
+    #define NORMAL_OMP_PARALLEL_FOR
+    #define NORMAL_OMP_CRITICAL
+#elif defined(OPENMP)
+    #define BIG_BATCH_OMP_PARALLEL_FOR
+    #define BIG_BATCH_OMP_ORDERED
+    #define NORMAL_OMP_PARALLEL_FOR _Pragma("omp parallel for schedule(dynamic)")
+    #define NORMAL_OMP_CRITICAL _Pragma("omp critical")
+#else
+    #define BIG_BATCH_OMP_PARALLEL_FOR
+    #define BIG_BATCH_OMP_ORDERED
+    #define NORMAL_OMP_PARALLEL_FOR
+    #define NORMAL_OMP_CRITICAL
+#endif
+
 struct Scale_vars
 {
 public:
@@ -58,7 +75,7 @@ public:
         alloc_size =uint((windows_size[0]/cell_size)*(windows_size[1]/cell_size))*alloc_size*sizeof(float);
         CudaSafeCall(cudaHostAlloc(reinterpret_cast<void**>(&this->gauss_corr_res), alloc_size, cudaHostAllocMapped));
         CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void**>(&this->gauss_corr_res_d), reinterpret_cast<void*>(this->gauss_corr_res), 0));
-        this->in_all = cv::Mat(windows_size[1]/cell_size*num_of_scales, windows_size[0]/cell_size, CV_32F, this->gauss_corr_res_d);
+        this->in_all = cv::Mat(windows_size[1]/cell_size*num_of_scales, windows_size[0]/cell_size, CV_32F, this->gauss_corr_res);
 
         if (zero_index) {
             alloc_size = uint((windows_size[0]/cell_size)*(windows_size[1]/cell_size))*sizeof(float);

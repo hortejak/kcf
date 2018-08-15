@@ -21,8 +21,6 @@
 
 #define DEBUG_PRINT(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;}
 #define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl << (obj) << std::endl;}
-#define DEBUG_PRINTD(obj) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl << (obj) << std::endl;}
-
 
 KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor, double output_sigma_factor, int cell_size) :
     fft(*new FFT()),
@@ -317,7 +315,7 @@ void KCF_Tracker::track(cv::Mat &img)
     } else {
         uint start = m_use_big_batch ? 1 : 0;
         uint end = m_use_big_batch ? 2 : uint(p_num_scales);
-#pragma omp parallel for schedule(dynamic)
+        NORMAL_OMP_PARALLEL_FOR
         for (uint i = start; i < end; ++i) {
             auto it = p_scale_vars.begin();
             std::advance(it, i);
@@ -333,13 +331,13 @@ void KCF_Tracker::track(cv::Mat &img)
                     }
                 }
             } else {
-#pragma omp critical
+            NORMAL_OMP_CRITICAL
                 {
                     if ((*it)->max_response > max_response) {
                         max_response = (*it)->max_response;
                         max_response_pt = & (*it)->max_loc;
                         max_response_map = & (*it)->response;
-                        scale_index = i;
+                        scale_index = int(i);
                     }
                 }
             }
@@ -430,6 +428,7 @@ void KCF_Tracker::scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & 
 {
     if (m_use_big_batch) {
         vars.patch_feats.clear();
+        BIG_BATCH_OMP_PARALLEL_FOR
         for (uint i = 0; i < uint(p_num_scales); ++i) {
             get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size[0], this->p_windows_size[1],
                                         vars, this->p_current_scale * this->p_scales[i]);
@@ -447,8 +446,7 @@ void KCF_Tracker::scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & 
                 vars.kzf = m_use_big_batch ? (vars.zf.mul2(this->p_model_alphaf)).sum_over_channels() : (p_model_alphaf * vars.zf).sum_over_channels();
                 fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch_d : nullptr, vars.stream);
     } else {
-
-#if defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
+#if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
         gaussian_correlation(vars, vars.zf, vars.model_xf, this->p_kernel_sigma);
         vars.kzf = vars.model_alphaf * vars.kzf;
 #else
@@ -540,6 +538,7 @@ void KCF_Tracker::get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx
         std::vector<cv::Mat> cn_feat = CNFeat::extract(patch_rgb);
         color_feat.insert(color_feat.end(), cn_feat.begin(), cn_feat.end());
     }
+    BIG_BATCH_OMP_ORDERED
     vars.patch_feats.insert(vars.patch_feats.end(), color_feat.begin(), color_feat.end());
     return;
 }

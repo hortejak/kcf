@@ -83,7 +83,7 @@ public:
                     desc.at<float>(y,x) = H[i*hb*wb + x*hb + y];
                 }
             }
-
+            BIG_BATCH_OMP_ORDERED
             vars.patch_feats.push_back(desc.clone());
         }
 
