@@ -4,6 +4,7 @@
 
 #include "fft.h"
 #include "cuda/cuda_error_check.cuh"
+#include "pragmas.h"
 
 #if CV_MAJOR_VERSION == 2
   #include <opencv2/gpu/gpu.hpp>
@@ -16,7 +17,7 @@
 #include <cufft.h>
 #include <cuda_runtime.h>
 
-struct Scale_vars;
+struct ThreadCtx;
 
 class cuFFT : public Fft
 {
