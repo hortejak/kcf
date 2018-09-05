@@ -7,12 +7,12 @@
 #include "fhog.hpp"
 
 #ifdef CUFFT
-  #include "complexmat.cuh"
-  #include "cuda_functions.cuh"
-  #include "cuda/cuda_error_check.cuh"
-  #include <cuda_runtime.h>
+#include "complexmat.cuh"
+#include "cuda_functions.cuh"
+#include "cuda/cuda_error_check.cuh"
+#include <cuda_runtime.h>
 #else
-  #include "complexmat.hpp"
+#include "complexmat.hpp"
 #endif
 
 #include "cnfeat.hpp"
