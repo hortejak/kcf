@@ -10,21 +10,21 @@
 
 class ComplexMat {
   public:
-    int cols;
-    int rows;
-    int n_channels;
-    int n_scales = 1;
+    uint cols;
+    uint rows;
+    uint n_channels;
+    uint n_scales = 1;
     bool foreign_data = false;
     cudaStream_t stream = nullptr;
 
     ComplexMat() : cols(0), rows(0), n_channels(0) {}
-    ComplexMat(int _rows, int _cols, int _n_channels, cudaStream_t _stream)
+    ComplexMat(uint _rows, uint _cols, uint _n_channels, cudaStream_t _stream)
         : cols(_cols), rows(_rows), n_channels(_n_channels), stream(_stream)
     {
         CudaSafeCall(cudaMalloc(&p_data, n_channels * cols * rows * sizeof(cufftComplex)));
     }
 
-    ComplexMat(int _rows, int _cols, int _n_channels, int _n_scales, cudaStream_t _stream)
+    ComplexMat(uint _rows, uint _cols, uint _n_channels, uint _n_scales, cudaStream_t _stream)
         : cols(_cols), rows(_rows), n_channels(_n_channels), n_scales(_n_scales), stream(_stream)
     {
         CudaSafeCall(cudaMalloc(&p_data, n_channels * cols * rows * sizeof(cufftComplex)));
@@ -50,7 +50,7 @@ class ComplexMat {
         }
     }
 
-    void create(int _rows, int _cols, int _n_channels, cudaStream_t _stream = nullptr)
+    void create(uint _rows, uint _cols, uint _n_channels, cudaStream_t _stream = nullptr)
     {
         rows = _rows;
         cols = _cols;
@@ -59,7 +59,7 @@ class ComplexMat {
         CudaSafeCall(cudaMalloc(&p_data, n_channels * cols * rows * sizeof(cufftComplex)));
     }
 
-    void create(int _rows, int _cols, int _n_channels, int _n_scales, cudaStream_t _stream = nullptr)
+    void create(uint _rows, uint _cols, uint _n_channels, uint _n_scales, cudaStream_t _stream = nullptr)
     {
         rows = _rows;
         cols = _cols;

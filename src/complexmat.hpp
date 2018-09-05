@@ -9,27 +9,27 @@
 #ifdef TEMPLATE_COMPLEXMAT
 template <typename T> class ComplexMat_ {
   public:
-    int cols;
-    int rows;
-    int n_channels;
-    int n_scales = 1;
+    uint cols;
+    uint rows;
+    uint n_channels;
+    uint n_scales = 1;
 
     ComplexMat_() : cols(0), rows(0), n_channels(0) {}
-    ComplexMat_(int _rows, int _cols, int _n_channels) : cols(_cols), rows(_rows), n_channels(_n_channels)
+    ComplexMat_(uint _rows, uint _cols, uint _n_channels) : cols(_cols), rows(_rows), n_channels(_n_channels)
     {
         p_data.resize(n_channels * cols * rows);
     }
 
-    ComplexMat_(int _rows, int _cols, int _n_channels, int _n_scales)
+    ComplexMat_(uint _rows, uint _cols, uint _n_channels, uint _n_scales)
         : cols(_cols), rows(_rows), n_channels(_n_channels), n_scales(_n_scales)
     {
         p_data.resize(n_channels * cols * rows);
     }
 
     // assuming that mat has 2 channels (real, img)
-    ComplexMat_(const cv::Mat &mat) : cols(mat.cols), rows(mat.rows), n_channels(1) { p_data = convert(mat); }
+    ComplexMat_(const cv::Mat &mat) : cols(uint(mat.cols)), rows(uint(mat.rows)), n_channels(1) { p_data = convert(mat); }
 
-    void create(int _rows, int _cols, int _n_channels)
+    void create(uint _rows, uint _cols, uint _n_channels)
     {
         rows = _rows;
         cols = _cols;
@@ -37,7 +37,7 @@ template <typename T> class ComplexMat_ {
         p_data.resize(n_channels * cols * rows);
     }
 
-    void create(int _rows, int _cols, int _n_channels, int _n_scales)
+    void create(uint _rows, uint _cols, uint _n_channels, uint _n_scales)
     {
         rows = _rows;
         cols = _cols;
@@ -78,7 +78,7 @@ template <typename T> class ComplexMat_ {
         int n_channels_per_scale = n_channels / n_scales;
         int scale_offset = n_channels_per_scale * rows * cols;
         T sum_sqr_norm;
-        for (int scale = 0; scale < n_scales; ++scale) {
+        for (uint scale = 0; scale < n_scales; ++scale) {
             sum_sqr_norm = 0;
             for (int i = 0; i < n_channels_per_scale; ++i)
                 for (auto lhs = p_data.begin() + i * rows * cols + scale * scale_offset;
@@ -107,7 +107,7 @@ template <typename T> class ComplexMat_ {
         int scale_offset = n_channels_per_scale * rows * cols;
 
         ComplexMat_<T> result(this->rows, this->cols, n_scales);
-        for (int scale = 0; scale < n_scales; ++scale) {
+        for (uint scale = 0; scale < n_scales; ++scale) {
             std::copy(p_data.begin() + scale * scale_offset, p_data.begin() + rows * cols + scale * scale_offset,
                       result.p_data.begin() + scale * rows * cols);
             for (int i = 1; i < n_channels_per_scale; ++i) {
@@ -182,8 +182,8 @@ template <typename T> class ComplexMat_ {
         // for (int i = 0; i < mat.n_channels; ++i){
         for (int i = 0; i < 1; ++i) {
             os << "Channel " << i << std::endl;
-            for (int j = 0; j < mat.rows; ++j) {
-                for (int k = 0; k < mat.cols - 1; ++k)
+            for (uint j = 0; j < mat.rows; ++j) {
+                for (uint k = 0; k < mat.cols - 1; ++k)
                     os << mat.p_data[j * mat.cols + k] << ", ";
                 os << mat.p_data[j * mat.cols + mat.cols - 1] << std::endl;
             }
@@ -214,7 +214,7 @@ template <typename T> class ComplexMat_ {
         assert(mat_rhs.n_channels == n_channels && mat_rhs.cols == cols && mat_rhs.rows == rows);
 
         ComplexMat_<T> result = *this;
-        for (int i = 0; i < n_channels; ++i) {
+        for (uint i = 0; i < n_channels; ++i) {
             auto lhs = result.p_data.begin() + i * rows * cols;
             auto rhs = mat_rhs.p_data.begin() + i * rows * cols;
             for (; lhs != result.p_data.begin() + (i + 1) * rows * cols; ++lhs, ++rhs)
@@ -229,7 +229,7 @@ template <typename T> class ComplexMat_ {
         assert(mat_rhs.n_channels == 1 && mat_rhs.cols == cols && mat_rhs.rows == rows);
 
         ComplexMat_<T> result = *this;
-        for (int i = 0; i < n_channels; ++i) {
+        for (uint i = 0; i < n_channels; ++i) {
             auto lhs = result.p_data.begin() + i * rows * cols;
             auto rhs = mat_rhs.p_data.begin();
             for (; lhs != result.p_data.begin() + (i + 1) * rows * cols; ++lhs, ++rhs)
@@ -246,7 +246,7 @@ template <typename T> class ComplexMat_ {
         int n_channels_per_scale = n_channels / n_scales;
         int scale_offset = n_channels_per_scale * rows * cols;
         ComplexMat_<T> result = *this;
-        for (int i = 0; i < n_scales; ++i) {
+        for (uint i = 0; i < n_scales; ++i) {
             for (int j = 0; j < n_channels_per_scale; ++j) {
                 auto lhs = result.p_data.begin() + (j * rows * cols) + (i * scale_offset);
                 auto rhs = mat_rhs.p_data.begin() + (j * rows * cols);
@@ -260,7 +260,7 @@ template <typename T> class ComplexMat_ {
     ComplexMat_<T> mat_const_operator(const std::function<void(std::complex<T> &c_rhs)> &op) const
     {
         ComplexMat_<T> result = *this;
-        for (int i = 0; i < n_channels; ++i)
+        for (uint i = 0; i < n_channels; ++i)
             for (auto lhs = result.p_data.begin() + i * rows * cols;
                  lhs != result.p_data.begin() + (i + 1) * rows * cols; ++lhs)
                 op(*lhs);

@@ -15,7 +15,7 @@ typedef int *cudaStream_t;
 
 struct ThreadCtx {
   public:
-    ThreadCtx(cv::Size windows_size, int cell_size, int num_of_feats, int num_of_scales = 1,
+    ThreadCtx(cv::Size windows_size, uint cell_size, uint num_of_feats, uint num_of_scales = 1,
               ComplexMat *model_xf = nullptr, ComplexMat *yf = nullptr, bool zero_index = false)
     {
         uint alloc_size;
@@ -32,27 +32,27 @@ struct ThreadCtx {
         this->patch_feats.reserve(uint(num_of_feats));
 
         alloc_size =
-            uint(windows_size.width / cell_size * windows_size.height / cell_size * num_of_scales) * sizeof(cufftReal);
+            (uint(windows_size.width) / cell_size * uint(windows_size.height )/ cell_size * num_of_scales) * sizeof(cufftReal);
         CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&this->data_i_1ch), alloc_size, cudaHostAllocMapped));
         CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->data_i_1ch_d),
                                               reinterpret_cast<void *>(this->data_i_1ch), 0));
 
         alloc_size =
-            uint(windows_size.width / cell_size * windows_size.height / cell_size * num_of_feats) * sizeof(cufftReal);
+            (uint(windows_size.width) / cell_size * uint(windows_size.height) / cell_size * num_of_feats) * sizeof(cufftReal);
         CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&this->data_i_features), alloc_size, cudaHostAllocMapped));
         CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->data_i_features_d),
                                               reinterpret_cast<void *>(this->data_i_features), 0));
 
-        this->ifft2_res = cv::Mat(windows_size.height / cell_size, windows_size.width / cell_size,
-                                  CV_32FC(num_of_feats), this->data_i_features);
-        this->response = cv::Mat(windows_size.height / cell_size, windows_size.width / cell_size,
-                                 CV_32FC(num_of_scales), this->data_i_1ch);
+        this->ifft2_res = cv::Mat(windows_size.height / int(cell_size), windows_size.width / int(cell_size),
+                                  CV_32FC(int(num_of_feats)), this->data_i_features);
+        this->response = cv::Mat(windows_size.height / int(cell_size), windows_size.width / int(cell_size),
+                                 CV_32FC(int(num_of_scales)), this->data_i_1ch);
 
-        this->zf.create(windows_size.height / cell_size, (windows_size.width / cell_size) / 2 + 1, num_of_feats,
+        this->zf.create(uint(windows_size.height)/ cell_size, (uint(windows_size.width)/ cell_size) / 2 + 1, num_of_feats,
                         num_of_scales, this->stream);
-        this->kzf.create(windows_size.height / cell_size, (windows_size.width / cell_size) / 2 + 1, num_of_scales,
+        this->kzf.create(uint(windows_size.height)/ cell_size, (uint(windows_size.width)/ cell_size) / 2 + 1, num_of_scales,
                          this->stream);
-        this->kf.create(windows_size.height / cell_size, (windows_size.width / cell_size) / 2 + 1, num_of_scales,
+        this->kf.create(uint(windows_size.height)/ cell_size, (uint(windows_size.width)/ cell_size) / 2 + 1, num_of_scales,
                         this->stream);
 
         alloc_size = uint(num_of_scales);
@@ -67,70 +67,70 @@ struct ThreadCtx {
                                               reinterpret_cast<void *>(this->yf_sqr_norm), 0));
 
         alloc_size =
-            uint((windows_size.width / cell_size) * (windows_size.height / cell_size)) * alloc_size * sizeof(float);
+            uint(windows_size.width) / cell_size * uint(windows_size.height)/ cell_size * alloc_size * sizeof(float);
         CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&this->gauss_corr_res), alloc_size, cudaHostAllocMapped));
         CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->gauss_corr_res_d),
                                               reinterpret_cast<void *>(this->gauss_corr_res), 0));
-        this->in_all = cv::Mat(windows_size.height / cell_size * num_of_scales, windows_size.width / cell_size, CV_32F,
-                               this->gauss_corr_res);
+        this->in_all = cv::Mat(windows_size.height / int(cell_size) * int(num_of_scales), windows_size.width / int(cell_size),
+                               CV_32F, this->gauss_corr_res);
 
         if (zero_index) {
-            alloc_size = uint((windows_size.width / cell_size) * (windows_size.height / cell_size)) * sizeof(float);
+            alloc_size = uint(windows_size.width) / cell_size * uint(windows_size.height) / cell_size * sizeof(float);
             CudaSafeCall(
                 cudaHostAlloc(reinterpret_cast<void **>(&this->rot_labels_data), alloc_size, cudaHostAllocMapped));
             CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->rot_labels_data_d),
                                                   reinterpret_cast<void *>(this->rot_labels_data), 0));
-            this->rot_labels = cv::Mat(windows_size.height / cell_size, windows_size.width / cell_size, CV_32FC1,
+            this->rot_labels = cv::Mat(windows_size.height / int(cell_size), windows_size.width / int(cell_size), CV_32FC1,
                                        this->rot_labels_data);
         }
 
-        alloc_size = uint((windows_size.width / cell_size) * ((windows_size.height / cell_size) * num_of_feats)) *
+        alloc_size = (uint(windows_size.width) / cell_size * uint(windows_size.height) / cell_size * num_of_feats) *
                      sizeof(cufftReal);
         CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&this->data_features), alloc_size, cudaHostAllocMapped));
         CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->data_features_d),
                                               reinterpret_cast<void *>(this->data_features), 0));
-        this->fw_all = cv::Mat((windows_size.height / cell_size) * num_of_feats, windows_size.width / cell_size, CV_32F,
-                               this->data_features);
+        this->fw_all = cv::Mat((windows_size.height / int(cell_size)) * int(num_of_feats), windows_size.width / int(cell_size),
+                               CV_32F, this->data_features);
 #else
-        alloc_size = uint(num_of_scales);
+        alloc_size = num_of_scales;
 
         this->xf_sqr_norm = reinterpret_cast<float *>(malloc(alloc_size * sizeof(float)));
         this->yf_sqr_norm = reinterpret_cast<float *>(malloc(sizeof(float)));
 
-        this->patch_feats.reserve(uint(num_of_feats));
+        this->patch_feats.reserve(num_of_feats);
 
-        int height = windows_size.height / cell_size;
+        uint height = uint(windows_size.height) / cell_size;
 #ifdef FFTW
-        int width = (windows_size.width / cell_size) / 2 + 1;
+        uint width = (uint(windows_size.width) / cell_size) / 2 + 1;
 #else
         int width = windows_size.width / cell_size;
 #endif
 
-        this->ifft2_res = cv::Mat(height, windows_size.width / cell_size, CV_32FC(num_of_feats));
-        this->response = cv::Mat(height, windows_size.width / cell_size, CV_32FC(num_of_scales));
+        this->ifft2_res = cv::Mat(int(height), windows_size.width / int(cell_size), CV_32FC(int(num_of_feats)));
+        this->response = cv::Mat(int(height), windows_size.width / int(cell_size), CV_32FC(int(num_of_scales)));
 
         this->zf = ComplexMat(height, width, num_of_feats, num_of_scales);
         this->kzf = ComplexMat(height, width, num_of_scales);
         this->kf = ComplexMat(height, width, num_of_scales);
 #ifdef FFTW
         this->in_all =
-            cv::Mat((windows_size.height / cell_size) * num_of_scales, windows_size.width / cell_size, CV_32F);
+            cv::Mat((windows_size.height / int(cell_size)) * int(num_of_scales), windows_size.width / int(cell_size), CV_32F);
         this->fw_all =
-            cv::Mat((windows_size.height / cell_size) * num_of_feats, windows_size.width / cell_size, CV_32F);
+            cv::Mat((windows_size.height / int(cell_size)) * int(num_of_feats), windows_size.width / int(cell_size), CV_32F);
 #else
-        this->in_all = cv::Mat((windows_size.height / cell_size), windows_size.width / cell_size, CV_32F);
+        this->in_all = cv::Mat((windows_size.height / int(cell_size)), windows_size.width / int(cell_size), CV_32F);
 #endif
 #endif
 #if defined(FFTW) || defined(CUFFT)
         if (zero_index) {
-            model_xf->create(windows_size.height / cell_size, (windows_size.width / cell_size) / 2 + 1, num_of_feats);
-            yf->create(windows_size.height / cell_size, (windows_size.width / cell_size) / 2 + 1, 1);
+            model_xf->create(uint(windows_size.height) / cell_size, (uint(windows_size.width)/ cell_size) / 2 + 1, num_of_feats);
+            yf->create(uint(windows_size.height) / cell_size, (uint(windows_size.width)/ cell_size) / 2 + 1, 1);
             // We use scale_vars[0] for updating the tracker, so we only allocate memory for  its xf only.
 #ifdef CUFFT
-            this->xf.create(windows_size.height / cell_size, (windows_size.width / cell_size) / 2 + 1, num_of_feats,
+            this->xf.create(uint(windows_size.height) / cell_size, (uint(windows_size.width)/ cell_size) / 2 + 1, num_of_feats,
                             this->stream);
 #else
-            this->xf.create(windows_size.height / cell_size, (windows_size.width / cell_size) / 2 + 1, num_of_feats);
+            this->xf.create(uint(windows_size.height) / cell_size, (uint(windows_size.width)/ cell_size) / 2 + 1, num_of_feats);
 #endif
         } else if (num_of_scales > 1) {
             this->max_responses.reserve(uint(num_of_scales));
