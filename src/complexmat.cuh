@@ -73,12 +73,6 @@ class ComplexMat {
     int channels() { return n_channels; }
     int channels() const { return n_channels; }
 
-    void set_stream(cudaStream_t _stream)
-    {
-        stream = _stream;
-        return;
-    }
-
     void sqr_norm(float *result) const;
 
     ComplexMat sqr_mag() const;
