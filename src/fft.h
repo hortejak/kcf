@@ -12,8 +12,6 @@
     #include "complexmat.hpp"
 #endif
 
-struct Scale_vars;
-
 class Fft
 {
 public:
