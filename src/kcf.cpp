@@ -331,7 +331,7 @@ void KCF_Tracker::track(cv::Mat &img)
                     }
                 }
             } else {
-            NORMAL_OMP_CRITICAL
+                NORMAL_OMP_CRITICAL
                 {
                     if ((*it)->max_response > max_response) {
                         max_response = (*it)->max_response;
@@ -388,9 +388,10 @@ void KCF_Tracker::track(cv::Mat &img)
 
     //obtain a subwindow for training at newly estimated target position
     p_scale_vars.front()->patch_feats.clear();
-    get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size[0], p_windows_size[1], *p_scale_vars.front(), p_current_scale);
+    get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size[0], p_windows_size[1],
+                 *p_scale_vars.front(), p_current_scale);
     fft.forward_window(p_scale_vars.front()->patch_feats, p_scale_vars.front()->xf, p_scale_vars.front()->fw_all,
-                                               m_use_cuda ? p_scale_vars.front()->data_features_d : nullptr, p_scale_vars.front()->stream);
+                       m_use_cuda ? p_scale_vars.front()->data_features_d : nullptr, p_scale_vars.front()->stream);
 
     //subsequent frames, interpolate model
     p_model_xf = p_model_xf *float((1. - p_interp_factor)) + p_scale_vars.front()->xf * float(p_interp_factor);
@@ -430,21 +431,22 @@ void KCF_Tracker::scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & 
         vars.patch_feats.clear();
         BIG_BATCH_OMP_PARALLEL_FOR
         for (uint i = 0; i < uint(p_num_scales); ++i) {
-            get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size[0], this->p_windows_size[1],
-                                        vars, this->p_current_scale * this->p_scales[i]);
+            get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size[0],
+                         this->p_windows_size[1], vars, this->p_current_scale * this->p_scales[i]);
         }
     } else {
         vars.patch_feats.clear();
-        get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size[0], this->p_windows_size[1],
-                                    vars, this->p_current_scale * scale);
+        get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size[0],
+                     this->p_windows_size[1], vars, this->p_current_scale *scale);
     }
 
     fft.forward_window(vars.patch_feats, vars.zf, vars.fw_all, m_use_cuda ? vars.data_features_d : nullptr, vars.stream);
     DEBUG_PRINTM(vars.zf);
 
     if (m_use_linearkernel) {
-                vars.kzf = m_use_big_batch ? (vars.zf.mul2(this->p_model_alphaf)).sum_over_channels() : (p_model_alphaf * vars.zf).sum_over_channels();
-                fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch_d : nullptr, vars.stream);
+        vars.kzf = m_use_big_batch ? (vars.zf.mul2(this->p_model_alphaf)).sum_over_channels()
+                                   : (p_model_alphaf * vars.zf).sum_over_channels();
+        fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch_d : nullptr, vars.stream);
     } else {
 #if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
         gaussian_correlation(vars, vars.zf, vars.model_xf, this->p_kernel_sigma);
@@ -728,28 +730,31 @@ void KCF_Tracker::gaussian_correlation(struct Scale_vars & vars, const ComplexMa
     DEBUG_PRINTM(vars.xyf);
     fft.inverse(vars.xyf, vars.ifft2_res, m_use_cuda ? vars.data_i_features_d : nullptr, vars.stream);
 #ifdef CUFFT
-    if(auto_correlation)
+    if (auto_correlation)
         cuda_gaussian_correlation(vars.data_i_features, vars.gauss_corr_res_d, vars.xf_sqr_norm_d, vars.xf_sqr_norm_d,
-                                                                sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width, vars.stream);
+                                  sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width, vars.stream);
     else
         cuda_gaussian_correlation(vars.data_i_features, vars.gauss_corr_res_d, vars.xf_sqr_norm_d, vars.yf_sqr_norm_d,
-                                                                sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width, vars.stream);
+                                  sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width, vars.stream);
 #else
     //ifft2 and sum over 3rd dimension, we dont care about individual channels
     DEBUG_PRINTM(vars.ifft2_res);
     cv::Mat xy_sum;
-    if (xf.channels() != p_num_scales*p_num_of_feats)
+    if (xf.channels() != p_num_scales * p_num_of_feats)
         xy_sum.create(vars.ifft2_res.size(), CV_32FC1);
     else
         xy_sum.create(vars.ifft2_res.size(), CV_32FC(int(p_scales.size())));
     xy_sum.setTo(0);
     for (int y = 0; y < vars.ifft2_res.rows; ++y) {
-        float * row_ptr = vars.ifft2_res.ptr<float>(y);
-        float * row_ptr_sum = xy_sum.ptr<float>(y);
+        float *row_ptr = vars.ifft2_res.ptr<float>(y);
+        float *row_ptr_sum = xy_sum.ptr<float>(y);
         for (int x = 0; x < vars.ifft2_res.cols; ++x) {
             for (int sum_ch = 0; sum_ch < xy_sum.channels(); ++sum_ch) {
-                row_ptr_sum[(x*xy_sum.channels())+sum_ch] += std::accumulate(row_ptr + x*vars.ifft2_res.channels() + sum_ch*(vars.ifft2_res.channels()/xy_sum.channels()),
-                                                                                                                                                        (row_ptr + x*vars.ifft2_res.channels() + (sum_ch+1)*(vars.ifft2_res.channels()/xy_sum.channels())), 0.f);
+                row_ptr_sum[(x * xy_sum.channels()) + sum_ch] += std::accumulate(
+                    row_ptr + x * vars.ifft2_res.channels() + sum_ch * (vars.ifft2_res.channels() / xy_sum.channels()),
+                    (row_ptr + x * vars.ifft2_res.channels() +
+                     (sum_ch + 1) * (vars.ifft2_res.channels() / xy_sum.channels())),
+                    0.f);
             }
         }
     }
@@ -758,15 +763,19 @@ void KCF_Tracker::gaussian_correlation(struct Scale_vars & vars, const ComplexMa
     std::vector<cv::Mat> scales;
     cv::split(xy_sum,scales);
 
-    float numel_xf_inv = 1.f/(xf.cols * xf.rows * (xf.channels()/xf.n_scales));
-    for (uint i = 0; i < uint(xf.n_scales); ++i){
-        cv::Mat in_roi(vars.in_all, cv::Rect(0, int(i)*scales[0].rows, scales[0].cols, scales[0].rows));
-        cv::exp(- 1. / (sigma * sigma) * cv::max((double(vars.xf_sqr_norm[i] + vars.yf_sqr_norm[0]) - 2 * scales[i]) * double(numel_xf_inv), 0), in_roi);
+    float numel_xf_inv = 1.f / (xf.cols * xf.rows * (xf.channels() / xf.n_scales));
+    for (uint i = 0; i < uint(xf.n_scales); ++i) {
+        cv::Mat in_roi(vars.in_all, cv::Rect(0, int(i) * scales[0].rows, scales[0].cols, scales[0].rows));
+        cv::exp(
+            -1. / (sigma * sigma) *
+                cv::max((double(vars.xf_sqr_norm[i] + vars.yf_sqr_norm[0]) - 2 * scales[i]) * double(numel_xf_inv), 0),
+            in_roi);
         DEBUG_PRINTM(in_roi);
     }
 #endif
     DEBUG_PRINTM(vars.in_all);
-    fft.forward(vars.in_all, auto_correlation ? vars.kf : vars.kzf, m_use_cuda ? vars.gauss_corr_res_d : nullptr, vars.stream);
+    fft.forward(vars.in_all, auto_correlation ? vars.kf : vars.kzf, m_use_cuda ? vars.gauss_corr_res_d : nullptr,
+                vars.stream);
     return;
 }
 
@@ -865,9 +874,10 @@ double KCF_Tracker::sub_grid_scale(int index)
         std::advance(it2, index);
         auto it3 = p_scale_vars.begin();
         std::advance(it3, index+1);
-        fval = (cv::Mat_<float>(3, 1) << (m_use_big_batch ? p_scale_vars.back()->max_responses[uint(index)-1] : (*it1)->max_response),
-                                                                        (m_use_big_batch ? p_scale_vars.back()->max_responses[uint(index)] : (*it2)->max_response),
-                                                                        (m_use_big_batch ? p_scale_vars.back()->max_responses[uint(index)+1] : (*it3)->max_response));
+        fval = (cv::Mat_<float>(3, 1) << (m_use_big_batch ? p_scale_vars.back()->max_responses[uint(index) - 1]
+                                                          : (*it1)->max_response),
+                (m_use_big_batch ? p_scale_vars.back()->max_responses[uint(index)] : (*it2)->max_response),
+                (m_use_big_batch ? p_scale_vars.back()->max_responses[uint(index) + 1] : (*it3)->max_response));
     }
 
     cv::Mat x;
