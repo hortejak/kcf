@@ -124,8 +124,8 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     }
 
     // compute win size + fit to fhog cell size
-    p_windows_size[0] = int(round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size);
-    p_windows_size[1] = int(round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size);
+    p_windows_size.width = int(round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size);
+    p_windows_size.height = int(round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size);
 
     p_scales.clear();
     if (m_use_scale)
@@ -135,12 +135,12 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         p_scales.push_back(1.);
 
 #ifdef CUFFT
-    if (p_windows_size[1] / p_cell_size * (p_windows_size[0] / p_cell_size / 2 + 1) > 1024) {
+    if (p_windows_size.height / p_cell_size * (p_windows_size.width / p_cell_size / 2 + 1) > 1024) {
         std::cerr << "Window after forward FFT is too big for CUDA kernels. Plese use -f to set "
                      "the window dimensions so its size is less or equal to "
                   << 1024 * p_cell_size * p_cell_size * 2 + 1
-                  << " pixels . Currently the size of the window is: " << p_windows_size[0] << "x" << p_windows_size[1]
-                  << " which is  " << p_windows_size[0] * p_windows_size[1] << " pixels. " << std::endl;
+                  << " pixels . Currently the size of the window is: " << p_windows_size.width << "x" << p_windows_size.height
+                  << " which is  " << p_windows_size.width * p_windows_size.height << " pixels. " << std::endl;
         std::exit(EXIT_FAILURE);
     }
 
@@ -153,8 +153,8 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_num_of_feats = 31;
     if (m_use_color) p_num_of_feats += 3;
     if (m_use_cnfeat) p_num_of_feats += 10;
-    p_roi_width = p_windows_size[0] / p_cell_size;
-    p_roi_height = p_windows_size[1] / p_cell_size;
+    p_roi_width = p_windows_size.width / p_cell_size;
+    p_roi_height = p_windows_size.height / p_cell_size;
 
     int max = m_use_big_batch ? 2 : p_num_scales;
     for (int i = 0; i < max; ++i) {
@@ -171,32 +171,32 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 
     p_current_scale = 1.;
 
-    double min_size_ratio = std::max(5. * p_cell_size / p_windows_size[0], 5. * p_cell_size / p_windows_size[1]);
+    double min_size_ratio = std::max(5. * p_cell_size / p_windows_size.width, 5. * p_cell_size / p_windows_size.height);
     double max_size_ratio =
-        std::min(floor((img.cols + p_windows_size[0] / 3) / p_cell_size) * p_cell_size / p_windows_size[0],
-                 floor((img.rows + p_windows_size[1] / 3) / p_cell_size) * p_cell_size / p_windows_size[1]);
+        std::min(floor((img.cols + p_windows_size.width / 3) / p_cell_size) * p_cell_size / p_windows_size.width,
+                 floor((img.rows + p_windows_size.height / 3) / p_cell_size) * p_cell_size / p_windows_size.height);
     p_min_max_scale[0] = std::pow(p_scale_step, std::ceil(std::log(min_size_ratio) / log(p_scale_step)));
     p_min_max_scale[1] = std::pow(p_scale_step, std::floor(std::log(max_size_ratio) / log(p_scale_step)));
 
     std::cout << "init: img size " << img.cols << " " << img.rows << std::endl;
-    std::cout << "init: win size. " << p_windows_size[0] << " " << p_windows_size[1] << std::endl;
+    std::cout << "init: win size. " << p_windows_size.width << " " << p_windows_size.height << std::endl;
     std::cout << "init: min max scales factors: " << p_min_max_scale[0] << " " << p_min_max_scale[1] << std::endl;
 
     p_output_sigma = std::sqrt(p_pose.w * p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
 
-    fft.init(uint(p_windows_size[0] / p_cell_size), uint(p_windows_size[1] / p_cell_size), uint(p_num_of_feats),
+    fft.init(uint(p_windows_size.width / p_cell_size), uint(p_windows_size.height / p_cell_size), uint(p_num_of_feats),
              uint(p_num_scales), m_use_big_batch);
-    fft.set_window(cosine_window_function(p_windows_size[0] / p_cell_size, p_windows_size[1] / p_cell_size));
+    fft.set_window(cosine_window_function(p_windows_size.width / p_cell_size, p_windows_size.height / p_cell_size));
 
     // window weights, i.e. labels
     fft.forward(
-        gaussian_shaped_labels(p_output_sigma, p_windows_size[0] / p_cell_size, p_windows_size[1] / p_cell_size), p_yf,
+        gaussian_shaped_labels(p_output_sigma, p_windows_size.width / p_cell_size, p_windows_size.height / p_cell_size), p_yf,
         m_use_cuda ? p_scale_vars.front()->rot_labels_data_d : nullptr, p_scale_vars.front()->stream);
     DEBUG_PRINTM(p_yf);
 
     // obtain a sub-window for training initial model
     p_scale_vars.front()->patch_feats.clear();
-    get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size[0], p_windows_size[1],
+    get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size.width, p_windows_size.height,
                  *p_scale_vars.front());
     fft.forward_window(p_scale_vars.front()->patch_feats, p_model_xf, p_scale_vars.front()->fw_all,
                        m_use_cuda ? p_scale_vars.front()->data_features_d : nullptr, p_scale_vars.front()->stream);
@@ -399,7 +399,7 @@ void KCF_Tracker::track(cv::Mat &img)
 
     // obtain a subwindow for training at newly estimated target position
     p_scale_vars.front()->patch_feats.clear();
-    get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size[0], p_windows_size[1],
+    get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size.width, p_windows_size.height,
                  *p_scale_vars.front(), p_current_scale);
     fft.forward_window(p_scale_vars.front()->patch_feats, p_scale_vars.front()->xf, p_scale_vars.front()->fw_all,
                        m_use_cuda ? p_scale_vars.front()->data_features_d : nullptr, p_scale_vars.front()->stream);
@@ -443,13 +443,13 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
         vars.patch_feats.clear();
         BIG_BATCH_OMP_PARALLEL_FOR
         for (uint i = 0; i < uint(p_num_scales); ++i) {
-            get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size[0],
-                         this->p_windows_size[1], vars, this->p_current_scale * this->p_scales[i]);
+            get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size.width,
+                         this->p_windows_size.height, vars, this->p_current_scale * this->p_scales[i]);
         }
     } else {
         vars.patch_feats.clear();
-        get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size[0],
-                     this->p_windows_size[1], vars, this->p_current_scale *scale);
+        get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size.width,
+                     this->p_windows_size.height, vars, this->p_current_scale *scale);
     }
 
     fft.forward_window(vars.patch_feats, vars.zf, vars.fw_all, m_use_cuda ? vars.data_features_d : nullptr,

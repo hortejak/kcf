@@ -119,7 +119,7 @@ private:
     double p_lambda = 1e-4;         //regularization in learning step
     double p_interp_factor = 0.02;  //def = 0.02, linear interpolation factor for adaptation
     int p_cell_size = 4;            //4 for hog (= bin_size)
-    int p_windows_size[2];
+    cv::Size p_windows_size;
     int p_num_scales {7};
     double p_scale_step = 1.02;
     double p_current_scale = 1.;
