@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-set(KCF_LIB_SRC kcf.cpp kcf.h fft.cpp scale_vars.hpp pragmas.h)
+set(KCF_LIB_SRC kcf.cpp kcf.h fft.cpp threadctx.hpp pragmas.h)
 
 find_package(PkgConfig)
 

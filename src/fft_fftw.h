@@ -14,8 +14,6 @@
   #include <cufftw.h>
 #endif //CUFFTW
 
-struct Scale_vars;
-
 class Fftw : public Fft
 {
 public:

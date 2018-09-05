@@ -17,7 +17,7 @@
 
 #include "cnfeat.hpp"
 #include "fft.h"
-#include "scale_vars.hpp"
+#include "threadctx.hpp"
 #include "pragmas.h"
 
 struct BBox_c
@@ -130,7 +130,7 @@ private:
     int p_num_of_feats;
     int p_roi_height, p_roi_width;
 
-    std::list<std::unique_ptr<Scale_vars>> p_scale_vars;
+    std::list<std::unique_ptr<ThreadCtx>> p_scale_vars;
 
     //model
     ComplexMat p_yf;
@@ -139,13 +139,13 @@ private:
     ComplexMat p_model_alphaf_den;
     ComplexMat p_model_xf;
     //helping functions
-    void scale_track(Scale_vars & vars, cv::Mat & input_rgb, cv::Mat & input_gray, double scale);
+    void scale_track(ThreadCtx & vars, cv::Mat & input_rgb, cv::Mat & input_gray, double scale);
     cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y);
     cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);
-    void gaussian_correlation(struct Scale_vars &vars, const ComplexMat & xf, const ComplexMat & yf, double sigma, bool auto_correlation = false);
+    void gaussian_correlation(struct ThreadCtx &vars, const ComplexMat & xf, const ComplexMat & yf, double sigma, bool auto_correlation = false);
     cv::Mat circshift(const cv::Mat & patch, int x_rot, int y_rot);
     cv::Mat cosine_window_function(int dim1, int dim2);
-    void get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx, int cy, int size_x, int size_y, Scale_vars & vars, double scale = 1.);
+    void get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx, int cy, int size_x, int size_y, ThreadCtx & vars, double scale = 1.);
     cv::Point2f sub_pixel_peak(cv::Point & max_loc, cv::Mat & response);
     double sub_grid_scale(int index = -1);
 

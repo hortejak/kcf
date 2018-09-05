@@ -13,9 +13,9 @@ typedef int *cudaStream_t;
 #endif
 #endif
 
-struct Scale_vars {
+struct ThreadCtx {
   public:
-    Scale_vars(int windows_size[2], int cell_size, int num_of_feats, int num_of_scales = 1,
+    ThreadCtx(int windows_size[2], int cell_size, int num_of_feats, int num_of_scales = 1,
                ComplexMat *model_xf = nullptr, ComplexMat *yf = nullptr, bool zero_index = false)
     {
         uint alloc_size;
@@ -142,7 +142,7 @@ struct Scale_vars {
 #endif
     }
 
-    ~Scale_vars()
+    ~ThreadCtx()
     {
 #ifdef CUFFT
         CudaSafeCall(cudaFreeHost(this->xf_sqr_norm));

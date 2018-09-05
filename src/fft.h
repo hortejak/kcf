@@ -4,7 +4,7 @@
 
 #include <opencv2/opencv.hpp>
 #include <vector>
-#include "scale_vars.hpp"
+#include "threadctx.hpp"
 
 #ifdef CUFFT
     #include "complexmat.cuh"

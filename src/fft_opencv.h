@@ -4,8 +4,6 @@
 
 #include "fft.h"
 
-struct Scale_vars;
-
 class FftOpencv : public Fft
 {
 public:

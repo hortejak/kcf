@@ -160,12 +160,12 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     for (int i = 0; i < max; ++i) {
         if (i == 0) {
             p_scale_vars.emplace_back(
-                new Scale_vars(p_windows_size, p_cell_size, p_num_of_feats, 1, &p_model_xf, &p_yf, true));
+                new ThreadCtx(p_windows_size, p_cell_size, p_num_of_feats, 1, &p_model_xf, &p_yf, true));
         } else if (m_use_big_batch) {
             p_scale_vars.emplace_back(
-                new Scale_vars(p_windows_size, p_cell_size, p_num_of_feats * p_num_scales, p_num_scales));
+                new ThreadCtx(p_windows_size, p_cell_size, p_num_of_feats * p_num_scales, p_num_scales));
         } else {
-            p_scale_vars.emplace_back(new Scale_vars(p_windows_size, p_cell_size, p_num_of_feats, 1));
+            p_scale_vars.emplace_back(new ThreadCtx(p_windows_size, p_cell_size, p_num_of_feats, 1));
         }
     }
 
@@ -437,7 +437,7 @@ void KCF_Tracker::track(cv::Mat &img)
 #endif
 }
 
-void KCF_Tracker::scale_track(Scale_vars &vars, cv::Mat &input_rgb, cv::Mat &input_gray, double scale)
+void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray, double scale)
 {
     if (m_use_big_batch) {
         vars.patch_feats.clear();
@@ -507,7 +507,7 @@ void KCF_Tracker::scale_track(Scale_vars &vars, cv::Mat &input_rgb, cv::Mat &inp
 // ****************************************************************************
 
 void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, int cy, int size_x, int size_y,
-                               Scale_vars &vars, double scale)
+                               ThreadCtx &vars, double scale)
 {
     int size_x_scaled = int(floor(size_x * scale));
     int size_y_scaled = int(floor(size_y * scale));
@@ -728,7 +728,7 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     return patch;
 }
 
-void KCF_Tracker::gaussian_correlation(struct Scale_vars &vars, const ComplexMat &xf, const ComplexMat &yf,
+void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat &xf, const ComplexMat &yf,
                                        double sigma, bool auto_correlation)
 {
 #ifdef CUFFT

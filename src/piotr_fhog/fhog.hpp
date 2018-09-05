@@ -11,10 +11,8 @@
 #include <opencv2/opencv.hpp>
 
 #include "gradientMex.h"
-#include "scale_vars.hpp"
+#include "threadctx.hpp"
 #include "pragmas.h"
-
-struct Scale_vars;
 
 class FHoG
 {
@@ -22,7 +20,7 @@ public:
     //description: extract hist. of gradients(use_hog == 0), hog(use_hog == 1) or fhog(use_hog == 2)
     //input: float one channel image as input, hog type
     //return: computed descriptor
-    static void extract(const cv::Mat & img, Scale_vars & vars,int use_hog = 2, int bin_size = 4, int n_orients = 9, int soft_bin = -1, float clip = 0.2)
+    static void extract(const cv::Mat & img, ThreadCtx & vars,int use_hog = 2, int bin_size = 4, int n_orients = 9, int soft_bin = -1, float clip = 0.2)
     {
         // d image dimension -> gray image d = 1
         // h, w -> height, width of image
