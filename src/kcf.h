@@ -18,6 +18,7 @@
 #include "cnfeat.hpp"
 #include "fft.h"
 #include "scale_vars.hpp"
+#include "pragmas.h"
 
 struct BBox_c
 {

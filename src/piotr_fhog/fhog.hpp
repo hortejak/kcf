@@ -12,6 +12,7 @@
 
 #include "gradientMex.h"
 #include "scale_vars.hpp"
+#include "pragmas.h"
 
 struct Scale_vars;
 
