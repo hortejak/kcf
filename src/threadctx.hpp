@@ -29,7 +29,7 @@ struct ThreadCtx {
 #endif
 
         this->patch_feats.reserve(uint(num_of_feats));
-
+// Size of cufftReal == float
         uint cells_size =
             ((uint(windows_size.width) / cell_size) * (uint(windows_size.height) / cell_size)) * sizeof(float);
 
@@ -72,7 +72,6 @@ struct ThreadCtx {
                                windows_size.width / int(cell_size), CV_32F, this->gauss_corr_res);
 
         if (zero_index) {
-            cells_size = uint(windows_size.width) / cell_size * uint(windows_size.height) / cell_size * sizeof(float);
             CudaSafeCall(
                 cudaHostAlloc(reinterpret_cast<void **>(&this->rot_labels_data), cells_size, cudaHostAllocMapped));
             CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->rot_labels_data_d),
@@ -81,7 +80,7 @@ struct ThreadCtx {
                                        CV_32FC1, this->rot_labels_data);
         }
 
-        CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&this->data_features), cells_size, cudaHostAllocMapped));
+        CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&this->data_features), cells_size*num_of_feats, cudaHostAllocMapped));
         CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->data_features_d),
                                               reinterpret_cast<void *>(this->data_features), 0));
         this->fw_all = cv::Mat((windows_size.height / int(cell_size)) * int(num_of_feats),
