@@ -74,10 +74,6 @@ FIND_PACKAGE( OpenCV REQUIRED )
 IF(use_cuda)
   find_package(CUDA REQUIRED)
 
-  if (NOT ${OpenCV_USE_CUFFT})
-    message(SEND_ERROR "OpenCV was not built with cuFFT")
-  endif()
-
   include_directories ( ${CUDA_INCLUDE_DIRS} )
   set(CUDA_SEPARABLE_COMPILATION ON)
   set(CUDA_PROPAGATE_HOST_FLAGS OFF)
