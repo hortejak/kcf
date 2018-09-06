@@ -1,6 +1,9 @@
-
 #ifndef FFT_CUDA_H
 #define FFT_CUDA_H
+
+
+#include <cufft.h>
+#include <cuda_runtime.h>
 
 #include "fft.h"
 #include "cuda/cuda_error_check.cuh"
@@ -13,9 +16,6 @@
   #include "opencv2/opencv.hpp"
   #define CUDA cv::cuda
 #endif
-
-#include <cufft.h>
-#include <cuda_runtime.h>
 
 struct ThreadCtx;
 

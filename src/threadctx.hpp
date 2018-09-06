@@ -1,6 +1,8 @@
 #ifndef SCALE_VARS_HPP
 #define SCALE_VARS_HPP
 
+#include "dynmem.hpp"
+
 #ifdef CUFFT
 #include "complexmat.cuh"
 #else
@@ -8,8 +10,6 @@
 #ifndef CUFFTW
 // For compatibility reasons between CuFFT and FFTW, OpenCVfft versions.
 typedef int *cudaStream_t;
-#else
-#include "cuda_runtime.h"
 #endif
 #endif
 
@@ -29,24 +29,17 @@ struct ThreadCtx {
 #endif
 
         this->patch_feats.reserve(uint(num_of_feats));
-// Size of cufftReal == float
+        // Size of cufftReal == float
         uint cells_size =
             ((uint(windows_size.width) / cell_size) * (uint(windows_size.height) / cell_size)) * sizeof(float);
 
-        CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&this->data_i_1ch), cells_size * num_of_scales,
-                                   cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->data_i_1ch_d),
-                                              reinterpret_cast<void *>(this->data_i_1ch), 0));
-
-        CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&this->data_i_features), cells_size * num_of_feats,
-                                   cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->data_i_features_d),
-                                              reinterpret_cast<void *>(this->data_i_features), 0));
+        this->data_i_1ch = DynMem(cells_size * num_of_scales);
+        this->data_i_features = DynMem(cells_size * num_of_feats);
 
         this->ifft2_res = cv::Mat(windows_size.height / int(cell_size), windows_size.width / int(cell_size),
-                                  CV_32FC(int(num_of_feats)), this->data_i_features);
+                                  CV_32FC(int(num_of_feats)), this->data_i_features.hostMem());
         this->response = cv::Mat(windows_size.height / int(cell_size), windows_size.width / int(cell_size),
-                                 CV_32FC(int(num_of_scales)), this->data_i_1ch);
+                                 CV_32FC(int(num_of_scales)), this->data_i_1ch.hostMem());
 
         this->zf.create(uint(windows_size.height) / cell_size, (uint(windows_size.width) / cell_size) / 2 + 1,
                         num_of_feats, num_of_scales, this->stream);
@@ -55,40 +48,26 @@ struct ThreadCtx {
         this->kf.create(uint(windows_size.height) / cell_size, (uint(windows_size.width) / cell_size) / 2 + 1,
                         num_of_scales, this->stream);
 
-        CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&this->xf_sqr_norm), num_of_scales * sizeof(float),
-                                   cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->xf_sqr_norm_d),
-                                              reinterpret_cast<void *>(this->xf_sqr_norm), 0));
+        this->xf_sqr_norm = DynMem(num_of_scales * sizeof(float));
+        this->yf_sqr_norm = DynMem(sizeof(float));
 
-        CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&this->yf_sqr_norm), sizeof(float), cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->yf_sqr_norm_d),
-                                              reinterpret_cast<void *>(this->yf_sqr_norm), 0));
-
-        CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&this->gauss_corr_res), cells_size * num_of_scales,
-                                   cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->gauss_corr_res_d),
-                                              reinterpret_cast<void *>(this->gauss_corr_res), 0));
+        this->gauss_corr_res = DynMem(cells_size * num_of_scales);
         this->in_all = cv::Mat(windows_size.height / int(cell_size) * int(num_of_scales),
-                               windows_size.width / int(cell_size), CV_32F, this->gauss_corr_res);
+                               windows_size.width / int(cell_size), CV_32F, this->gauss_corr_res.hostMem());
 
         if (zero_index) {
-            CudaSafeCall(
-                cudaHostAlloc(reinterpret_cast<void **>(&this->rot_labels_data), cells_size, cudaHostAllocMapped));
-            CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->rot_labels_data_d),
-                                                  reinterpret_cast<void *>(this->rot_labels_data), 0));
+            this->rot_labels_data = DynMem(cells_size);
             this->rot_labels = cv::Mat(windows_size.height / int(cell_size), windows_size.width / int(cell_size),
-                                       CV_32FC1, this->rot_labels_data);
+                                       CV_32FC1, this->rot_labels_data.hostMem());
         }
 
-        CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&this->data_features), cells_size*num_of_feats, cudaHostAllocMapped));
-        CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&this->data_features_d),
-                                              reinterpret_cast<void *>(this->data_features), 0));
+        this->data_features = DynMem(cells_size * num_of_feats);
         this->fw_all = cv::Mat((windows_size.height / int(cell_size)) * int(num_of_feats),
-                               windows_size.width / int(cell_size), CV_32F, this->data_features);
+                               windows_size.width / int(cell_size), CV_32F, this->data_features.hostMem());
 #else
 
-        this->xf_sqr_norm = reinterpret_cast<float *>(malloc(num_of_scales * sizeof(float)));
-        this->yf_sqr_norm = reinterpret_cast<float *>(malloc(sizeof(float)));
+        this->xf_sqr_norm = DynMem(num_of_scales * sizeof(float));
+        this->yf_sqr_norm = DynMem(sizeof (float));
 
         this->patch_feats.reserve(num_of_feats);
 
@@ -143,24 +122,12 @@ struct ThreadCtx {
 
     ~ThreadCtx()
     {
-#ifdef CUFFT
-        CudaSafeCall(cudaFreeHost(this->xf_sqr_norm));
-        CudaSafeCall(cudaFreeHost(this->yf_sqr_norm));
-        CudaSafeCall(cudaFreeHost(this->data_i_1ch));
-        CudaSafeCall(cudaFreeHost(this->data_i_features));
-        CudaSafeCall(cudaFreeHost(this->gauss_corr_res));
-        if (zero_index) CudaSafeCall(cudaFreeHost(this->rot_labels_data));
-        CudaSafeCall(cudaFreeHost(this->data_features));
-#if defined(ASYNC) || defined(OPENMP)
+#if defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
         CudaSafeCall(cudaStreamDestroy(this->stream));
-#endif
-#else
-        free(this->xf_sqr_norm);
-        free(this->yf_sqr_norm);
 #endif
     }
 
-    float *xf_sqr_norm = nullptr, *yf_sqr_norm = nullptr;
+    DynMem xf_sqr_norm, yf_sqr_norm;
     std::vector<cv::Mat> patch_feats;
 
     cv::Mat in_all, fw_all, ifft2_res, response;
@@ -168,11 +135,7 @@ struct ThreadCtx {
 
     // CuFFT variables
     cv::Mat rot_labels;
-    float *xf_sqr_norm_d = nullptr, *yf_sqr_norm_d = nullptr, *gauss_corr_res = nullptr, *gauss_corr_res_d = nullptr,
-          *rot_labels_data = nullptr, *rot_labels_data_d = nullptr, *data_features = nullptr,
-          *data_features_d = nullptr;
-    float *data_f = nullptr, *data_i_features = nullptr, *data_i_features_d = nullptr, *data_i_1ch = nullptr,
-          *data_i_1ch_d = nullptr;
+    DynMem gauss_corr_res, rot_labels_data, data_features, data_f, data_i_features, data_i_1ch;
 
     cudaStream_t stream = nullptr;
     ComplexMat model_alphaf, model_xf;
