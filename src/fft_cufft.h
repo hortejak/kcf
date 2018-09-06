@@ -9,14 +9,6 @@
 #include "cuda/cuda_error_check.cuh"
 #include "pragmas.h"
 
-#if CV_MAJOR_VERSION == 2
-  #include <opencv2/gpu/gpu.hpp>
-  #define CUDA cv::gpu
-#else
-  #include "opencv2/opencv.hpp"
-  #define CUDA cv::cuda
-#endif
-
 struct ThreadCtx;
 
 class cuFFT : public Fft
