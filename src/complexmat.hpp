@@ -27,7 +27,10 @@ template <typename T> class ComplexMat_ {
     }
 
     // assuming that mat has 2 channels (real, img)
-    ComplexMat_(const cv::Mat &mat) : cols(uint(mat.cols)), rows(uint(mat.rows)), n_channels(1) { p_data = convert(mat); }
+    ComplexMat_(const cv::Mat &mat) : cols(uint(mat.cols)), rows(uint(mat.rows)), n_channels(1)
+    {
+        p_data = convert(mat);
+    }
 
     void create(uint _rows, uint _cols, uint _n_channels)
     {

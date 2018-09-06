@@ -191,7 +191,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     // window weights, i.e. labels
     fft.forward(
         gaussian_shaped_labels(p_output_sigma, p_windows_size.width / p_cell_size, p_windows_size.height / p_cell_size), p_yf,
-        m_use_cuda ? p_scale_vars.front()->rot_labels_data_d : nullptr, p_scale_vars.front()->stream);
+        m_use_cuda ? p_scale_vars.front()->rot_labels_data.deviceMem() : nullptr, p_scale_vars.front()->stream);
     DEBUG_PRINTM(p_yf);
 
     // obtain a sub-window for training initial model
@@ -199,7 +199,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size.width, p_windows_size.height,
                  *p_scale_vars.front());
     fft.forward_window(p_scale_vars.front()->patch_feats, p_model_xf, p_scale_vars.front()->fw_all,
-                       m_use_cuda ? p_scale_vars.front()->data_features_d : nullptr, p_scale_vars.front()->stream);
+                       m_use_cuda ? p_scale_vars.front()->data_features.deviceMem() : nullptr, p_scale_vars.front()->stream);
     DEBUG_PRINTM(p_model_xf);
 #if defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
     p_scale_vars.front()->model_xf = p_model_xf;
@@ -402,7 +402,7 @@ void KCF_Tracker::track(cv::Mat &img)
     get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size.width, p_windows_size.height,
                  *p_scale_vars.front(), p_current_scale);
     fft.forward_window(p_scale_vars.front()->patch_feats, p_scale_vars.front()->xf, p_scale_vars.front()->fw_all,
-                       m_use_cuda ? p_scale_vars.front()->data_features_d : nullptr, p_scale_vars.front()->stream);
+                       m_use_cuda ? p_scale_vars.front()->data_features.deviceMem() : nullptr, p_scale_vars.front()->stream);
 
     // subsequent frames, interpolate model
     p_model_xf = p_model_xf * float((1. - p_interp_factor)) + p_scale_vars.front()->xf * float(p_interp_factor);
@@ -452,14 +452,14 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
                      this->p_windows_size.height, vars, this->p_current_scale *scale);
     }
 
-    fft.forward_window(vars.patch_feats, vars.zf, vars.fw_all, m_use_cuda ? vars.data_features_d : nullptr,
+    fft.forward_window(vars.patch_feats, vars.zf, vars.fw_all, m_use_cuda ? vars.data_features.deviceMem() : nullptr,
                        vars.stream);
     DEBUG_PRINTM(vars.zf);
 
     if (m_use_linearkernel) {
         vars.kzf = m_use_big_batch ? (vars.zf.mul2(this->p_model_alphaf)).sum_over_channels()
                                    : (p_model_alphaf * vars.zf).sum_over_channels();
-        fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch_d : nullptr, vars.stream);
+        fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch.deviceMem() : nullptr, vars.stream);
     } else {
 #if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
         gaussian_correlation(vars, vars.zf, vars.model_xf, this->p_kernel_sigma);
@@ -470,7 +470,7 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
         DEBUG_PRINTM(vars.kzf);
         vars.kzf = m_use_big_batch ? vars.kzf.mul(this->p_model_alphaf) : this->p_model_alphaf * vars.kzf;
 #endif
-        fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch_d : nullptr, vars.stream);
+        fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch.deviceMem() : nullptr, vars.stream);
     }
 
     DEBUG_PRINTM(vars.response);
@@ -732,25 +732,25 @@ void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat 
                                        double sigma, bool auto_correlation)
 {
 #ifdef CUFFT
-    xf.sqr_norm(vars.xf_sqr_norm_d);
-    if (!auto_correlation) yf.sqr_norm(vars.yf_sqr_norm_d);
+    xf.sqr_norm(vars.xf_sqr_norm.deviceMem());
+    if (!auto_correlation) yf.sqr_norm(vars.yf_sqr_norm.deviceMem());
 #else
-    xf.sqr_norm(vars.xf_sqr_norm);
+    xf.sqr_norm(vars.xf_sqr_norm.hostMem());
     if (auto_correlation) {
-        vars.yf_sqr_norm[0] = vars.xf_sqr_norm[0];
+        vars.yf_sqr_norm.hostMem()[0] = vars.xf_sqr_norm.hostMem()[0];
     } else {
-        yf.sqr_norm(vars.yf_sqr_norm);
+        yf.sqr_norm(vars.yf_sqr_norm.hostMem());
     }
 #endif
     vars.xyf = auto_correlation ? xf.sqr_mag() : xf.mul2(yf.conj());
     DEBUG_PRINTM(vars.xyf);
-    fft.inverse(vars.xyf, vars.ifft2_res, m_use_cuda ? vars.data_i_features_d : nullptr, vars.stream);
+    fft.inverse(vars.xyf, vars.ifft2_res, m_use_cuda ? vars.data_i_features.deviceMem() : nullptr, vars.stream);
 #ifdef CUFFT
     if (auto_correlation)
-        cuda_gaussian_correlation(vars.data_i_features, vars.gauss_corr_res_d, vars.xf_sqr_norm_d, vars.xf_sqr_norm_d,
+        cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(), vars.xf_sqr_norm.deviceMem(), vars.xf_sqr_norm.deviceMem(),
                                   sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width, vars.stream);
     else
-        cuda_gaussian_correlation(vars.data_i_features, vars.gauss_corr_res_d, vars.xf_sqr_norm_d, vars.yf_sqr_norm_d,
+        cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(), vars.xf_sqr_norm.deviceMem(), vars.yf_sqr_norm.deviceMem(),
                                   sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width, vars.stream);
 #else
     // ifft2 and sum over 3rd dimension, we dont care about individual channels
@@ -784,13 +784,13 @@ void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat 
         cv::Mat in_roi(vars.in_all, cv::Rect(0, int(i) * scales[0].rows, scales[0].cols, scales[0].rows));
         cv::exp(
             -1. / (sigma * sigma) *
-                cv::max((double(vars.xf_sqr_norm[i] + vars.yf_sqr_norm[0]) - 2 * scales[i]) * double(numel_xf_inv), 0),
+                cv::max((double(vars.xf_sqr_norm.hostMem()[i] + vars.yf_sqr_norm.hostMem()[0]) - 2 * scales[i]) * double(numel_xf_inv), 0),
             in_roi);
         DEBUG_PRINTM(in_roi);
     }
 #endif
     DEBUG_PRINTM(vars.in_all);
-    fft.forward(vars.in_all, auto_correlation ? vars.kf : vars.kzf, m_use_cuda ? vars.gauss_corr_res_d : nullptr,
+    fft.forward(vars.in_all, auto_correlation ? vars.kf : vars.kzf, m_use_cuda ? vars.gauss_corr_res.deviceMem() : nullptr,
                 vars.stream);
     return;
 }
