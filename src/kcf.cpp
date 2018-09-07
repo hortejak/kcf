@@ -127,6 +127,12 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_windows_size.width = int(round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size);
     p_windows_size.height = int(round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size);
 
+    p_num_of_feats = 31;
+    if (m_use_color) p_num_of_feats += 3;
+    if (m_use_cnfeat) p_num_of_feats += 10;
+    p_roi_width = p_windows_size.width / p_cell_size;
+    p_roi_height = p_windows_size.height / p_cell_size;
+
     p_scales.clear();
     if (m_use_scale)
         for (int i = -p_num_scales / 2; i <= p_num_scales / 2; ++i)
@@ -148,20 +154,33 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         std::cerr << "cuFFT supports only Gaussian kernel." << std::endl;
         std::exit(EXIT_FAILURE);
     }
+    CudaSafeCall(cudaSetDeviceFlags(cudaDeviceMapHost));
+    p_xf.create(uint(p_windows_size.height) / p_cell_size, (uint(p_windows_size.width) / p_cell_size) / 2 + 1, p_num_of_feats, this->stream);
+    p_rot_labels_data = DynMem(
+        ((uint(p_windows_size.width) / p_cell_size) * (uint(p_windows_size.height) / p_cell_size)) * sizeof(float));
+    p_rot_labels = cv::Mat(p_windows_size.height / int(p_cell_size), windows_size.width / int(p_cell_size), CV_32FC1,
+                           p_rot_labels_data.hostMem());
+#else
+    p_xf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.height / p_cell_size)) / 2 + 1,
+                p_num_of_feats);
 #endif
 
-    p_num_of_feats = 31;
-    if (m_use_color) p_num_of_feats += 3;
-    if (m_use_cnfeat) p_num_of_feats += 10;
-    p_roi_width = p_windows_size.width / p_cell_size;
-    p_roi_height = p_windows_size.height / p_cell_size;
+#if defined(CUFFT) || defined(FFTW)
+    p_model_xf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.width / p_cell_size)) / 2 + 1,
+                      uint(p_num_of_feats));
+    p_yf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.width / p_cell_size)) / 2 + 1, 1);
+    p_xf.create(uint(p_windows_size.height) / p_cell_size, (uint(p_windows_size.width) / p_cell_size) / 2 + 1,
+                p_num_of_feats);
+#else
+    p_model_xf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.width / p_cell_size)),
+                      uint(p_num_of_feats));
+    p_yf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.width / p_cell_size)), 1);
+    p_xf.create(uint(p_windows_size.height) / p_cell_size, (uint(p_windows_size.width) / p_cell_size), p_num_of_feats);
+#endif
 
     int max = m_use_big_batch ? 2 : p_num_scales;
     for (int i = 0; i < max; ++i) {
-        if (i == 0) {
-            p_scale_vars.emplace_back(
-                new ThreadCtx(p_windows_size, p_cell_size, p_num_of_feats, 1, &p_model_xf, &p_yf, true));
-        } else if (m_use_big_batch) {
+        if (m_use_big_batch && i == 1) {
             p_scale_vars.emplace_back(
                 new ThreadCtx(p_windows_size, p_cell_size, p_num_of_feats * p_num_scales, p_num_scales));
         } else {
@@ -191,7 +210,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     // window weights, i.e. labels
     fft.forward(
         gaussian_shaped_labels(p_output_sigma, p_windows_size.width / p_cell_size, p_windows_size.height / p_cell_size), p_yf,
-        m_use_cuda ? p_scale_vars.front()->rot_labels_data.deviceMem() : nullptr, p_scale_vars.front()->stream);
+        m_use_cuda ? p_rot_labels_data.deviceMem() : nullptr, p_scale_vars.front()->stream);
     DEBUG_PRINTM(p_yf);
 
     // obtain a sub-window for training initial model
@@ -206,6 +225,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_scale_vars.front()->model_xf.set_stream(p_scale_vars.front()->stream);
     p_yf.set_stream(p_scale_vars.front()->stream);
     p_model_xf.set_stream(p_scale_vars.front()->stream);
+    p_xf.set_stream(p_scale_vars.front()->stream);
 #endif
 
     if (m_use_linearkernel) {
@@ -401,21 +421,21 @@ void KCF_Tracker::track(cv::Mat &img)
     p_scale_vars.front()->patch_feats.clear();
     get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size.width, p_windows_size.height,
                  *p_scale_vars.front(), p_current_scale);
-    fft.forward_window(p_scale_vars.front()->patch_feats, p_scale_vars.front()->xf, p_scale_vars.front()->fw_all,
+    fft.forward_window(p_scale_vars.front()->patch_feats, p_xf, p_scale_vars.front()->fw_all,
                        m_use_cuda ? p_scale_vars.front()->data_features.deviceMem() : nullptr, p_scale_vars.front()->stream);
 
     // subsequent frames, interpolate model
-    p_model_xf = p_model_xf * float((1. - p_interp_factor)) + p_scale_vars.front()->xf * float(p_interp_factor);
+    p_model_xf = p_model_xf * float((1. - p_interp_factor)) + p_xf * float(p_interp_factor);
 
     ComplexMat alphaf_num, alphaf_den;
 
     if (m_use_linearkernel) {
-        ComplexMat xfconj = p_scale_vars.front()->xf.conj();
+        ComplexMat xfconj = p_xf.conj();
         alphaf_num = xfconj.mul(p_yf);
-        alphaf_den = (p_scale_vars.front()->xf * xfconj);
+        alphaf_den = (p_xf * xfconj);
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
-        gaussian_correlation(*p_scale_vars.front(), p_scale_vars.front()->xf, p_scale_vars.front()->xf, p_kernel_sigma,
+        gaussian_correlation(*p_scale_vars.front(), p_xf, p_xf, p_kernel_sigma,
                              true);
         //        ComplexMat alphaf = p_yf / (kf + p_lambda); //equation for fast training
         //        p_model_alphaf = p_model_alphaf * (1. - p_interp_factor) + alphaf * p_interp_factor;
@@ -580,9 +600,9 @@ cv::Mat KCF_Tracker::gaussian_shaped_labels(double sigma, int dim1, int dim2)
     // rotate so that 1 is at top-left corner (see KCF paper for explanation)
 #ifdef CUFFT
     cv::Mat tmp = circshift(labels, range_x[0], range_y[0]);
-    tmp.copyTo(p_scale_vars.front()->rot_labels);
+    tmp.copyTo(p_rot_labels);
 
-    assert(p_scale_vars[0].rot_labels.at<float>(0, 0) >= 1.f - 1e-10f);
+    assert(p_rot_labels.at<float>(0, 0) >= 1.f - 1e-10f);
     return tmp;
 #else
     cv::Mat rot_labels = circshift(labels, range_x[0], range_y[0]);

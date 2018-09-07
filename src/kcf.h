@@ -132,12 +132,17 @@ private:
 
     std::list<std::unique_ptr<ThreadCtx>> p_scale_vars;
 
+    //CUDA compability
+    cv::Mat p_rot_labels;
+    DynMem p_rot_labels_data;
+
     //model
     ComplexMat p_yf;
     ComplexMat p_model_alphaf;
     ComplexMat p_model_alphaf_num;
     ComplexMat p_model_alphaf_den;
     ComplexMat p_model_xf;
+    ComplexMat p_xf;
     //helping functions
     void scale_track(ThreadCtx & vars, cv::Mat & input_rgb, cv::Mat & input_gray, double scale);
     cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y);
