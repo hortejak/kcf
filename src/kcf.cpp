@@ -155,10 +155,9 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         std::exit(EXIT_FAILURE);
     }
     CudaSafeCall(cudaSetDeviceFlags(cudaDeviceMapHost));
-    p_xf.create(uint(p_windows_size.height) / p_cell_size, (uint(p_windows_size.width) / p_cell_size) / 2 + 1, p_num_of_feats, this->stream);
     p_rot_labels_data = DynMem(
         ((uint(p_windows_size.width) / p_cell_size) * (uint(p_windows_size.height) / p_cell_size)) * sizeof(float));
-    p_rot_labels = cv::Mat(p_windows_size.height / int(p_cell_size), windows_size.width / int(p_cell_size), CV_32FC1,
+    p_rot_labels = cv::Mat(p_windows_size.height / int(p_cell_size), p_windows_size.width / int(p_cell_size), CV_32FC1,
                            p_rot_labels_data.hostMem());
 #else
     p_xf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.height / p_cell_size)) / 2 + 1,
