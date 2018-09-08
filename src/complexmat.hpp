@@ -56,9 +56,9 @@ template <typename T> class ComplexMat_ {
     void set_channel(int idx, const cv::Mat &mat)
     {
         assert(idx >= 0 && idx < n_channels);
-        for (int i = 0; i < rows; ++i) {
+        for (uint i = 0; i < rows; ++i) {
             const std::complex<T> *row = mat.ptr<std::complex<T>>(i);
-            for (int j = 0; j < cols; ++j)
+            for (uint j = 0; j < cols; ++j)
                 p_data[idx * rows * cols + i * cols + j] = row[j];
         }
     }
@@ -134,7 +134,7 @@ template <typename T> class ComplexMat_ {
         std::vector<cv::Mat> result;
         result.reserve(n_channels);
 
-        for (int i = 0; i < n_channels; ++i)
+        for (uint i = 0; i < n_channels; ++i)
             result.push_back(channel_to_cv_mat(i));
 
         return result;
@@ -272,9 +272,9 @@ template <typename T> class ComplexMat_ {
     cv::Mat channel_to_cv_mat(int channel_id) const
     {
         cv::Mat result(rows, cols, CV_32FC2);
-        for (int y = 0; y < rows; ++y) {
+        for (uint y = 0; y < rows; ++y) {
             std::complex<T> *row_ptr = result.ptr<std::complex<T>>(y);
-            for (int x = 0; x < cols; ++x) {
+            for (uint x = 0; x < cols; ++x) {
                 row_ptr[x] = p_data[channel_id * rows * cols + y * cols + x];
             }
         }
