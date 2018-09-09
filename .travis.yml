@@ -1,17 +1,41 @@
 language: c++
 addons:
   apt:
-    sources:
-      - ubuntu-toolchain-r-test
+    sources: &common_sources
       - sourceline: deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64 /
         key_url: http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64/7fa2af80.pub
-    packages:
+      - ubuntu-toolchain-r-test
+      - llvm-toolchain-precise-3.8
+    packages: &common_packages
       - cmake
       - ninja-build
       - libopencv-dev
       - libfftw3-dev
       - cuda-command-line-tools-8-0 cuda-cufft-dev-8-0
-      - g++-5
+
 env:
   - CUDA_BIN_PATH=/usr/local/cuda-8.0 CXXFLAGS=-Werror
-script: make CC=gcc-5 CXX=g++-5
+
+script: make
+
+matrix:
+  include:
+    - compiler: gcc-5
+      addons:
+        apt:
+          sources: *common_sources
+          packages:
+            - *common_packages
+            - g++-5
+      script: make CC=gcc-5 CXX=g++-5
+    - compiler: clang-3.8
+      addons:
+        apt:
+          sources: *common_sources
+          packages:
+            - *common_packages
+            - clang-3.8
+      script: make CC=clang-3.8 CXX=clang++-3.8 $(grep -v openmp .kcf_builds)
+
+before_script:
+    - make -qp|grep "^BUILDS ="|grep -o '[a-z-]*' | tee .kcf_builds
