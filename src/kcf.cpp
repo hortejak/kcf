@@ -219,7 +219,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     fft.forward_window(p_scale_vars.front()->patch_feats, p_model_xf, p_scale_vars.front()->fw_all,
                        m_use_cuda ? p_scale_vars.front()->data_features.deviceMem() : nullptr, p_scale_vars.front()->stream);
     DEBUG_PRINTM(p_model_xf);
-#if defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
+#if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
     p_scale_vars.front()->model_xf = p_model_xf;
     p_scale_vars.front()->model_xf.set_stream(p_scale_vars.front()->stream);
     p_yf.set_stream(p_scale_vars.front()->stream);
@@ -233,7 +233,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         p_model_alphaf_den = (p_model_xf * xfconj);
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
-#if defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
+#if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
         gaussian_correlation(*p_scale_vars.front(), p_scale_vars.front()->model_xf, p_scale_vars.front()->model_xf,
                              p_kernel_sigma, true);
 #else
@@ -249,7 +249,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     DEBUG_PRINTM(p_model_alphaf);
     //        p_model_alphaf = p_yf / (kf + p_lambda);   //equation for fast training
 
-#if defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
+#if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
     for (auto it = p_scale_vars.begin(); it != p_scale_vars.end(); ++it) {
         (*it)->model_xf = p_model_xf;
         (*it)->model_xf.set_stream((*it)->stream);
@@ -446,7 +446,7 @@ void KCF_Tracker::track(cv::Mat &img)
     p_model_alphaf_den = p_model_alphaf_den * float((1. - p_interp_factor)) + alphaf_den * float(p_interp_factor);
     p_model_alphaf = p_model_alphaf_num / p_model_alphaf_den;
 
-#if defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
+#if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
     for (auto it = p_scale_vars.begin(); it != p_scale_vars.end(); ++it) {
         (*it)->model_xf = p_model_xf;
         (*it)->model_xf.set_stream((*it)->stream);
