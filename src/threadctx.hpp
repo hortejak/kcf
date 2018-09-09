@@ -24,7 +24,7 @@ struct ThreadCtx {
         uint cells_size =
             ((uint(windows_size.width) / cell_size) * (uint(windows_size.height) / cell_size)) * sizeof(float);
 
-#if defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
+#if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
         CudaSafeCall(cudaStreamCreate(&this->stream));
 #endif
 
