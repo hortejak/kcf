@@ -105,8 +105,6 @@ private:
     bool p_resize_image = false;
     bool p_fit_to_pw2 = false;
 
-    bool first = true;
-
     const double p_downscale_factor = 0.5;
     double p_scale_factor_x = 1;
     double p_scale_factor_y = 1;

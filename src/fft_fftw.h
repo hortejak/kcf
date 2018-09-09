@@ -18,7 +18,6 @@ class Fftw : public Fft
 {
 public:
     Fftw();
-    Fftw(unsigned num_of_threads);
     void init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales, bool big_batch_mode) override;
     void set_window(const cv::Mat & window) override;
     void forward(const cv::Mat & real_input, ComplexMat & complex_result, float *real_input_arr, cudaStream_t  stream) override;
@@ -26,7 +25,6 @@ public:
     void inverse(ComplexMat &  complex_input, cv::Mat & real_result, float *real_result_arr, cudaStream_t stream) override;
     ~Fftw() override;
 private:
-    unsigned m_num_threads = 6;
     unsigned m_width, m_height, m_num_of_feats, m_num_of_scales;
     bool m_big_batch_mode;
     cv::Mat m_window;
