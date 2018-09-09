@@ -2,6 +2,7 @@ language: c++
 addons:
   apt:
     sources:
+      - ubuntu-toolchain-r-test
       - sourceline: deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64 /
         key_url: http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64/7fa2af80.pub
     packages:
@@ -10,6 +11,7 @@ addons:
       - libopencv-dev
       - libfftw3-dev
       - cuda-command-line-tools-8-0 cuda-cufft-dev-8-0
+      - g++-5
 env:
   - CUDA_BIN_PATH=/usr/local/cuda-8.0
-script: make
+script: make CC=gcc-5 CXX=g++-5
