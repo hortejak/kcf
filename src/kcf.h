@@ -130,7 +130,7 @@ private:
     int p_num_of_feats;
     int p_roi_height, p_roi_width;
 
-    std::list<std::unique_ptr<ThreadCtx>> p_scale_vars;
+    std::list<std::unique_ptr<ThreadCtx>> p_threadctxs;
 
     //CUDA compability
     cv::Mat p_rot_labels;
