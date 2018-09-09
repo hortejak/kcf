@@ -75,7 +75,7 @@ struct ThreadCtx {
 
     ~ThreadCtx()
     {
-#if defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
+#if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
         CudaSafeCall(cudaStreamDestroy(this->stream));
 #endif
     }
