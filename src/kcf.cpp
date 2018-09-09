@@ -220,11 +220,11 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
                        m_use_cuda ? p_threadctxs.front()->data_features.deviceMem() : nullptr, p_threadctxs.front()->stream);
     DEBUG_PRINTM(p_model_xf);
 #if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
-    p_scale_vars.front()->model_xf = p_model_xf;
-    p_scale_vars.front()->model_xf.set_stream(p_scale_vars.front()->stream);
-    p_yf.set_stream(p_scale_vars.front()->stream);
-    p_model_xf.set_stream(p_scale_vars.front()->stream);
-    p_xf.set_stream(p_scale_vars.front()->stream);
+    p_threadctxs.front()->model_xf = p_model_xf;
+    p_threadctxs.front()->model_xf.set_stream(p_threadctxs.front()->stream);
+    p_yf.set_stream(p_threadctxs.front()->stream);
+    p_model_xf.set_stream(p_threadctxs.front()->stream);
+    p_xf.set_stream(p_threadctxs.front()->stream);
 #endif
 
     if (m_use_linearkernel) {
@@ -234,7 +234,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
 #if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
-        gaussian_correlation(*p_scale_vars.front(), p_scale_vars.front()->model_xf, p_scale_vars.front()->model_xf,
+        gaussian_correlation(*p_threadctxs.front(), p_threadctxs.front()->model_xf, p_threadctxs.front()->model_xf,
                              p_kernel_sigma, true);
 #else
         gaussian_correlation(*p_threadctxs.front(), p_model_xf, p_model_xf, p_kernel_sigma, true);
@@ -250,7 +250,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     //        p_model_alphaf = p_yf / (kf + p_lambda);   //equation for fast training
 
 #if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
-    for (auto it = p_scale_vars.begin(); it != p_scale_vars.end(); ++it) {
+    for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
         (*it)->model_xf = p_model_xf;
         (*it)->model_xf.set_stream((*it)->stream);
         (*it)->model_alphaf = p_model_alphaf;
