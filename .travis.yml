@@ -36,6 +36,10 @@ matrix:
             - *common_packages
             - clang-3.8
       script: make CC=clang-3.8 CXX=clang++-3.8 $(grep -v openmp .kcf_builds)
+    - compiler: clang
+      script: make $(grep -v cufft .kcf_builds)
+      addons:
+        apt: { sources: *common_sources, packages: *common_packages }
 
 before_script:
     - make -qp|grep "^BUILDS ="|grep -o '[a-z-]*' | tee .kcf_builds
