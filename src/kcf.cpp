@@ -447,7 +447,7 @@ void KCF_Tracker::track(cv::Mat &img)
     p_model_alphaf = p_model_alphaf_num / p_model_alphaf_den;
 
 #if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
-    for (auto it = p_scale_vars.begin(); it != p_scale_vars.end(); ++it) {
+    for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
         (*it)->model_xf = p_model_xf;
         (*it)->model_xf.set_stream((*it)->stream);
         (*it)->model_alphaf = p_model_alphaf;
