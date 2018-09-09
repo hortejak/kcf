@@ -94,10 +94,12 @@ struct ThreadCtx {
     cudaStream_t stream = nullptr;
     ComplexMat model_alphaf, model_xf;
 
-    // Big batch variables
+    // Variables used during non big batch mode and in big batch mode with ThreadCtx in p_threadctxs in kcf  on zero index.
     cv::Point2i max_loc;
     double max_val, max_response;
 
+    // Big batch variables
+    // Stores value of responses, location of maximal response and response maps for each scale
     std::vector<double> max_responses;
     std::vector<cv::Point2i> max_locs;
     std::vector<cv::Mat> response_maps;
