@@ -13,5 +13,5 @@ addons:
       - cuda-command-line-tools-8-0 cuda-cufft-dev-8-0
       - g++-5
 env:
-  - CUDA_BIN_PATH=/usr/local/cuda-8.0
+  - CUDA_BIN_PATH=/usr/local/cuda-8.0 CXXFLAGS=-Werror
 script: make CC=gcc-5 CXX=g++-5
