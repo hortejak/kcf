@@ -1,14 +1,15 @@
 language: c++
-before_install:
-- |
-  CUDA_VERSION="8.0.61-1"
-  CUDA_REPO_PKG=cuda-repo-ubuntu1404_${CUDA_VERSION}_amd64.deb
-  NVIDIA_URL=http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64/
-  wget ${NVIDIA_URL}${CUDA_REPO_PKG}
-  sudo dpkg -i ${CUDA_REPO_PKG}
-  rm ${CUDA_REPO_PKG}
-- sudo apt update -q
-install:
-  - sudo apt install cmake ninja-build libopencv-dev libfftw3-dev cuda-command-line-tools-8-0 cuda-cufft-dev-8-0
-  - sudo ln -s cuda-8.0 /usr/local/cuda
+addons:
+  apt:
+    sources:
+      - sourceline: deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64 /
+        key_url: http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64/7fa2af80.pub
+    packages:
+      - cmake
+      - ninja-build
+      - libopencv-dev
+      - libfftw3-dev
+      - cuda-command-line-tools-8-0 cuda-cufft-dev-8-0
+env:
+  - CUDA_BIN_PATH=/usr/local/cuda-8.0
 script: make
