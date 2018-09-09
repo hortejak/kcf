@@ -7,14 +7,12 @@
 #endif
 
 #if !defined(ASYNC) && !defined(OPENMP) && !defined(CUFFTW)
-#define FFTW_PLAN_WITH_THREADS() fftw_plan_with_nthreads(int(m_num_threads));
+#define FFTW_PLAN_WITH_THREADS() fftw_plan_with_nthreads(4);
 #else
 #define FFTW_PLAN_WITH_THREADS()
 #endif
 
-Fftw::Fftw() : m_num_threads(4) {}
-
-Fftw::Fftw(unsigned num_threads) : m_num_threads(num_threads) {}
+Fftw::Fftw(){}
 
 void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales, bool big_batch_mode)
 {
