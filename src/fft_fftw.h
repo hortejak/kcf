@@ -26,7 +26,6 @@ public:
     void inverse(ComplexMat &  complex_input, cv::Mat & real_result, float *real_result_arr, cudaStream_t stream) override;
     ~Fftw() override;
 private:
-    unsigned m_num_threads = 6;
     unsigned m_width, m_height, m_num_of_feats, m_num_of_scales;
     bool m_big_batch_mode;
     cv::Mat m_window;
