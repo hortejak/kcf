@@ -72,7 +72,7 @@ struct ThreadCtx {
             this->response_maps.reserve(uint(num_of_scales));
         }
     }
-
+    ThreadCtx(ThreadCtx &&) = default;
     ~ThreadCtx()
     {
 #if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))

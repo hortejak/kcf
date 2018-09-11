@@ -53,7 +53,7 @@ template <typename T> class ComplexMat_ {
     int channels() const { return n_channels; }
 
     // assuming that mat has 2 channels (real, imag)
-    void set_channel(int idx, const cv::Mat &mat)
+    void set_channel(uint idx, const cv::Mat &mat)
     {
         assert(idx >= 0 && idx < n_channels);
         for (uint i = 0; i < rows; ++i) {
