@@ -96,10 +96,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
     } else if (!(fit_size_x == -1 && fit_size_y == -1)) {
         if (fit_size_x % p_cell_size != 0 || fit_size_y % p_cell_size != 0) {
-            std::cerr << "Fit size does not fit to hog cell size. The dimensions have to be divisible by HOG cell "
-                         "size, which is: "
-                      << p_cell_size << std::endl;
-            ;
+            std::cerr << "Error: Fit size is not multiple of HOG cell size (" << p_cell_size << ")" << std::endl;
             std::exit(EXIT_FAILURE);
         }
         double tmp = (p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
