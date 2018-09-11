@@ -178,12 +178,10 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 
     int max = m_use_big_batch ? 2 : p_num_scales;
     for (int i = 0; i < max; ++i) {
-        if (m_use_big_batch && i == 1) {
-            p_threadctxs.emplace_back(
-                new ThreadCtx(p_windows_size, p_cell_size, p_num_of_feats * p_num_scales, p_num_scales));
-        } else {
-            p_threadctxs.emplace_back(new ThreadCtx(p_windows_size, p_cell_size, p_num_of_feats, 1));
-        }
+        if (m_use_big_batch && i == 1)
+            p_threadctxs.emplace_back(p_windows_size, p_cell_size, p_num_of_feats * p_num_scales, p_num_scales);
+        else
+            p_threadctxs.emplace_back(p_windows_size, p_cell_size, p_num_of_feats, 1);
     }
 
     p_current_scale = 1.;
@@ -208,22 +206,22 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     // window weights, i.e. labels
     fft.forward(
         gaussian_shaped_labels(p_output_sigma, p_windows_size.width / p_cell_size, p_windows_size.height / p_cell_size), p_yf,
-        m_use_cuda ? p_rot_labels_data.deviceMem() : nullptr, p_threadctxs.front()->stream);
+        m_use_cuda ? p_rot_labels_data.deviceMem() : nullptr, p_threadctxs.front().stream);
     DEBUG_PRINTM(p_yf);
 
     // obtain a sub-window for training initial model
-    p_threadctxs.front()->patch_feats.clear();
+    p_threadctxs.front().patch_feats.clear();
     get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size.width, p_windows_size.height,
-                 *p_threadctxs.front());
-    fft.forward_window(p_threadctxs.front()->patch_feats, p_model_xf, p_threadctxs.front()->fw_all,
-                       m_use_cuda ? p_threadctxs.front()->data_features.deviceMem() : nullptr, p_threadctxs.front()->stream);
+                 p_threadctxs.front());
+    fft.forward_window(p_threadctxs.front().patch_feats, p_model_xf, p_threadctxs.front().fw_all,
+                       m_use_cuda ? p_threadctxs.front().data_features.deviceMem() : nullptr, p_threadctxs.front().stream);
     DEBUG_PRINTM(p_model_xf);
 #if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
-    p_threadctxs.front()->model_xf = p_model_xf;
-    p_threadctxs.front()->model_xf.set_stream(p_threadctxs.front()->stream);
-    p_yf.set_stream(p_threadctxs.front()->stream);
-    p_model_xf.set_stream(p_threadctxs.front()->stream);
-    p_xf.set_stream(p_threadctxs.front()->stream);
+    p_threadctxs.front().model_xf = p_model_xf;
+    p_threadctxs.front().model_xf.set_stream(p_threadctxs.front().stream);
+    p_yf.set_stream(p_threadctxs.front().stream);
+    p_model_xf.set_stream(p_threadctxs.front().stream);
+    p_xf.set_stream(p_threadctxs.front().stream);
 #endif
 
     if (m_use_linearkernel) {
@@ -233,15 +231,15 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
 #if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
-        gaussian_correlation(*p_threadctxs.front(), p_threadctxs.front()->model_xf, p_threadctxs.front()->model_xf,
+        gaussian_correlation(p_threadctxs.front(), p_threadctxs.front().model_xf, p_threadctxs.front().model_xf,
                              p_kernel_sigma, true);
 #else
-        gaussian_correlation(*p_threadctxs.front(), p_model_xf, p_model_xf, p_kernel_sigma, true);
+        gaussian_correlation(p_threadctxs.front(), p_model_xf, p_model_xf, p_kernel_sigma, true);
 #endif
-        DEBUG_PRINTM(p_threadctxs.front()->kf);
-        p_model_alphaf_num = p_yf * p_threadctxs.front()->kf;
+        DEBUG_PRINTM(p_threadctxs.front().kf);
+        p_model_alphaf_num = p_yf * p_threadctxs.front().kf;
         DEBUG_PRINTM(p_model_alphaf_num);
-        p_model_alphaf_den = p_threadctxs.front()->kf * (p_threadctxs.front()->kf + float(p_lambda));
+        p_model_alphaf_den = p_threadctxs.front().kf * (p_threadctxs.front().kf + float(p_lambda));
         DEBUG_PRINTM(p_model_alphaf_den);
     }
     p_model_alphaf = p_model_alphaf_num / p_model_alphaf_den;
@@ -250,10 +248,10 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 
 #if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
     for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
-        (*it)->model_xf = p_model_xf;
-        (*it)->model_xf.set_stream((*it)->stream);
-        (*it)->model_alphaf = p_model_alphaf;
-        (*it)->model_alphaf.set_stream((*it)->stream);
+        it->model_xf = p_model_xf;
+        it->model_xf.set_stream(it->stream);
+        it->model_alphaf = p_model_alphaf;
+        it->model_alphaf.set_stream(it->stream);
     }
 #endif
 }
@@ -332,16 +330,16 @@ void KCF_Tracker::track(cv::Mat &img)
         for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
             uint index = uint(std::distance(p_threadctxs.begin(), it));
             async_res[index] = std::async(std::launch::async, [this, &input_gray, &input_rgb, index, it]() -> void {
-                return scale_track(*(*it), input_rgb, input_gray, this->p_scales[index]);
+                return scale_track(*it, input_rgb, input_gray, this->p_scales[index]);
             });
         }
         for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
             uint index = uint(std::distance(p_threadctxs.begin(), it));
             async_res[index].wait();
-            if ((*it)->max_response > max_response) {
-                max_response = (*it)->max_response;
-                max_response_pt = &(*it)->max_loc;
-                max_response_map = &(*it)->response;
+            if (it->max_response > max_response) {
+                max_response = it->max_response;
+                max_response_pt = &it->max_loc;
+                max_response_map = &it->response;
                 scale_index = index;
             }
         }
@@ -352,24 +350,24 @@ void KCF_Tracker::track(cv::Mat &img)
         for (uint i = start; i < end; ++i) {
             auto it = p_threadctxs.begin();
             std::advance(it, i);
-            scale_track(*(*it), input_rgb, input_gray, this->p_scales[i]);
+            scale_track(*it, input_rgb, input_gray, this->p_scales[i]);
 
             if (m_use_big_batch) {
                 for (size_t j = 0; j < p_scales.size(); ++j) {
-                    if ((*it)->max_responses[j] > max_response) {
-                        max_response = (*it)->max_responses[j];
-                        max_response_pt = &(*it)->max_locs[j];
-                        max_response_map = &(*it)->response_maps[j];
+                    if (it->max_responses[j] > max_response) {
+                        max_response = it->max_responses[j];
+                        max_response_pt = &it->max_locs[j];
+                        max_response_map = &it->response_maps[j];
                         scale_index = j;
                     }
                 }
             } else {
                 NORMAL_OMP_CRITICAL
                 {
-                    if ((*it)->max_response > max_response) {
-                        max_response = (*it)->max_response;
-                        max_response_pt = &(*it)->max_loc;
-                        max_response_map = &(*it)->response;
+                    if (it->max_response > max_response) {
+                        max_response = it->max_response;
+                        max_response_pt = &it->max_loc;
+                        max_response_map = &it->response;
                         scale_index = i;
                     }
                 }
@@ -418,11 +416,11 @@ void KCF_Tracker::track(cv::Mat &img)
     if (p_current_scale > p_min_max_scale[1]) p_current_scale = p_min_max_scale[1];
 
     // obtain a subwindow for training at newly estimated target position
-    p_threadctxs.front()->patch_feats.clear();
+    p_threadctxs.front().patch_feats.clear();
     get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size.width, p_windows_size.height,
-                 *p_threadctxs.front(), p_current_scale);
-    fft.forward_window(p_threadctxs.front()->patch_feats, p_xf, p_threadctxs.front()->fw_all,
-                       m_use_cuda ? p_threadctxs.front()->data_features.deviceMem() : nullptr, p_threadctxs.front()->stream);
+                 p_threadctxs.front(), p_current_scale);
+    fft.forward_window(p_threadctxs.front().patch_feats, p_xf, p_threadctxs.front().fw_all,
+                       m_use_cuda ? p_threadctxs.front().data_features.deviceMem() : nullptr, p_threadctxs.front().stream);
 
     // subsequent frames, interpolate model
     p_model_xf = p_model_xf * float((1. - p_interp_factor)) + p_xf * float(p_interp_factor);
@@ -435,12 +433,12 @@ void KCF_Tracker::track(cv::Mat &img)
         alphaf_den = (p_xf * xfconj);
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
-        gaussian_correlation(*p_threadctxs.front(), p_xf, p_xf, p_kernel_sigma,
+        gaussian_correlation(p_threadctxs.front(), p_xf, p_xf, p_kernel_sigma,
                              true);
         //        ComplexMat alphaf = p_yf / (kf + p_lambda); //equation for fast training
         //        p_model_alphaf = p_model_alphaf * (1. - p_interp_factor) + alphaf * p_interp_factor;
-        alphaf_num = p_yf * p_threadctxs.front()->kf;
-        alphaf_den = p_threadctxs.front()->kf * (p_threadctxs.front()->kf + float(p_lambda));
+        alphaf_num = p_yf * p_threadctxs.front().kf;
+        alphaf_den = p_threadctxs.front().kf * (p_threadctxs.front().kf + float(p_lambda));
     }
 
     p_model_alphaf_num = p_model_alphaf_num * float((1. - p_interp_factor)) + alphaf_num * float(p_interp_factor);
@@ -449,10 +447,10 @@ void KCF_Tracker::track(cv::Mat &img)
 
 #if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
     for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
-        (*it)->model_xf = p_model_xf;
-        (*it)->model_xf.set_stream((*it)->stream);
-        (*it)->model_alphaf = p_model_alphaf;
-        (*it)->model_alphaf.set_stream((*it)->stream);
+        it->model_xf = p_model_xf;
+        it->model_xf.set_stream(it->stream);
+        it->model_alphaf = p_model_alphaf;
+        it->model_alphaf.set_stream(it->stream);
     }
 #endif
 }
@@ -889,7 +887,7 @@ double KCF_Tracker::sub_grid_scale(int index)
             A.at<float>(j, 1) = float(p_scales[i]);
             A.at<float>(j, 2) = 1;
             fval.at<float>(j) =
-                m_use_big_batch ? float(p_threadctxs.back()->max_responses[i]) : float((*it)->max_response);
+                m_use_big_batch ? float(p_threadctxs.back().max_responses[i]) : float(it->max_response);
         }
     } else {
         // only from neighbours
@@ -904,10 +902,10 @@ double KCF_Tracker::sub_grid_scale(int index)
         std::advance(it2, index);
         auto it3 = p_threadctxs.begin();
         std::advance(it3, index + 1);
-        fval = (cv::Mat_<float>(3, 1) << (m_use_big_batch ? p_threadctxs.back()->max_responses[uint(index) - 1]
-                                                          : (*it1)->max_response),
-                (m_use_big_batch ? p_threadctxs.back()->max_responses[uint(index)] : (*it2)->max_response),
-                (m_use_big_batch ? p_threadctxs.back()->max_responses[uint(index) + 1] : (*it3)->max_response));
+        fval = (cv::Mat_<float>(3, 1) << (m_use_big_batch ? p_threadctxs.back().max_responses[uint(index) - 1]
+                                                          : it1->max_response),
+                (m_use_big_batch ? p_threadctxs.back().max_responses[uint(index)] : it2->max_response),
+                (m_use_big_batch ? p_threadctxs.back().max_responses[uint(index) + 1] : it3->max_response));
     }
 
     cv::Mat x;
