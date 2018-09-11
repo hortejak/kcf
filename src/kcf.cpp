@@ -100,9 +100,11 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
             std::exit(EXIT_FAILURE);
         }
         double tmp = (p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
-        if (fabs(tmp - fit_size_x) > p_floating_error) p_scale_factor_x = fit_size_x / tmp;
+        if (fabs(tmp - fit_size_x) > p_floating_error)
+            p_scale_factor_x = fit_size_x / tmp;
         tmp = (p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size;
-        if (fabs(tmp - fit_size_y) > p_floating_error) p_scale_factor_y = fit_size_y / tmp;
+        if (fabs(tmp - fit_size_y) > p_floating_error)
+            p_scale_factor_y = fit_size_y / tmp;
         std::cout << "resizing image horizontaly by factor of " << p_scale_factor_x << " and verticaly by factor of "
                   << p_scale_factor_y << std::endl;
         p_fit_to_pw2 = true;
@@ -387,7 +389,8 @@ void KCF_Tracker::track(cv::Mat &img)
     cv::Point2f new_location(max_response_pt->x, max_response_pt->y);
     DEBUG_PRINT(new_location);
 
-    if (m_use_subpixel_localization) new_location = sub_pixel_peak(*max_response_pt, *max_response_map);
+    if (m_use_subpixel_localization)
+        new_location = sub_pixel_peak(*max_response_pt, *max_response_map);
     DEBUG_PRINT(new_location);
 
     p_pose.cx += p_current_scale * p_cell_size * double(new_location.x);
@@ -406,7 +409,8 @@ void KCF_Tracker::track(cv::Mat &img)
 
     // sub grid scale interpolation
     double new_scale = p_scales[uint(scale_index)];
-    if (m_use_subgrid_scale) new_scale = sub_grid_scale(scale_index);
+    if (m_use_subgrid_scale)
+        new_scale = sub_grid_scale(scale_index);
 
     p_current_scale *= new_scale;
 
