@@ -91,9 +91,9 @@ set_target_properties(kcf PROPERTIES VERSION 1.0.0 SOVERSION 1)
 IF(FFT STREQUAL "fftw")
   target_link_libraries(kcf ${FFTW_LDFLAGS})
   IF(OPENMP)
-    target_link_libraries(kcf fftw3_omp)
+    target_link_libraries(kcf fftw3f_omp)
   ELSEIF(NOT ASYNC)
-    target_link_libraries(kcf fftw3_threads)
+    target_link_libraries(kcf fftw3f_threads)
   ENDIF()
 ENDIF() #FFTW
 

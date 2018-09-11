@@ -6,13 +6,17 @@
 #include <omp.h>
 #endif
 
-#if !defined(ASYNC) && !defined(OPENMP) && !defined(CUFFTW)
-#define FFTW_PLAN_WITH_THREADS() fftw_plan_with_nthreads(4);
+#if (defined(BIG_BATCH) && !defined(CUFFTW)) || (!defined(ASYNC) && !defined(OPENMP) && !defined(CUFFTW))
+#define FFTW_PLAN_WITH_THREADS() fftwf_plan_with_nthreads(4);
+#define FFTW_INIT_THREAD() fftwf_init_threads();
+#define FFTW_CLEAN_THREADS() fftwf_cleanup_threads();
 #else
 #define FFTW_PLAN_WITH_THREADS()
+#define FFTW_INIT_THREAD()
+#define FFTW_CLEAN_THREADS()
 #endif
 
-Fftw::Fftw(){}
+Fftw::Fftw() {}
 
 void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales, bool big_batch_mode)
 {
@@ -22,20 +26,20 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
     m_num_of_scales = num_of_scales;
     m_big_batch_mode = big_batch_mode;
 
-#if (!defined(ASYNC) && !defined(CUFFTW)) && defined(OPENMP)
-    fftw_init_threads();
-#endif // OPENMP
-
 #ifndef CUFFTW
     std::cout << "FFT: FFTW" << std::endl;
 #else
     std::cout << "FFT: cuFFTW" << std::endl;
 #endif
-    fftwf_cleanup();
+
+     FFTW_INIT_THREAD();
+
     // FFT forward one scale
     {
         cv::Mat in_f = cv::Mat::zeros(int(m_height), int(m_width), CV_32FC1);
         ComplexMat out_f(int(m_height), m_width / 2 + 1, 1);
+
+        FFTW_PLAN_WITH_THREADS();
         plan_f = fftwf_plan_dft_r2c_2d(int(m_height), int(m_width), reinterpret_cast<float *>(in_f.data),
                                        reinterpret_cast<fftwf_complex *>(out_f.get_p_data()), FFTW_PATIENT);
     }
@@ -245,4 +249,5 @@ Fftw::~Fftw()
         fftwf_destroy_plan(plan_fw_all_scales);
         fftwf_destroy_plan(plan_i_1ch_all_scales);
     }
+    FFTW_CLEAN_THREADS();
 }

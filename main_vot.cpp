@@ -9,11 +9,11 @@
 double calcAccuracy(std::string line, cv::Rect bb_rect, cv::Rect &groundtruth_rect)
 {
     std::vector<float> numbers;
-    std::istringstream s( line );
+    std::istringstream s(line);
     float x;
     char ch;
 
-    while (s >> x){
+    while (s >> x) {
         numbers.push_back(x);
         s >> ch;
     }
@@ -22,38 +22,34 @@ double calcAccuracy(std::string line, cv::Rect bb_rect, cv::Rect &groundtruth_re
     double y1 = std::min(numbers[1], std::min(numbers[3], std::min(numbers[5], numbers[7])));
     double y2 = std::max(numbers[1], std::max(numbers[3], std::max(numbers[5], numbers[7])));
 
-    groundtruth_rect = cv::Rect(x1, y1, x2-x1, y2-y1);
+    groundtruth_rect = cv::Rect(x1, y1, x2 - x1, y2 - y1);
 
     double rects_intersection = (groundtruth_rect & bb_rect).area();
     double rects_union = (groundtruth_rect | bb_rect).area();
-    double accuracy = rects_intersection/rects_union;
+    double accuracy = rects_intersection / rects_union;
 
     return accuracy;
 }
 
 int main(int argc, char *argv[])
 {
-    //load region, images and prepare for output
+    // load region, images and prepare for output
     std::string region, images, output;
     int visualize_delay = -1, fit_size_x = -1, fit_size_y = -1;
     KCF_Tracker tracker;
 
     while (1) {
         int option_index = 0;
-        static struct option long_options[] = {
-            {"debug",     no_argument,       0,  'd' },
-            {"visualDebug",     no_argument,       0,  'p' },
-            {"help",      no_argument,       0,  'h' },
-            {"output",    required_argument, 0,  'o' },
-            {"visualize", optional_argument, 0,  'v' },
-            {"fit",       optional_argument, 0,  'f' },
-            {0,           0,                 0,  0 }
-        };
+        static struct option long_options[] = {{"debug", no_argument, 0, 'd'},
+                                               {"visualDebug", no_argument, 0, 'p'},
+                                               {"help", no_argument, 0, 'h'},
+                                               {"output", required_argument, 0, 'o'},
+                                               {"visualize", optional_argument, 0, 'v'},
+                                               {"fit", optional_argument, 0, 'f'},
+                                               {0, 0, 0, 0}};
 
-        int c = getopt_long(argc, argv, "dphv::f::o:",
-                        long_options, &option_index);
-        if (c == -1)
-            break;
+        int c = getopt_long(argc, argv, "dphv::f::o:", long_options, &option_index);
+        if (c == -1) break;
 
         switch (c) {
         case 'd':
@@ -64,16 +60,18 @@ int main(int argc, char *argv[])
             visualize_delay = 500;
             break;
         case 'h':
-            std::cerr << "Usage: \n"
-                      << argv[0] << " [options]\n"
-                      << argv[0] << " [options] <directory>\n"
-                      << argv[0] << " [options] <path/to/region.txt or groundtruth.txt> <path/to/images.txt> [path/to/output.txt]\n"
-                      << "Options:\n"
-                      << " --visualize | -v[delay_ms]\n"
-                      << " --output    | -o <output.txt>\n"
-                      << " --debug     | -d\n"
-                      << " --visualDebug | -p\n"
-                      << " --fit       | -f[WxH]\n";
+            std::cerr
+                << "Usage: \n"
+                << argv[0] << " [options]\n"
+                << argv[0] << " [options] <directory>\n"
+                << argv[0]
+                << " [options] <path/to/region.txt or groundtruth.txt> <path/to/images.txt> [path/to/output.txt]\n"
+                << "Options:\n"
+                << " --visualize | -v[delay_ms]\n"
+                << " --output    | -o <output.txt>\n"
+                << " --debug     | -d\n"
+                << " --visualDebug | -p\n"
+                << " --fit       | -f[WxH]\n";
             exit(0);
             break;
         case 'o':
@@ -90,7 +88,7 @@ int main(int argc, char *argv[])
             sizes.erase(0, pos + delimiter.length());
 
             fit_size_x = stol(first_argument);
-	    fit_size_y = stol(sizes);
+            fit_size_y = stol(sizes);
             break;
         }
     }
@@ -105,8 +103,7 @@ int main(int argc, char *argv[])
     case 0:
         region = access("groundtruth.txt", F_OK) == 0 ? "groundtruth.txt" : "region.txt";
         images = "images.txt";
-        if (output.empty())
-            output = "output.txt";
+        if (output.empty()) output = "output.txt";
         break;
     case 2:
         // Fall through
@@ -136,7 +133,7 @@ int main(int argc, char *argv[])
 
     cv::Mat image;
 
-    //img = firts frame, initPos = initial position in the first frame
+    // img = firts frame, initPos = initial position in the first frame
     cv::Rect init_rect = vot_io.getInitRectangle();
     vot_io.outputBoundingBox(init_rect);
     vot_io.getNextImage(image);
@@ -147,16 +144,16 @@ int main(int argc, char *argv[])
     cv::Rect bb_rect;
     double avg_time = 0., sum_accuracy = 0.;
     int frames = 0;
-    while (vot_io.getNextImage(image) == 1){
+    while (vot_io.getNextImage(image) == 1) {
         double time_profile_counter = cv::getCPUTickCount();
         tracker.track(image);
         time_profile_counter = cv::getCPUTickCount() - time_profile_counter;
-         std::cout << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms. per frame";
-        avg_time += time_profile_counter/((double)cvGetTickFrequency()*1000);
+        std::cout << "  -> speed : " << time_profile_counter / ((double)cvGetTickFrequency() * 1000) << "ms. per frame";
+        avg_time += time_profile_counter / ((double)cvGetTickFrequency() * 1000);
         frames++;
 
         bb = tracker.getBBox();
-        bb_rect = cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h);
+        bb_rect = cv::Rect(bb.cx - bb.w / 2., bb.cy - bb.h / 2., bb.w, bb.h);
         vot_io.outputBoundingBox(bb_rect);
 
         if (groundtruth_stream.is_open()) {
@@ -165,8 +162,7 @@ int main(int argc, char *argv[])
 
             cv::Rect groundtruthRect;
             double accuracy = calcAccuracy(line, bb_rect, groundtruthRect);
-            if (visualize_delay >= 0)
-                cv::rectangle(image, groundtruthRect, CV_RGB(255, 0,0), 1);
+            if (visualize_delay >= 0) cv::rectangle(image, groundtruthRect, CV_RGB(255, 0, 0), 1);
             std::cout << ", accuracy: " << accuracy;
             sum_accuracy += accuracy;
         }
@@ -176,48 +172,50 @@ int main(int argc, char *argv[])
         if (visualize_delay >= 0) {
             cv::Point pt(bb.cx, bb.cy);
             cv::Size size(bb.w, bb.h);
-            cv::RotatedRect rotatedRectangle(pt,size, bb.a);
+            cv::RotatedRect rotatedRectangle(pt, size, bb.a);
 
             cv::Point2f vertices[4];
             rotatedRectangle.points(vertices);
 
             for (int i = 0; i < 4; i++)
-                cv::line(image, vertices[i], vertices[(i+1)%4], cv::Scalar(0,255,0), 2);
-//             cv::rectangle(image, cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h), CV_RGB(0,255,0), 2);
-            std::string angle = std::to_string (bb.a);
-            angle.erase ( angle.find_last_not_of('0') + 1, std::string::npos );
-            angle.erase ( angle.find_last_not_of('.') + 1, std::string::npos );
-            cv::putText(image, "Frame: " + std::to_string(frames) + " " + angle + " angle", cv::Point(0, image.rows-1), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0,255,0),2,cv::LINE_AA);
+                cv::line(image, vertices[i], vertices[(i + 1) % 4], cv::Scalar(0, 255, 0), 2);
+            //             cv::rectangle(image, cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h), CV_RGB(0,255,0),
+            //             2);
+            std::string angle = std::to_string(bb.a);
+            angle.erase(angle.find_last_not_of('0') + 1, std::string::npos);
+            angle.erase(angle.find_last_not_of('.') + 1, std::string::npos);
+            cv::putText(image, "Frame: " + std::to_string(frames) + " " + angle + " angle",
+                        cv::Point(0, image.rows - 1), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
             cv::imshow("output", image);
             int ret = cv::waitKey(visualize_delay);
-            if (visualize_delay > 0 && ret != -1 && ret != 255)
-                break;
+            if (visualize_delay > 0 && ret != -1 && ret != 255) break;
         }
 
-//        std::stringstream s;
-//        std::string ss;
-//        int countTmp = frames;
-//        s << "imgs" << "/img" << (countTmp/10000);
-//        countTmp = countTmp%10000;
-//        s << (countTmp/1000);
-//        countTmp = countTmp%1000;
-//        s << (countTmp/100);
-//        countTmp = countTmp%100;
-//        s << (countTmp/10);
-//        countTmp = countTmp%10;
-//        s << (countTmp);
-//        s << ".jpg";
-//        s >> ss;
-//        //set image output parameters
-//        std::vector<int> compression_params;
-//        compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
-//        compression_params.push_back(90);
-//        cv::imwrite(ss.c_str(), image, compression_params);
+        //        std::stringstream s;
+        //        std::string ss;
+        //        int countTmp = frames;
+        //        s << "imgs" << "/img" << (countTmp/10000);
+        //        countTmp = countTmp%10000;
+        //        s << (countTmp/1000);
+        //        countTmp = countTmp%1000;
+        //        s << (countTmp/100);
+        //        countTmp = countTmp%100;
+        //        s << (countTmp/10);
+        //        countTmp = countTmp%10;
+        //        s << (countTmp);
+        //        s << ".jpg";
+        //        s >> ss;
+        //        //set image output parameters
+        //        std::vector<int> compression_params;
+        //        compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
+        //        compression_params.push_back(90);
+        //        cv::imwrite(ss.c_str(), image, compression_params);
     }
 
-    std::cout << "Average processing speed " << avg_time/frames <<  "ms. (" << 1./(avg_time/frames)*1000 << " fps)" << std::endl;
+    std::cout << "Average processing speed " << avg_time / frames << "ms. (" << 1. / (avg_time / frames) * 1000
+              << " fps)" << std::endl;
     if (groundtruth_stream.is_open()) {
-        std::cout << "Average accuracy: " << sum_accuracy/frames << std::endl;
+        std::cout << "Average accuracy: " << sum_accuracy / frames << std::endl;
         groundtruth_stream.close();
     }
 

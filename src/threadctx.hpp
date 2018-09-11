@@ -15,26 +15,26 @@ typedef int *cudaStream_t;
 
 struct ThreadCtx {
   public:
-    ThreadCtx(cv::Size windows_size, uint cell_size, uint num_of_feats, uint num_of_scales = 1)
+    ThreadCtx(cv::Size windows_size, uint cell_size, uint num_of_feats, uint num_of_scales = 1, uint num_of_angles = 1)
     {
-        this->xf_sqr_norm = DynMem(num_of_scales * sizeof(float));
+        this->xf_sqr_norm = DynMem(num_of_scales * num_of_angles * sizeof(float));
         this->yf_sqr_norm = DynMem(sizeof(float));
         this->patch_feats.reserve(uint(num_of_feats));
 
         uint cells_size =
             ((uint(windows_size.width) / cell_size) * (uint(windows_size.height) / cell_size)) * sizeof(float);
 
-#if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
+#if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
         CudaSafeCall(cudaStreamCreate(&this->stream));
 #endif
 
 #if defined(CUFFT) || defined(FFTW)
-        this->gauss_corr_res = DynMem(cells_size * num_of_scales);
+        this->gauss_corr_res = DynMem(cells_size * num_of_scales * num_of_angles);
         this->data_features = DynMem(cells_size * num_of_feats);
 
         uint width_freq = (uint(windows_size.width) / cell_size) / 2 + 1;
 
-        this->in_all = cv::Mat(windows_size.height / int(cell_size) * int(num_of_scales),
+        this->in_all = cv::Mat(windows_size.height / int(cell_size) * int(num_of_scales) * int(num_of_angles),
                                windows_size.width / int(cell_size), CV_32F, this->gauss_corr_res.hostMem());
 
         this->fw_all = cv::Mat((windows_size.height / int(cell_size)) * int(num_of_feats),
@@ -46,30 +46,31 @@ struct ThreadCtx {
 #endif
 
         this->data_i_features = DynMem(cells_size * num_of_feats);
-        this->data_i_1ch = DynMem(cells_size * num_of_scales);
+        this->data_i_1ch = DynMem(cells_size * num_of_scales * num_of_angles);
 
         this->ifft2_res = cv::Mat(windows_size.height / int(cell_size), windows_size.width / int(cell_size),
                                   CV_32FC(int(num_of_feats)), this->data_i_features.hostMem());
 
         this->response = cv::Mat(windows_size.height / int(cell_size), windows_size.width / int(cell_size),
-                                 CV_32FC(int(num_of_scales)), this->data_i_1ch.hostMem());
+                                 CV_32FC(int(num_of_scales * num_of_angles)), this->data_i_1ch.hostMem());
 
         this->patch_feats.reserve(num_of_feats);
 
 #ifdef CUFFT
-        this->zf.create(uint(windows_size.height) / cell_size, width_freq, num_of_feats, num_of_scales, this->stream);
-        this->kzf.create(uint(windows_size.height) / cell_size, width_freq, num_of_scales, this->stream);
-        this->kf.create(uint(windows_size.height) / cell_size, width_freq, num_of_scales, this->stream);
+        this->zf.create(uint(windows_size.height) / cell_size, width_freq, num_of_feats, num_of_scales * num_of_angles,
+                        this->stream);
+        this->kzf.create(uint(windows_size.height) / cell_size, width_freq, num_of_scales * num_of_angles, this->stream);
+        this->kf.create(uint(windows_size.height) / cell_size, width_freq, num_of_scales * num_of_angles, this->stream);
 #else
-        this->zf.create(uint(windows_size.height) / cell_size, width_freq, num_of_feats, num_of_scales);
-        this->kzf.create(uint(windows_size.height) / cell_size, width_freq, num_of_scales);
-        this->kf.create(uint(windows_size.height) / cell_size, width_freq, num_of_scales);
+        this->zf.create(uint(windows_size.height) / cell_size, width_freq, num_of_feats, num_of_scales * num_of_angles);
+        this->kzf.create(uint(windows_size.height) / cell_size, width_freq, num_of_scales * num_of_angles);
+        this->kf.create(uint(windows_size.height) / cell_size, width_freq, num_of_scales * num_of_angles);
 #endif
 
         if (num_of_scales > 1) {
-            this->max_responses.reserve(uint(num_of_scales));
-            this->max_locs.reserve(uint(num_of_scales));
-            this->response_maps.reserve(uint(num_of_scales));
+            this->max_responses.reserve(uint(num_of_scales * num_of_angles));
+            this->max_locs.reserve(uint(num_of_scales * num_of_angles));
+            this->response_maps.reserve(uint(num_of_scales * num_of_angles));
         }
     }
 

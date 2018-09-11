@@ -19,7 +19,6 @@
 #include <omp.h>
 #endif // OPENMP
 
-<<<<<<< HEAD
 #define DEBUG_PRINT(obj)                                                                                               \
     if (m_debug) {                                                                                                     \
         std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;                                      \
@@ -29,10 +28,6 @@
         std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl       \
                   << (obj) << std::endl;                                                                               \
     }
-=======
-#define DEBUG_PRINT(obj) if (m_debug || m_visual_debug) {std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;}
-#define DEBUG_PRINTM(obj) if (m_debug) {std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl << (obj) << std::endl;}
->>>>>>> Addded visual debug mode and also modified the rotation tracking implementation.
 
 KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor,
                          double output_sigma_factor, int cell_size)
@@ -132,24 +127,19 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_windows_size.width = int(round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size);
     p_windows_size.height = int(round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size);
 
-    p_num_of_feats = 31;
-    if (m_use_color) p_num_of_feats += 3;
-    if (m_use_cnfeat) p_num_of_feats += 10;
-    p_roi_width = p_windows_size.width / p_cell_size;
-    p_roi_height = p_windows_size.height / p_cell_size;
-
     p_scales.clear();
     if (m_use_scale)
         for (int i = -p_num_scales / 2; i <= p_num_scales / 2; ++i)
             p_scales.push_back(std::pow(p_scale_step, i));
     else
         p_scales.push_back(1.);
-    
-     if (m_use_angle)
-        for (int i = p_angle_min; i <=p_angle_max ; i += p_angle_step)
+
+    if (m_use_angle) {
+        for (int i = p_angle_min; i <= p_angle_max; i += p_angle_step)
             p_angles.push_back(i);
-    else
+    } else {
         p_angles.push_back(0);
+    }
 
 #ifdef CUFFT
     if (p_windows_size.height / p_cell_size * (p_windows_size.width / p_cell_size / 2 + 1) > 1024) {
@@ -165,7 +155,12 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         std::cerr << "cuFFT supports only Gaussian kernel." << std::endl;
         std::exit(EXIT_FAILURE);
     }
+
+    p_roi_width = p_windows_size.width / p_cell_size;
+    p_roi_height = p_windows_size.height / p_cell_size;
+
     CudaSafeCall(cudaSetDeviceFlags(cudaDeviceMapHost));
+
     p_rot_labels_data = DynMem(
         ((uint(p_windows_size.width) / p_cell_size) * (uint(p_windows_size.height) / p_cell_size)) * sizeof(float));
     p_rot_labels = cv::Mat(p_windows_size.height / int(p_cell_size), p_windows_size.width / int(p_cell_size), CV_32FC1,
@@ -192,9 +187,9 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     for (int i = 0; i < max; ++i) {
         if (m_use_big_batch && i == 1) {
             p_threadctxs.emplace_back(
-                new ThreadCtx(p_windows_size, p_cell_size, p_num_of_feats * p_num_scales, p_num_scales));
+                new ThreadCtx(p_windows_size, p_cell_size, p_num_of_feats * p_scales.size() * p_angles.size() , p_scales.size(), p_angles.size()));
         } else {
-            p_threadctxs.emplace_back(new ThreadCtx(p_windows_size, p_cell_size, p_num_of_feats, 1));
+            p_threadctxs.emplace_back(new ThreadCtx(p_windows_size, p_cell_size, p_num_of_feats));
         }
     }
 
@@ -214,22 +209,35 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_output_sigma = std::sqrt(p_pose.w * p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
 
     fft.init(uint(p_windows_size.width / p_cell_size), uint(p_windows_size.height / p_cell_size), uint(p_num_of_feats),
-             uint(p_num_scales), m_use_big_batch);
+             uint(p_scales.size() * p_angles.size()), m_use_big_batch);
     fft.set_window(cosine_window_function(p_windows_size.width / p_cell_size, p_windows_size.height / p_cell_size));
 
     // window weights, i.e. labels
     fft.forward(
-        gaussian_shaped_labels(p_output_sigma, p_windows_size.width / p_cell_size, p_windows_size.height / p_cell_size), p_yf,
-        m_use_cuda ? p_rot_labels_data.deviceMem() : nullptr, p_threadctxs.front()->stream);
+        gaussian_shaped_labels(p_output_sigma, p_windows_size.width / p_cell_size, p_windows_size.height / p_cell_size),
+        p_yf, m_use_cuda ? p_rot_labels_data.deviceMem() : nullptr, p_threadctxs.front()->stream);
     DEBUG_PRINTM(p_yf);
 
     // obtain a sub-window for training initial model
     p_threadctxs.front()->patch_feats.clear();
-    get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size.width, p_windows_size.height,
-                 *p_threadctxs.front());
+
+    int size_x_scaled = floor(p_windows_size.width);
+    int size_y_scaled = floor(p_windows_size.height);
+
+    cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+    geometric_transformations(patch_gray, p_windows_size.width, p_windows_size.height, 1, 0, false);
+
+    cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
+    if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
+        patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+        geometric_transformations(patch_rgb, p_windows_size.width, p_windows_size.height, 1, 0, false);
+    }
+
+    get_features(patch_rgb, patch_gray, *p_threadctxs.front());
     fft.forward_window(p_threadctxs.front()->patch_feats, p_model_xf, p_threadctxs.front()->fw_all,
                        m_use_cuda ? p_threadctxs.front()->data_features.deviceMem() : nullptr, p_threadctxs.front()->stream);
     DEBUG_PRINTM(p_model_xf);
+
 #if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
     p_threadctxs.front()->model_xf = p_model_xf;
     p_threadctxs.front()->model_xf.set_stream(p_threadctxs.front()->stream);
@@ -336,7 +344,8 @@ void KCF_Tracker::track(cv::Mat &img)
     }
 
     double max_response = -1.;
-    int scale_index = 0;
+    uint scale_index = 0;
+    uint angle_index = 0;
     cv::Point2i *max_response_pt = nullptr;
     cv::Mat *max_response_map = nullptr;
 
@@ -355,38 +364,68 @@ void KCF_Tracker::track(cv::Mat &img)
                 max_response = (*it)->max_response;
                 max_response_pt = &(*it)->max_loc;
                 max_response_map = &(*it)->response;
-                scale_index = int(index);
+                scale_index = index;
             }
         }
     } else {
         uint start = m_use_big_batch ? 1 : 0;
-        uint end = m_use_big_batch ? 2 : uint(p_num_scales);
+        uint end1 = m_use_big_batch ? 2 : uint(p_scales.size());
+        uint end2 = m_use_big_batch ? 1 : uint(p_angles.size());
         NORMAL_OMP_PARALLEL_FOR
-        for (uint i = start; i < end; ++i) {
+        for (uint i = start; i < end1; ++i) {
             auto it = p_threadctxs.begin();
             std::advance(it, i);
-            scale_track(*(*it), input_rgb, input_gray, this->p_scales[i]);
+            for (size_t j = 0; j < end2; ++j) {
+                scale_track(*(*it), input_rgb, input_gray, this->p_scales[i], this->p_angles[j]);
 
-            if (m_use_big_batch) {
-                for (size_t j = 0; j < p_scales.size(); ++j) {
-                    if ((*it)->max_responses[j] > max_response) {
-                        max_response = (*it)->max_responses[j];
-                        max_response_pt = &(*it)->max_locs[j];
-                        max_response_map = &(*it)->response_maps[j];
-                        scale_index = int(j);
+                if (m_use_big_batch) {
+                    for (uint x = 0; x < p_scales.size(); ++x) {
+                        for (uint k = 0; k < p_angles.size(); ++k) {
+                            if ((*it)->max_responses[x+k] > max_response) {
+                                max_response = (*it)->max_responses[x+k];
+                                max_response_pt = &(*it)->max_locs[x+k];
+                                max_response_map = &(*it)->response_maps[x+k];
+                                scale_index = x;
+                                angle_index = k;
+                            }
+                        }
                     }
-                }
-            } else {
-                NORMAL_OMP_CRITICAL
-                {
-                    if ((*it)->max_response > max_response) {
-                        max_response = (*it)->max_response;
-                        max_response_pt = &(*it)->max_loc;
-                        max_response_map = &(*it)->response;
-                        scale_index = int(i);
+                } else {
+                    NORMAL_OMP_CRITICAL
+                    {
+                        if ((*it)->max_response > max_response) {
+                            max_response = (*it)->max_response;
+                            max_response_pt = &(*it)->max_loc;
+                            max_response_map = &(*it)->response;
+                            scale_index = i;
+                            angle_index = j;
+                        }
                     }
                 }
             }
+        }
+        if (m_visual_debug) {
+            cv::Mat all_responses(cv::Size(p_angles.size() * p_debug_image_size, p_scales.size() * p_debug_image_size),
+                                  p_debug_scale_responses[0].type(), cv::Scalar::all(0));
+            cv::Mat all_subwindows(cv::Size(p_angles.size() * p_debug_image_size, p_scales.size() * p_debug_image_size),
+                                   p_debug_subwindows[0].type(), cv::Scalar::all(0));
+            for (size_t i = 0; i < p_scales.size(); ++i) {
+                for (size_t j = 0; j < p_angles.size(); ++j) {
+                    cv::Mat in_roi(all_responses, cv::Rect(j * p_debug_image_size, i * p_debug_image_size,
+                                                           p_debug_image_size, p_debug_image_size));
+                    p_debug_scale_responses[5 * i + j].copyTo(in_roi);
+                    in_roi = all_subwindows(cv::Rect(j * p_debug_image_size, i * p_debug_image_size, p_debug_image_size,
+                                                     p_debug_image_size));
+                    p_debug_subwindows[5 * i + j].copyTo(in_roi);
+                }
+            }
+            cv::namedWindow("All subwindows", CV_WINDOW_AUTOSIZE);
+            cv::imshow("All subwindows", all_subwindows);
+            cv::namedWindow("All responses", CV_WINDOW_AUTOSIZE);
+            cv::imshow("All responses", all_responses);
+            cv::waitKey();
+            p_debug_scale_responses.clear();
+            p_debug_subwindows.clear();
         }
     }
 
@@ -410,10 +449,8 @@ void KCF_Tracker::track(cv::Mat &img)
     p_pose.cx += p_current_scale * p_cell_size * double(new_location.x);
     p_pose.cy += p_current_scale * p_cell_size * double(new_location.y);
 
-    if (m_visual_debug) {
+    if (m_visual_debug)
         std::cout << "New p_pose, cx: " << p_pose.cx << " cy: " << p_pose.cy << std::endl;
-        cv::waitKey();
-    }
 
     if (p_fit_to_pw2) {
         if (p_pose.cx < 0) p_pose.cx = 0;
@@ -436,14 +473,28 @@ void KCF_Tracker::track(cv::Mat &img)
     if (p_current_scale < p_min_max_scale[0]) p_current_scale = p_min_max_scale[0];
     if (p_current_scale > p_min_max_scale[1]) p_current_scale = p_min_max_scale[1];
 
-    // TODO Missing angle_index
-    //            int tmp_angle = p_current_angle + p_angles[angle_index];
-    //            p_current_angle = tmp_angle < 0 ? -std::abs(tmp_angle)%360 : tmp_angle%360;
+    p_current_angle = (p_current_angle + p_angles[angle_index]) < 0
+                          ? -std::abs(p_current_angle + p_angles[angle_index]) % 360
+                          : (p_current_angle + p_angles[angle_index]) % 360;
 
     // obtain a subwindow for training at newly estimated target position
     p_threadctxs.front()->patch_feats.clear();
-    get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size.width, p_windows_size.height,
-                 *p_threadctxs.front(), p_current_scale, p_current_angle);
+
+    int size_x_scaled = floor(p_windows_size.width * p_current_scale);
+    int size_y_scaled = floor(p_windows_size.height * p_current_scale);
+
+    cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+    geometric_transformations(patch_gray, p_windows_size.width, p_windows_size.height, p_current_scale, p_current_angle,
+                              false);
+
+    cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
+    if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
+        patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+        geometric_transformations(patch_rgb, p_windows_size.width, p_windows_size.height, p_current_scale,
+                                  p_current_angle, false);
+    }
+
+    get_features(patch_rgb, patch_gray, *p_threadctxs.front());
     fft.forward_window(p_threadctxs.front()->patch_feats, p_xf, p_threadctxs.front()->fw_all,
                        m_use_cuda ? p_threadctxs.front()->data_features.deviceMem() : nullptr,
                        p_threadctxs.front()->stream);
@@ -481,19 +532,46 @@ void KCF_Tracker::track(cv::Mat &img)
 #endif
 }
 
-void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray, double scale)
+void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray, double scale, int angle)
 {
     if (m_use_big_batch) {
         vars.patch_feats.clear();
+        std::cout << "WE ARE HERE BOIS" <<std::endl;
         BIG_BATCH_OMP_PARALLEL_FOR
-        for (uint i = 0; i < uint(p_num_scales); ++i) {
-            get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size.width,
-                         this->p_windows_size.height, vars, this->p_current_scale * this->p_scales[i]);
+        for (uint i = 0; i < this->p_scales.size(); ++i) {
+            for (uint j = 0; j < this->p_angles.size(); ++j) {
+                int size_x_scaled = floor(this->p_windows_size.width * this->p_current_scale * this->p_scales[i]);
+                int size_y_scaled = floor(this->p_windows_size.height * this->p_current_scale * this->p_scales[i]);
+
+                cv::Mat patch_gray =
+                    get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+                geometric_transformations(patch_gray, p_windows_size.width, p_windows_size.height,
+                                          p_current_scale * this->p_scales[i], p_current_angle + this->p_angles[j]);
+
+                cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
+                if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
+                    patch_rgb =
+                        get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+                    geometric_transformations(patch_rgb, p_windows_size.width, p_windows_size.height,
+                                              p_current_scale * this->p_scales[i], p_current_angle + this->p_angles[j]);
+                }
+                get_features(patch_rgb, patch_gray, vars);
+            }
         }
     } else {
+        int size_x_scaled = floor(this->p_windows_size.width * this->p_current_scale * scale);
+        int size_y_scaled = floor(this->p_windows_size.height * this->p_current_scale * scale);
+
+        cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+        geometric_transformations(patch_gray, p_windows_size.width, p_windows_size.height, p_current_scale * scale);
+
+        cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
+        if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
+            patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
+            geometric_transformations(patch_rgb, p_windows_size.width, p_windows_size.height, p_current_scale * scale, p_current_angle + angle);
+        }
         vars.patch_feats.clear();
-        get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size.width,
-                     this->p_windows_size.height, vars, this->p_current_scale *scale);
+        get_features(patch_rgb, patch_gray, vars);
     }
 
     fft.forward_window(vars.patch_feats, vars.zf, vars.fw_all, m_use_cuda ? vars.data_features.deviceMem() : nullptr,
@@ -550,27 +628,17 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
 
 // ****************************************************************************
 
-void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, int cy, int size_x, int size_y,
-                               ThreadCtx &vars, double scale, int angle)
+void KCF_Tracker::get_features(cv::Mat & patch_rgb, cv::Mat & patch_gray, ThreadCtx &vars)
 {
-    int size_x_scaled = int(floor(size_x * scale));
-    int size_y_scaled = int(floor(size_y * scale));
-
-    cv::Mat patch_gray = get_subwindow(input_gray, cx, cy, size_x_scaled, size_y_scaled);
-    cv::Mat patch_rgb = get_subwindow(input_rgb, cx, cy, size_x_scaled, size_y_scaled);
-
-    geometric_transformations(patch_gray, scale, size_x, size_y, angle);
 
     // get hog(Histogram of Oriented Gradients) features
     FHoG::extract(patch_gray, vars, 2, p_cell_size, 9);
 
     // get color rgb features (simple r,g,b channels)
     std::vector<cv::Mat> color_feat;
-    if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3)
-        geometric_transformations(patch_rgb, scale, size_x, size_y, angle);
 
-    if (m_use_color && input_rgb.channels() == 3) {
-        // use rgb color space
+    if (m_use_color && patch_rgb.channels() == 3) {
+        //use rgb color space
         cv::Mat patch_rgb_norm;
         patch_rgb.convertTo(patch_rgb_norm, CV_32F, 1. / 255., -0.5);
         cv::Mat ch1(patch_rgb_norm.size(), CV_32FC1);
@@ -581,7 +649,7 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
         color_feat.insert(color_feat.end(), rgb.begin(), rgb.end());
     }
 
-    if (m_use_cnfeat && input_rgb.channels() == 3) {
+    if (m_use_cnfeat && patch_rgb.channels() == 3) {
         std::vector<cv::Mat> cn_feat = CNFeat::extract(patch_rgb);
         color_feat.insert(color_feat.end(), cn_feat.begin(), cn_feat.end());
     }
@@ -703,7 +771,7 @@ cv::Mat KCF_Tracker::cosine_window_function(int dim1, int dim2)
 // Returns sub-window of image input centered at [cx, cy] coordinates),
 // with size [width, height]. If any pixels are outside of the image,
 // they will replicate the values at the borders.
-cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int width, int height/*, int angle*/)
+cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int width, int height)
 {
     cv::Mat patch;
 
@@ -742,37 +810,10 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     } else
         y2 += height % 2;
 
-    //     cv::Point2f center(x1+width/2, y1+height/2);
-    //     cv::Mat r = getRotationMatrix2D(center, angle, 1.0);
-    //
-    //     cv::Mat input_clone = input.clone();
-    //
-    //     cv::warpAffine(input_clone, input_clone, r, cv::Size(input_clone.cols, input_clone.rows), cv::INTER_LINEAR,
-    //     cv::BORDER_CONSTANT);
-    cv::Mat input_clone;
-    if (m_visual_debug) {
-        input_clone = input.clone();
-        cv::rectangle(input_clone, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(0, 255, 0));
-        cv::line(input_clone, cv::Point(0, (input_clone.rows - 1) / 2),
-                 cv::Point(input_clone.cols - 1, (input_clone.rows - 1) / 2), cv::Scalar(0, 0, 255));
-        cv::line(input_clone, cv::Point((input_clone.cols - 1) / 2, 0),
-                 cv::Point((input_clone.cols - 1) / 2, input_clone.rows - 1), cv::Scalar(0, 0, 255));
-
-        cv::imshow("Patch before copyMakeBorder", input_clone);
-    }
-
     if (x2 - x1 == 0 || y2 - y1 == 0)
         patch = cv::Mat::zeros(height, width, CV_32FC1);
-    else {
-        cv::copyMakeBorder(input(cv::Range(y1, y2), cv::Range(x1, x2)), patch, top, bottom, left, right,
-                           cv::BORDER_REPLICATE);
-        if (m_visual_debug) {
-            cv::Mat patch_dummy;
-            cv::copyMakeBorder(input_clone(cv::Range(y1, y2), cv::Range(x1, x2)), patch_dummy, top, bottom, left, right,
-                               cv::BORDER_REPLICATE);
-            cv::imshow("Patch after copyMakeBorder", patch_dummy);
-        }
-    }
+    else
+        cv::copyMakeBorder(input(cv::Range(y1, y2), cv::Range(x1, x2)), patch, top, bottom, left, right, cv::BORDER_REPLICATE);
 
     // sanity check
     assert(patch.cols == width && patch.rows == height);
@@ -780,22 +821,16 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     return patch;
 }
 
-void KCF_Tracker::geometric_transformations(cv::Mat &patch, double scale, int size_x, int size_y, int angle)
+void KCF_Tracker::geometric_transformations(cv::Mat &patch, int size_x, int size_y, double scale, int angle,
+                                            bool search)
 {
     if (m_use_angle) {
         cv::Point2f center((patch.cols - 1) / 2., (patch.rows - 1) / 2.);
         cv::Mat r = cv::getRotationMatrix2D(center, angle, 1.0);
 
         cv::warpAffine(patch, patch, r, cv::Size(patch.cols, patch.rows), cv::INTER_LINEAR, cv::BORDER_REPLICATE);
-
-        if (m_visual_debug) {
-            cv::Mat patch_copy = patch.clone();
-            cv::namedWindow("Patch RGB copy", CV_WINDOW_AUTOSIZE);
-            cv::putText(patch_copy, std::to_string(angle), cv::Point(0, patch_copy.rows - 1),
-                        cv::FONT_HERSHEY_COMPLEX_SMALL, 1, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
-            cv::imshow("Rotated patch", patch_copy);
-        }
     }
+
     // resize to default size
     if (patch.channels() != 3) {
         if (scale > 1.) {
@@ -811,11 +846,31 @@ void KCF_Tracker::geometric_transformations(cv::Mat &patch, double scale, int si
         } else {
             cv::resize(patch, patch, cv::Size(size_x / p_cell_size, size_y / p_cell_size), 0., 0., cv::INTER_LINEAR);
         }
+        if (m_visual_debug && search) {
+            cv::Mat input_clone = patch.clone();
+            cv::resize(input_clone, input_clone, cv::Size(p_debug_image_size, p_debug_image_size), 0., 0.,
+                       cv::INTER_LINEAR);
+
+            std::string angle_string = std::to_string(p_current_angle + angle);
+            if (p_count % 5 == 0) {
+                std::string scale_string = std::to_string(scale);
+                scale_string.erase(scale_string.find_last_not_of('0') + 1, std::string::npos);
+                scale_string.erase(scale_string.find_last_not_of('.') + 1, std::string::npos);
+                cv::putText(input_clone, scale_string, cv::Point(0, 10), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.5,
+                            cv::Scalar(0, 255, 0), 1);
+            }
+
+            cv::putText(input_clone, angle_string, cv::Point(1, input_clone.rows - 5), cv::FONT_HERSHEY_COMPLEX_SMALL,
+                        0.5, cv::Scalar(0, 255, 0), 1);
+
+            p_debug_subwindows.push_back(input_clone);
+            p_count += 1;
+        }
     }
 }
 
-void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat &xf, const ComplexMat &yf,
-                                       double sigma, bool auto_correlation)
+void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat &xf, const ComplexMat &yf, double sigma,
+                                       bool auto_correlation)
 {
 #ifdef CUFFT
     xf.sqr_norm(vars.xf_sqr_norm.deviceMem());
