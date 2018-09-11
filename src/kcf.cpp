@@ -323,7 +323,7 @@ void KCF_Tracker::track(cv::Mat &img)
     }
 
     double max_response = -1.;
-    int scale_index = 0;
+    uint scale_index = 0;
     cv::Point2i *max_response_pt = nullptr;
     cv::Mat *max_response_map = nullptr;
 
@@ -342,7 +342,7 @@ void KCF_Tracker::track(cv::Mat &img)
                 max_response = (*it)->max_response;
                 max_response_pt = &(*it)->max_loc;
                 max_response_map = &(*it)->response;
-                scale_index = int(index);
+                scale_index = index;
             }
         }
     } else {
@@ -360,7 +360,7 @@ void KCF_Tracker::track(cv::Mat &img)
                         max_response = (*it)->max_responses[j];
                         max_response_pt = &(*it)->max_locs[j];
                         max_response_map = &(*it)->response_maps[j];
-                        scale_index = int(j);
+                        scale_index = j;
                     }
                 }
             } else {
@@ -370,7 +370,7 @@ void KCF_Tracker::track(cv::Mat &img)
                         max_response = (*it)->max_response;
                         max_response_pt = &(*it)->max_loc;
                         max_response_map = &(*it)->response;
-                        scale_index = int(i);
+                        scale_index = i;
                     }
                 }
             }
@@ -408,7 +408,7 @@ void KCF_Tracker::track(cv::Mat &img)
     }
 
     // sub grid scale interpolation
-    double new_scale = p_scales[uint(scale_index)];
+    double new_scale = p_scales[scale_index];
     if (m_use_subgrid_scale)
         new_scale = sub_grid_scale(scale_index);
 
