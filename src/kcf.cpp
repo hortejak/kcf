@@ -20,7 +20,7 @@
 #endif // OPENMP
 
 #define DEBUG_PRINT(obj)                                                                                               \
-    if (m_debug) {                                                                                                     \
+    if (m_debug || m_visual_debug) {                                                                                   \
         std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;                                      \
     }
 #define DEBUG_PRINTM(obj)                                                                                              \
