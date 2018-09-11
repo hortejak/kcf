@@ -1,7 +1,6 @@
 #include "kcf.h"
 #include <numeric>
 #include <thread>
-#include <future>
 #include <algorithm>
 
 #ifdef FFTW
@@ -321,59 +320,45 @@ void KCF_Tracker::track(cv::Mat &img)
     }
 
     double max_response = -1.;
-    uint scale_index = 0;
+    ThreadCtx *max = nullptr;
     cv::Point2i *max_response_pt = nullptr;
     cv::Mat *max_response_map = nullptr;
 
-    if (m_use_multithreading) {
-        std::vector<std::future<void>> async_res(p_scales.size());
-        for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
-            uint index = uint(std::distance(p_threadctxs.begin(), it));
-            async_res[index] = std::async(std::launch::async, [this, &input_gray, &input_rgb, index, it]() -> void {
-                return scale_track(*it, input_rgb, input_gray, this->p_scales[index]);
-            });
-        }
-        for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
-            uint index = uint(std::distance(p_threadctxs.begin(), it));
-            async_res[index].wait();
-            if (it->max_response > max_response) {
-                max_response = it->max_response;
-                max_response_pt = &it->max_loc;
-                max_response_map = &it->response;
-                scale_index = index;
-            }
-        }
-    } else {
-        uint start = m_use_big_batch ? 1 : 0;
-        uint end = m_use_big_batch ? 2 : uint(p_num_scales);
-        NORMAL_OMP_PARALLEL_FOR
-        for (uint i = start; i < end; ++i) {
-            auto it = p_threadctxs.begin();
-            std::advance(it, i);
-            scale_track(*it, input_rgb, input_gray, this->p_scales[i]);
+#ifdef ASYNC
+    for (auto &it : p_threadctxs)
+        it.async_res = std::async(std::launch::async, [this, &input_gray, &input_rgb, &it]() -> void {
+            scale_track(it, input_rgb, input_gray);
+        });
+    for (auto const &it : p_threadctxs)
+        it.async_res.wait();
 
-            if (m_use_big_batch) {
-                for (size_t j = 0; j < p_scales.size(); ++j) {
-                    if (it->max_responses[j] > max_response) {
-                        max_response = it->max_responses[j];
-                        max_response_pt = &it->max_locs[j];
-                        max_response_map = &it->response_maps[j];
-                        scale_index = j;
-                    }
-                }
-            } else {
-                NORMAL_OMP_CRITICAL
-                {
-                    if (it->max_response > max_response) {
-                        max_response = it->max_response;
-                        max_response_pt = &it->max_loc;
-                        max_response_map = &it->response;
-                        scale_index = i;
-                    }
-                }
-            }
+#else  // !ASYNC
+    // FIXME: Iterate correctly in big batch mode - perhaps have only one element in the list
+    NORMAL_OMP_PARALLEL_FOR
+    for (uint i = 0; i < p_threadctxs.size(); ++i)
+        scale_track(p_threadctxs[i], input_rgb, input_gray);
+#endif
+
+#ifndef BIG_BATCH
+    for (auto &it : p_threadctxs) {
+        if (it.max_response > max_response) {
+            max_response = it.max_response;
+            max_response_pt = &it.max_loc;
+            max_response_map = &it.response;
+            max = &it;
         }
     }
+#else
+    // FIXME: Iterate correctly in big batch mode - perhaps have only one element in the list
+    for (uint j = 0; j < p_scales.size(); ++j) {
+        if (p_threadctxs[0].max_responses[j] > max_response) {
+            max_response = p_threadctxs[0].max_responses[j];
+            max_response_pt = &p_threadctxs[0].max_locs[j];
+            max_response_map = &p_threadctxs[0].response_maps[j];
+            max = &p_threadctxs[0];
+        }
+    }
+#endif
 
     DEBUG_PRINTM(*max_response_map);
     DEBUG_PRINT(*max_response_pt);
@@ -406,11 +391,13 @@ void KCF_Tracker::track(cv::Mat &img)
     }
 
     // sub grid scale interpolation
-    double new_scale = p_scales[scale_index];
-    if (m_use_subgrid_scale)
-        new_scale = sub_grid_scale(scale_index);
+    if (m_use_subgrid_scale) {
+        auto it = std::find_if(p_threadctxs.begin(), p_threadctxs.end(), [max](ThreadCtx &ctx) { return &ctx == max; });
+        p_current_scale *= sub_grid_scale(std::distance(p_threadctxs.begin(), it));
+    } else {
+        p_current_scale *= max->scale;
+    }
 
-    p_current_scale *= new_scale;
 
     if (p_current_scale < p_min_max_scale[0]) p_current_scale = p_min_max_scale[0];
     if (p_current_scale > p_min_max_scale[1]) p_current_scale = p_min_max_scale[1];
@@ -455,7 +442,7 @@ void KCF_Tracker::track(cv::Mat &img)
 #endif
 }
 
-void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray, double scale)
+void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray)
 {
     if (m_use_big_batch) {
         vars.patch_feats.clear();
@@ -467,7 +454,7 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
     } else {
         vars.patch_feats.clear();
         get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size.width,
-                     this->p_windows_size.height, vars, this->p_current_scale *scale);
+                     this->p_windows_size.height, vars, this->p_current_scale * vars.scale);
     }
 
     fft.forward_window(vars.patch_feats, vars.zf, vars.fw_all, m_use_cuda ? vars.data_features.deviceMem() : nullptr,
@@ -516,7 +503,7 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
 
         DEBUG_PRINT(vars.max_loc);
 
-        double weight = scale < 1. ? scale : 1. / scale;
+        double weight = vars.scale < 1. ? vars.scale : 1. / vars.scale;
         vars.max_response = vars.max_val * weight;
     }
     return;

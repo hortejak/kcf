@@ -1,6 +1,7 @@
 #ifndef SCALE_VARS_HPP
 #define SCALE_VARS_HPP
 
+#include <future>
 #include "dynmem.hpp"
 
 #ifdef CUFFT
@@ -15,7 +16,8 @@ typedef int *cudaStream_t;
 
 struct ThreadCtx {
   public:
-    ThreadCtx(cv::Size windows_size, uint cell_size, uint num_of_feats, uint num_of_scales = 1)
+    ThreadCtx(cv::Size windows_size, uint cell_size, uint num_of_feats, double scale, uint num_of_scales = 1)
+        : scale(scale)
     {
         this->xf_sqr_norm = DynMem(num_of_scales * sizeof(float));
         this->yf_sqr_norm = DynMem(sizeof(float));
@@ -79,6 +81,11 @@ struct ThreadCtx {
         CudaSafeCall(cudaStreamDestroy(this->stream));
 #endif
     }
+
+    const double scale;
+#ifdef ASYNC
+    std::future<void> async_res;
+#endif
 
     DynMem xf_sqr_norm, yf_sqr_norm;
     std::vector<cv::Mat> patch_feats;
