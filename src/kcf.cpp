@@ -119,12 +119,12 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     // compute win size + fit to fhog cell size
     p_windows_size.width = round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
     p_windows_size.height = round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size;
+    p_roi.width = p_windows_size.width / p_cell_size;
+    p_roi.height = p_windows_size.height / p_cell_size;
 
     p_num_of_feats = 31;
     if (m_use_color) p_num_of_feats += 3;
     if (m_use_cnfeat) p_num_of_feats += 10;
-    p_roi.width = p_windows_size.width / p_cell_size;
-    p_roi.height = p_windows_size.height / p_cell_size;
 
     p_scales.clear();
     if (m_use_scale)
@@ -134,7 +134,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         p_scales.push_back(1.);
 
 #ifdef CUFFT
-    if (p_windows_size.height / p_cell_size * (p_windows_size.width / p_cell_size / 2 + 1) > 1024) {
+    if (p_roi.height * (p_roi.width / 2 + 1) > 1024) {
         std::cerr << "Window after forward FFT is too big for CUDA kernels. Plese use -f to set "
                      "the window dimensions so its size is less or equal to "
                   << 1024 * p_cell_size * p_cell_size * 2 + 1
@@ -148,34 +148,28 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         std::exit(EXIT_FAILURE);
     }
     CudaSafeCall(cudaSetDeviceFlags(cudaDeviceMapHost));
-    p_rot_labels_data = DynMem(
-        ((uint(p_windows_size.width) / p_cell_size) * (uint(p_windows_size.height) / p_cell_size)) * sizeof(float));
-    p_rot_labels = cv::Mat(p_windows_size.height / int(p_cell_size), p_windows_size.width / int(p_cell_size), CV_32FC1,
-                           p_rot_labels_data.hostMem());
+    p_rot_labels_data = DynMem(p_roi.width * p_roi.height * sizeof(float));
+    p_rot_labels = cv::Mat(p_roi, CV_32FC1, p_rot_labels_data.hostMem());
 #else
-    p_xf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.height / p_cell_size)) / 2 + 1,
-                p_num_of_feats);
+    p_xf.create(p_roi.height, p_roi.height / 2 + 1, p_num_of_feats);
 #endif
 
 #if defined(CUFFT) || defined(FFTW)
-    p_model_xf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.width / p_cell_size)) / 2 + 1,
-                      uint(p_num_of_feats));
-    p_yf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.width / p_cell_size)) / 2 + 1, 1);
-    p_xf.create(uint(p_windows_size.height) / p_cell_size, (uint(p_windows_size.width) / p_cell_size) / 2 + 1,
-                p_num_of_feats);
+    p_model_xf.create(p_roi.height, p_roi.width / 2 + 1, p_num_of_feats);
+    p_yf.create(p_roi.height, p_roi.width / 2 + 1, 1);
+    p_xf.create(p_roi.height, p_roi.width / 2 + 1, p_num_of_feats);
 #else
-    p_model_xf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.width / p_cell_size)),
-                      uint(p_num_of_feats));
-    p_yf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.width / p_cell_size)), 1);
-    p_xf.create(uint(p_windows_size.height) / p_cell_size, (uint(p_windows_size.width) / p_cell_size), p_num_of_feats);
+    p_model_xf.create(p_roi.height, p_roi.width, p_num_of_feats);
+    p_yf.create(p_roi.height, p_roi.width, 1);
+    p_xf.create(p_roi.height, p_roi.width, p_num_of_feats);
 #endif
 
     int max = m_use_big_batch ? 2 : p_num_scales;
     for (int i = 0; i < max; ++i) {
         if (m_use_big_batch && i == 1)
-            p_threadctxs.emplace_back(p_windows_size, p_cell_size, p_num_of_feats * p_num_scales, 1, p_num_scales);
+            p_threadctxs.emplace_back(p_roi, p_num_of_feats * p_num_scales, 1, p_num_scales);
         else
-            p_threadctxs.emplace_back(p_windows_size, p_cell_size, p_num_of_feats, p_scales[i], 1);
+            p_threadctxs.emplace_back(p_roi, p_num_of_feats, p_scales[i], 1);
     }
 
     p_current_scale = 1.;
@@ -193,13 +187,13 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 
     p_output_sigma = std::sqrt(p_pose.w * p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
 
-    fft.init(uint(p_windows_size.width / p_cell_size), uint(p_windows_size.height / p_cell_size), uint(p_num_of_feats),
+    fft.init(uint(p_roi.width), uint(p_roi.height), uint(p_num_of_feats),
              uint(p_num_scales), m_use_big_batch);
-    fft.set_window(cosine_window_function(p_windows_size.width / p_cell_size, p_windows_size.height / p_cell_size));
+    fft.set_window(cosine_window_function(p_roi.width, p_roi.height));
 
     // window weights, i.e. labels
     fft.forward(
-        gaussian_shaped_labels(p_output_sigma, p_windows_size.width / p_cell_size, p_windows_size.height / p_cell_size), p_yf,
+        gaussian_shaped_labels(p_output_sigma, p_roi.width, p_roi.height), p_yf,
         m_use_cuda ? p_rot_labels_data.deviceMem() : nullptr, p_threadctxs.front().stream);
     DEBUG_PRINTM(p_yf);
 
