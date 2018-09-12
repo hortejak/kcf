@@ -105,7 +105,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         p_fit_to_pw2 = true;
         p_pose.scale_x(p_scale_factor_x);
         p_pose.scale_y(p_scale_factor_y);
-        if (fabs(p_scale_factor_x - 1) > p_floating_error && fabs(p_scale_factor_y - 1) > p_floating_error) {
+        if (fabs(p_scale_factor_x - 1) > p_floating_error || fabs(p_scale_factor_y - 1) > p_floating_error) {
             if (p_scale_factor_x < 1 && p_scale_factor_y < 1) {
                 cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
                 cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
