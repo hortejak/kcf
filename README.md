@@ -6,11 +6,12 @@ achieve the needed performance we try various ways of parallelization
 of the algorithm including execution on the GPU. The aim is also to
 modify the code according to the PRedictable Execution Model (PREM).
 
-Stable version of the tracker is available from [CTU server][2],
-development happens at [GitHub][3].
+Stable version of the tracker is available from a [CTU server][2],
+development happens at GitHub [here][wsh] and [here][3].
 
 [1]: http://hercules2020.eu/
 [2]: http://rtime.felk.cvut.cz/gitweb/hercules2020/kcf.git
+[wsh]: https://github.com/wentasah/kcf
 [3]: https://github.com/Shanigen/kcf
 
 ## Prerequisites
