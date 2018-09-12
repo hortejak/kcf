@@ -16,7 +16,7 @@ typedef int *cudaStream_t;
 
 struct ThreadCtx {
   public:
-    ThreadCtx(cv::Size windows_size, uint cell_size, uint num_of_feats, double scale, uint num_of_scales = 1)
+    ThreadCtx(cv::Size windows_size, uint cell_size, uint num_of_feats, double scale, uint num_of_scales)
         : scale(scale)
     {
         this->xf_sqr_norm = DynMem(num_of_scales * sizeof(float));

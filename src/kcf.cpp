@@ -178,9 +178,9 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     int max = m_use_big_batch ? 2 : p_num_scales;
     for (int i = 0; i < max; ++i) {
         if (m_use_big_batch && i == 1)
-            p_threadctxs.emplace_back(p_windows_size, p_cell_size, p_num_of_feats * p_num_scales, p_num_scales);
+            p_threadctxs.emplace_back(p_windows_size, p_cell_size, p_num_of_feats * p_num_scales, 1, p_num_scales);
         else
-            p_threadctxs.emplace_back(p_windows_size, p_cell_size, p_num_of_feats, 1);
+            p_threadctxs.emplace_back(p_windows_size, p_cell_size, p_num_of_feats, p_scales[i], 1);
     }
 
     p_current_scale = 1.;
