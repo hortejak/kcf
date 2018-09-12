@@ -853,46 +853,40 @@ cv::Point2f KCF_Tracker::sub_pixel_peak(cv::Point &max_loc, cv::Mat &response)
     return sub_peak;
 }
 
-double KCF_Tracker::sub_grid_scale(int index)
+double KCF_Tracker::sub_grid_scale(uint index)
 {
     cv::Mat A, fval;
-    if (index < 0 || index >= int(p_scales.size())) {
+    if (index >= p_scales.size()) {
         // interpolate from all values
         // fit 1d quadratic function f(x) = a*x^2 + b*x + c
-        A.create(int(p_scales.size()), 3, CV_32FC1);
-        fval.create(int(p_scales.size()), 1, CV_32FC1);
-        for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
-            uint i = uint(std::distance(p_threadctxs.begin(), it));
-            int j = int(i);
-            A.at<float>(j, 0) = float(p_scales[i] * p_scales[i]);
-            A.at<float>(j, 1) = float(p_scales[i]);
-            A.at<float>(j, 2) = 1;
-            fval.at<float>(j) =
-                m_use_big_batch ? float(p_threadctxs.back().max_responses[i]) : float(it->max_response);
+        A.create(p_scales.size(), 3, CV_32FC1);
+        fval.create(p_scales.size(), 1, CV_32FC1);
+        for (size_t i = 0; i < p_scales.size(); ++i) {
+            A.at<float>(i, 0) = float(p_scales[i] * p_scales[i]);
+            A.at<float>(i, 1) = float(p_scales[i]);
+            A.at<float>(i, 2) = 1;
+            fval.at<float>(i) = m_use_big_batch ? p_threadctxs.back().max_responses[i] : p_threadctxs[i].max_response;
         }
     } else {
         // only from neighbours
-        if (index == 0 || index == int(p_scales.size()) - 1) return p_scales[uint(index)];
+        if (index == 0 || index == p_scales.size() - 1)
+           return p_scales[index];
 
-        A = (cv::Mat_<float>(3, 3) << p_scales[uint(index) - 1] * p_scales[uint(index) - 1], p_scales[uint(index) - 1],
-             1, p_scales[uint(index)] * p_scales[uint(index)], p_scales[uint(index)], 1,
-             p_scales[uint(index) + 1] * p_scales[uint(index) + 1], p_scales[uint(index) + 1], 1);
-        auto it1 = p_threadctxs.begin();
-        std::advance(it1, index - 1);
-        auto it2 = p_threadctxs.begin();
-        std::advance(it2, index);
-        auto it3 = p_threadctxs.begin();
-        std::advance(it3, index + 1);
-        fval = (cv::Mat_<float>(3, 1) << (m_use_big_batch ? p_threadctxs.back().max_responses[uint(index) - 1]
-                                                          : it1->max_response),
-                (m_use_big_batch ? p_threadctxs.back().max_responses[uint(index)] : it2->max_response),
-                (m_use_big_batch ? p_threadctxs.back().max_responses[uint(index) + 1] : it3->max_response));
+        A = (cv::Mat_<float>(3, 3) <<
+             p_scales[index - 1] * p_scales[index - 1], p_scales[index - 1], 1,
+             p_scales[index + 0] * p_scales[index + 0], p_scales[index + 0], 1,
+             p_scales[index + 1] * p_scales[index + 1], p_scales[index + 1], 1);
+        fval = (cv::Mat_<float>(3, 1) <<
+                (m_use_big_batch ? p_threadctxs.back().max_responses[index - 1] : p_threadctxs[index - 1].max_response),
+                (m_use_big_batch ? p_threadctxs.back().max_responses[index + 0] : p_threadctxs[index + 0].max_response),
+                (m_use_big_batch ? p_threadctxs.back().max_responses[index + 1] : p_threadctxs[index + 1].max_response));
     }
 
     cv::Mat x;
     cv::solve(A, fval, x, cv::DECOMP_SVD);
     float a = x.at<float>(0), b = x.at<float>(1);
-    double scale = p_scales[uint(index)];
-    if (a > 0 || a < 0) scale = double(-b / (2 * a));
+    double scale = p_scales[index];
+    if (a > 0 || a < 0)
+        scale = -b / (2 * a);
     return scale;
 }
