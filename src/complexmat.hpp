@@ -49,8 +49,7 @@ template <typename T> class ComplexMat_ {
     }
     // cv::Mat API compatibility
     cv::Size size() { return cv::Size(cols, rows); }
-    int channels() { return n_channels; }
-    int channels() const { return n_channels; }
+    uint channels() const { return n_channels; }
 
     // assuming that mat has 2 channels (real, imag)
     void set_channel(uint idx, const cv::Mat &mat)

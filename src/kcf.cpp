@@ -128,7 +128,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 
     p_scales.clear();
     if (m_use_scale)
-        for (int i = -p_num_scales / 2; i <= p_num_scales / 2; ++i)
+        for (int i = -int(p_num_scales) / 2; i <= int(p_num_scales) / 2; ++i)
             p_scales.push_back(std::pow(p_scale_step, i));
     else
         p_scales.push_back(1.);
@@ -187,8 +187,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 
     p_output_sigma = std::sqrt(p_pose.w * p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
 
-    fft.init(uint(p_roi.width), uint(p_roi.height), uint(p_num_of_feats),
-             uint(p_num_scales), m_use_big_batch);
+    fft.init(p_roi.width, p_roi.height, p_num_of_feats, p_num_scales, m_use_big_batch);
     fft.set_window(cosine_window_function(p_roi.width, p_roi.height));
 
     // window weights, i.e. labels
@@ -199,10 +198,11 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 
     // obtain a sub-window for training initial model
     p_threadctxs.front().patch_feats.clear();
-    get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size.width, p_windows_size.height,
+    get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size.width, p_windows_size.height,
                  p_threadctxs.front());
     fft.forward_window(p_threadctxs.front().patch_feats, p_model_xf, p_threadctxs.front().fw_all,
-                       m_use_cuda ? p_threadctxs.front().data_features.deviceMem() : nullptr, p_threadctxs.front().stream);
+                       m_use_cuda ? p_threadctxs.front().data_features.deviceMem() : nullptr,
+                       p_threadctxs.front().stream);
     DEBUG_PRINTM(p_model_xf);
 #if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
     p_threadctxs.front().model_xf = p_model_xf;
@@ -398,7 +398,7 @@ void KCF_Tracker::track(cv::Mat &img)
 
     // obtain a subwindow for training at newly estimated target position
     p_threadctxs.front().patch_feats.clear();
-    get_features(input_rgb, input_gray, int(p_pose.cx), int(p_pose.cy), p_windows_size.width, p_windows_size.height,
+    get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size.width, p_windows_size.height,
                  p_threadctxs.front(), p_current_scale);
     fft.forward_window(p_threadctxs.front().patch_feats, p_xf, p_threadctxs.front().fw_all,
                        m_use_cuda ? p_threadctxs.front().data_features.deviceMem() : nullptr, p_threadctxs.front().stream);
@@ -441,13 +441,13 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
     if (m_use_big_batch) {
         vars.patch_feats.clear();
         BIG_BATCH_OMP_PARALLEL_FOR
-        for (uint i = 0; i < uint(p_num_scales); ++i) {
-            get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size.width,
+        for (uint i = 0; i < p_num_scales; ++i) {
+            get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size.width,
                          this->p_windows_size.height, vars, this->p_current_scale * this->p_scales[i]);
         }
     } else {
         vars.patch_feats.clear();
-        get_features(input_rgb, input_gray, int(this->p_pose.cx), int(this->p_pose.cy), this->p_windows_size.width,
+        get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size.width,
                      this->p_windows_size.height, vars, this->p_current_scale * vars.scale);
     }
 
@@ -508,8 +508,8 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
 void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, int cy, int size_x, int size_y,
                                ThreadCtx &vars, double scale)
 {
-    int size_x_scaled = int(floor(size_x * scale));
-    int size_y_scaled = int(floor(size_y * scale));
+    int size_x_scaled = floor(size_x * scale);
+    int size_y_scaled = floor(size_y * scale);
 
     cv::Mat patch_gray = get_subwindow(input_gray, cx, cy, size_x_scaled, size_y_scaled);
     cv::Mat patch_rgb = get_subwindow(input_rgb, cx, cy, size_x_scaled, size_y_scaled);
@@ -758,7 +758,7 @@ void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat 
     if (xf.channels() != p_num_scales * p_num_of_feats)
         xy_sum.create(vars.ifft2_res.size(), CV_32FC1);
     else
-        xy_sum.create(vars.ifft2_res.size(), CV_32FC(int(p_scales.size())));
+        xy_sum.create(vars.ifft2_res.size(), CV_32FC(p_scales.size()));
     xy_sum.setTo(0);
     for (int y = 0; y < vars.ifft2_res.rows; ++y) {
         float *row_ptr = vars.ifft2_res.ptr<float>(y);
@@ -779,8 +779,8 @@ void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat 
     cv::split(xy_sum, scales);
 
     float numel_xf_inv = 1.f / (xf.cols * xf.rows * (xf.channels() / xf.n_scales));
-    for (uint i = 0; i < uint(xf.n_scales); ++i) {
-        cv::Mat in_roi(vars.in_all, cv::Rect(0, int(i) * scales[0].rows, scales[0].cols, scales[0].rows));
+    for (uint i = 0; i < xf.n_scales; ++i) {
+        cv::Mat in_roi(vars.in_all, cv::Rect(0, i * scales[0].rows, scales[0].cols, scales[0].rows));
         cv::exp(
             -1. / (sigma * sigma) *
                 cv::max((double(vars.xf_sqr_norm.hostMem()[i] + vars.yf_sqr_norm.hostMem()[0]) - 2 * scales[i]) * double(numel_xf_inv), 0),
@@ -856,7 +856,7 @@ cv::Point2f KCF_Tracker::sub_pixel_peak(cv::Point &max_loc, cv::Mat &response)
 double KCF_Tracker::sub_grid_scale(int index)
 {
     cv::Mat A, fval;
-    if (index < 0 || index > int(p_scales.size()) - 1) {
+    if (index < 0 || index >= int(p_scales.size())) {
         // interpolate from all values
         // fit 1d quadratic function f(x) = a*x^2 + b*x + c
         A.create(int(p_scales.size()), 3, CV_32FC1);
