@@ -98,12 +98,8 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
             std::cerr << "Error: Fit size is not multiple of HOG cell size (" << p_cell_size << ")" << std::endl;
             std::exit(EXIT_FAILURE);
         }
-        double tmp = (p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
-        if (fabs(tmp - fit_size_x) > p_floating_error)
-            p_scale_factor_x = fit_size_x / tmp;
-        tmp = (p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size;
-        if (fabs(tmp - fit_size_y) > p_floating_error)
-            p_scale_factor_y = fit_size_y / tmp;
+        p_scale_factor_x = (double)fit_size_x / round(p_pose.w * (1. + p_padding));
+        p_scale_factor_y = (double)fit_size_y / round(p_pose.h * (1. + p_padding));
         std::cout << "resizing image horizontaly by factor of " << p_scale_factor_x << " and verticaly by factor of "
                   << p_scale_factor_y << std::endl;
         p_fit_to_pw2 = true;
@@ -114,16 +110,15 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
                 cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
                 cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
             } else {
-                cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y,
-                           cv::INTER_LINEAR);
+                cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
                 cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
             }
         }
     }
 
     // compute win size + fit to fhog cell size
-    p_windows_size.width = int(round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size);
-    p_windows_size.height = int(round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size);
+    p_windows_size.width = round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
+    p_windows_size.height = round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size;
 
     p_num_of_feats = 31;
     if (m_use_color) p_num_of_feats += 3;

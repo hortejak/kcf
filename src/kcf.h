@@ -111,7 +111,7 @@ private:
     const double p_downscale_factor = 0.5;
     double p_scale_factor_x = 1;
     double p_scale_factor_y = 1;
-    double p_floating_error = 0.0001;
+    const double p_floating_error = 0.0001;
 
     double p_padding = 1.5;
     double p_output_sigma_factor = 0.1;
