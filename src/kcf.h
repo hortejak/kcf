@@ -129,7 +129,7 @@ private:
 
     //for big batch
     int p_num_of_feats;
-    int p_roi_height, p_roi_width;
+    cv::Size p_roi;
 
     std::vector<ThreadCtx> p_threadctxs;
 

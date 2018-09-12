@@ -123,8 +123,8 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_num_of_feats = 31;
     if (m_use_color) p_num_of_feats += 3;
     if (m_use_cnfeat) p_num_of_feats += 10;
-    p_roi_width = p_windows_size.width / p_cell_size;
-    p_roi_height = p_windows_size.height / p_cell_size;
+    p_roi.width = p_windows_size.width / p_cell_size;
+    p_roi.height = p_windows_size.height / p_cell_size;
 
     p_scales.clear();
     if (m_use_scale)
@@ -753,10 +753,10 @@ void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat 
 #ifdef CUFFT
     if (auto_correlation)
         cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(), vars.xf_sqr_norm.deviceMem(), vars.xf_sqr_norm.deviceMem(),
-                                  sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width, vars.stream);
+                                  sigma, xf.n_channels, xf.n_scales, p_roi.height, p_roi.width, vars.stream);
     else
         cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(), vars.xf_sqr_norm.deviceMem(), vars.yf_sqr_norm.deviceMem(),
-                                  sigma, xf.n_channels, xf.n_scales, p_roi_height, p_roi_width, vars.stream);
+                                  sigma, xf.n_channels, xf.n_scales, p_roi.height, p_roi.width, vars.stream);
 #else
     // ifft2 and sum over 3rd dimension, we dont care about individual channels
     DEBUG_PRINTM(vars.ifft2_res);
