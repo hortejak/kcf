@@ -445,7 +445,6 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
                          this->p_windows_size.height, vars, this->p_current_scale * this->p_scales[i]);
         }
     } else {
-        vars.patch_feats.clear();
         get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size.width,
                      this->p_windows_size.height, vars, this->p_current_scale * vars.scale);
     }
@@ -522,7 +521,7 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
     }
 
     // get hog(Histogram of Oriented Gradients) features
-    FHoG::extract(patch_gray, vars, 2, p_cell_size, 9);
+    vars.patch_feats = FHoG::extract(patch_gray, 2, p_cell_size, 9);
 
     // get color rgb features (simple r,g,b channels)
     std::vector<cv::Mat> color_feat;
