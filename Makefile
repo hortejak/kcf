@@ -77,3 +77,37 @@ vot2016 $(TESTSEQ:%=vot2016/%): vot2016.zip
 .SECONDARY:    vot2016.zip
 vot2016.zip:
 	wget http://data.votchallenge.net/vot2016/vot2016.zip
+
+###################
+# Ninja generator #
+###################
+
+# Building all $(BUILDS) with make is slow, even when run with in
+# parallel (make -j). The target below generates build.ninja file that
+# compiles all variants in the same ways as this makefile, but faster.
+# The down side is that the build needs about 10 GB of memory.
+
+ninja: build.ninja
+	ninja
+
+# Ninja generator - to have faster parallel builds
+.PHONY: build.ninja
+build.ninja:
+	$(file >$@,$(ninja-rule))
+	$(foreach build,$(BUILDS),$(file >>$@,$(call ninja-build,$(build),$(CMAKE_OTPS_$(build)))))
+
+define ninja-rule
+rule cmake
+  command = cd $$$$(dirname $$out) && cmake $(CMAKE_OPTS) $$opts ..
+  description = CMake $$out
+rule ninja
+  # Absolute path in -C allows Emacs to properly jump to error message locations
+  command = ninja -C `realpath $$$$(dirname $$out)`
+  description = Ninja $$out
+endef
+
+define ninja-build
+build build-$(1)/build.ninja: cmake
+  opts = $(2)
+build build-$(1)/kcf_vot: ninja build-$(1)/build.ninja build.ninja
+endef
