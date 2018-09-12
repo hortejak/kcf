@@ -155,14 +155,13 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 #endif
 
 #if defined(CUFFT) || defined(FFTW)
-    p_model_xf.create(p_roi.height, p_roi.width / 2 + 1, p_num_of_feats);
-    p_yf.create(p_roi.height, p_roi.width / 2 + 1, 1);
-    p_xf.create(p_roi.height, p_roi.width / 2 + 1, p_num_of_feats);
+    uint width = p_roi.width / 2 + 1;
 #else
-    p_model_xf.create(p_roi.height, p_roi.width, p_num_of_feats);
-    p_yf.create(p_roi.height, p_roi.width, 1);
-    p_xf.create(p_roi.height, p_roi.width, p_num_of_feats);
+    uint width = p_roi.width;
 #endif
+    p_model_xf.create(p_roi.height, width, p_num_of_feats);
+    p_yf.create(p_roi.height, width, 1);
+    p_xf.create(p_roi.height, width, p_num_of_feats);
 
     int max = m_use_big_batch ? 2 : p_num_scales;
     for (int i = 0; i < max; ++i) {
