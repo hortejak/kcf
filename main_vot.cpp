@@ -196,11 +196,12 @@ int main(int argc, char *argv[])
 //        cv::imwrite(ss.c_str(), image, compression_params);
     }
 
-    std::cout << "Average processing speed " << avg_time/frames <<  "ms. (" << 1./(avg_time/frames)*1000 << " fps)" << std::endl;
+    std::cout << "Average processing speed: " << avg_time/frames <<  "ms (" << 1./(avg_time/frames)*1000 << " fps)";
     if (groundtruth_stream.is_open()) {
-        std::cout << "Average accuracy: " << sum_accuracy/frames << std::endl;
+        std::cout << "; Average accuracy: " << sum_accuracy/frames << std::endl;
         groundtruth_stream.close();
     }
+    std::cout << std::endl;
 
     return EXIT_SUCCESS;
 }
