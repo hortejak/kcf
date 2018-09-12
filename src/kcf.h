@@ -97,11 +97,14 @@ public:
     // frame-to-frame object tracking
     void track(cv::Mat & img);
     BBox_c getBBox();
+    double getFilterResponse() const; // Measure of tracking accuracy
 
 private:
     Fft &fft;
 
     BBox_c p_pose;
+    double max_response = -1.;
+
     bool p_resize_image = false;
     bool p_fit_to_pw2 = false;
 

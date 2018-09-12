@@ -145,7 +145,8 @@ int main(int argc, char *argv[])
         double time_profile_counter = cv::getCPUTickCount();
         tracker.track(image);
         time_profile_counter = cv::getCPUTickCount() - time_profile_counter;
-         std::cout << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms. per frame";
+         std::cout << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms. per frame, "
+                      "response : " << tracker.getFilterResponse();
         avg_time += time_profile_counter/((double)cvGetTickFrequency()*1000);
         frames++;
 

@@ -294,6 +294,11 @@ BBox_c KCF_Tracker::getBBox()
     return tmp;
 }
 
+double KCF_Tracker::getFilterResponse() const
+{
+    return this->max_response;
+}
+
 void KCF_Tracker::track(cv::Mat &img)
 {
     if (m_debug) std::cout << "NEW FRAME" << '\n';
@@ -319,7 +324,7 @@ void KCF_Tracker::track(cv::Mat &img)
         }
     }
 
-    double max_response = -1.;
+    max_response = -1.;
     ThreadCtx *max = nullptr;
     cv::Point2i *max_response_pt = nullptr;
     cv::Mat *max_response_map = nullptr;
