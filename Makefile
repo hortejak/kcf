@@ -1,7 +1,7 @@
 # Makefile to build all the available variants
 
 BUILDS = opencvfft-st opencvfft-async opencvfft-openmp fftw fftw-async fftw-openmp fftw-big fftw-big-openmp cufftw cufftw-big cufftw-big-openmp cufft cufft-openmp cufft-big cufft-big-openmp
-TESTSEQ = bag ball1 car1
+TESTSEQ = bag ball1 car1 book
 TESTFLAGS = default fit128
 
 all: $(foreach build,$(BUILDS),build-$(build)/kcf_vot)
