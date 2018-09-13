@@ -28,6 +28,18 @@
                   << (obj) << std::endl;                                                                               \
     }
 
+template <typename T>
+T clamp(const T& n, const T& lower, const T& upper)
+{
+    return std::max(lower, std::min(n, upper));
+}
+
+template <typename T>
+void clamp2(T& n, const T& lower, const T& upper)
+{
+    n = std::max(lower, std::min(n, upper));
+}
+
 KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor,
                          double output_sigma_factor, int cell_size)
     : fft(*new FFT()), p_padding(padding), p_output_sigma_factor(output_sigma_factor), p_kernel_sigma(kernel_sigma),
@@ -373,15 +385,11 @@ void KCF_Tracker::track(cv::Mat &img)
     p_pose.cx += p_current_scale * p_cell_size * double(new_location.x);
     p_pose.cy += p_current_scale * p_cell_size * double(new_location.y);
     if (p_fit_to_pw2) {
-        if (p_pose.cx < 0) p_pose.cx = 0;
-        if (p_pose.cx > (img.cols * p_scale_factor_x) - 1) p_pose.cx = (img.cols * p_scale_factor_x) - 1;
-        if (p_pose.cy < 0) p_pose.cy = 0;
-        if (p_pose.cy > (img.rows * p_scale_factor_y) - 1) p_pose.cy = (img.rows * p_scale_factor_y) - 1;
+        clamp2(p_pose.cx, 0.0, (img.cols * p_scale_factor_x) - 1);
+        clamp2(p_pose.cy, 0.0, (img.rows * p_scale_factor_y) - 1);
     } else {
-        if (p_pose.cx < 0) p_pose.cx = 0;
-        if (p_pose.cx > img.cols - 1) p_pose.cx = img.cols - 1;
-        if (p_pose.cy < 0) p_pose.cy = 0;
-        if (p_pose.cy > img.rows - 1) p_pose.cy = img.rows - 1;
+        clamp2(p_pose.cx, 0.0, img.cols - 1.0);
+        clamp2(p_pose.cy, 0.0, img.rows - 1.0);
     }
 
     // sub grid scale interpolation
@@ -392,9 +400,7 @@ void KCF_Tracker::track(cv::Mat &img)
         p_current_scale *= max->scale;
     }
 
-
-    if (p_current_scale < p_min_max_scale[0]) p_current_scale = p_min_max_scale[0];
-    if (p_current_scale > p_min_max_scale[1]) p_current_scale = p_min_max_scale[1];
+    clamp2(p_current_scale, p_min_max_scale[0], p_min_max_scale[1]);
 
     // obtain a subwindow for training at newly estimated target position
     p_threadctxs.front().patch_feats.clear();
