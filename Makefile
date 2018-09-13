@@ -70,7 +70,7 @@ test-$(1): test-$(1)-$(2)
 test-$(1)-$(2): $(foreach f,$(TESTFLAGS),build-$(1)/kcf_vot-$(2)-$(f).log)
 $(foreach f,$(TESTFLAGS),build-$(1)/kcf_vot-$(2)-$(f).log): build-$(1)/kcf_vot $$(filter-out %/output.txt,$$(wildcard vot2016/$(2)/*)) | vot2016/$(2)
 	$$< $$(if $$(@:%fit128.log=),,--fit=128) vot2016/$(2) > $$@
-# 	cat $$@
+	$(if $(TRAVIS),,cat $$@)
 endef
 
 $(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(eval $(call testcase,$(build),$(seq)))))
