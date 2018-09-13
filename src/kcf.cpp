@@ -209,10 +209,9 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     DEBUG_PRINTM(p_yf);
 
     // obtain a sub-window for training initial model
-    p_threadctxs.front().patch_feats.clear();
-    get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size.width, p_windows_size.height,
-                 p_threadctxs.front());
-    fft.forward_window(p_threadctxs.front().patch_feats, p_model_xf, p_threadctxs.front().fw_all,
+    std::vector<cv::Mat> patch_feats = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy,
+                                                    p_windows_size.width, p_windows_size.height);
+    fft.forward_window(patch_feats, p_model_xf, p_threadctxs.front().fw_all,
                        m_use_cuda ? p_threadctxs.front().data_features.deviceMem() : nullptr,
                        p_threadctxs.front().stream);
     DEBUG_PRINTM(p_model_xf);
@@ -404,10 +403,10 @@ void KCF_Tracker::track(cv::Mat &img)
 
     ThreadCtx &ctx = p_threadctxs.front();
     // obtain a subwindow for training at newly estimated target position
-    ctx.patch_feats.clear();
-    get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size.width, p_windows_size.height,
-                 ctx, p_current_scale);
-    fft.forward_window(ctx.patch_feats, p_xf, ctx.fw_all,
+    std::vector<cv::Mat> patch_feats = get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy,
+                                                    p_windows_size.width, p_windows_size.height,
+                                                    p_current_scale);
+    fft.forward_window(patch_feats, p_xf, ctx.fw_all,
                        m_use_cuda ? ctx.data_features.deviceMem() : nullptr, ctx.stream);
 
     // subsequent frames, interpolate model
@@ -445,19 +444,21 @@ void KCF_Tracker::track(cv::Mat &img)
 
 void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray)
 {
+    std::vector<cv::Mat> patch_feats;
     if (m_use_big_batch) {
-        vars.patch_feats.clear();
         BIG_BATCH_OMP_PARALLEL_FOR
         for (uint i = 0; i < p_num_scales; ++i) {
-            get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size.width,
-                         this->p_windows_size.height, vars, this->p_current_scale * this->p_scales[i]);
+            patch_feats = get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy,
+                                       this->p_windows_size.width, this->p_windows_size.height,
+                                       this->p_current_scale * this->p_scales[i]);
         }
     } else {
-        get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy, this->p_windows_size.width,
-                     this->p_windows_size.height, vars, this->p_current_scale * vars.scale);
+        patch_feats = get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy,
+                                   this->p_windows_size.width, this->p_windows_size.height,
+                                   this->p_current_scale * vars.scale);
     }
 
-    fft.forward_window(vars.patch_feats, vars.zf, vars.fw_all, m_use_cuda ? vars.data_features.deviceMem() : nullptr,
+    fft.forward_window(patch_feats, vars.zf, vars.fw_all, m_use_cuda ? vars.data_features.deviceMem() : nullptr,
                        vars.stream);
     DEBUG_PRINTM(vars.zf);
 
@@ -511,8 +512,7 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
 
 // ****************************************************************************
 
-void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, int cy, int size_x, int size_y,
-                               ThreadCtx &vars, double scale)
+std::vector<cv::Mat> KCF_Tracker::get_features(cv::Mat & input_rgb, cv::Mat & input_gray, int cx, int cy, int size_x, int size_y, double scale)
 {
     int size_x_scaled = floor(size_x * scale);
     int size_y_scaled = floor(size_y * scale);
@@ -529,7 +529,7 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
     }
 
     // get hog(Histogram of Oriented Gradients) features
-    vars.patch_feats = FHoG::extract(patch_gray, 2, p_cell_size, 9);
+    std::vector<cv::Mat> hog_feat = FHoG::extract(patch_gray, 2, p_cell_size, 9);
 
     // get color rgb features (simple r,g,b channels)
     std::vector<cv::Mat> color_feat;
@@ -537,11 +537,9 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
         // resize to default size
         if (scale > 1.) {
             // if we downsample use  INTER_AREA interpolation
-            cv::resize(patch_rgb, patch_rgb, cv::Size(size_x / p_cell_size, size_y / p_cell_size), 0., 0.,
-                       cv::INTER_AREA);
+            cv::resize(patch_rgb, patch_rgb, cv::Size(size_x / p_cell_size, size_y / p_cell_size), 0., 0., cv::INTER_AREA);
         } else {
-            cv::resize(patch_rgb, patch_rgb, cv::Size(size_x / p_cell_size, size_y / p_cell_size), 0., 0.,
-                       cv::INTER_LINEAR);
+            cv::resize(patch_rgb, patch_rgb, cv::Size(size_x / p_cell_size, size_y / p_cell_size), 0., 0., cv::INTER_LINEAR);
         }
     }
 
@@ -561,9 +559,9 @@ void KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, 
         std::vector<cv::Mat> cn_feat = CNFeat::extract(patch_rgb);
         color_feat.insert(color_feat.end(), cn_feat.begin(), cn_feat.end());
     }
-    BIG_BATCH_OMP_ORDERED
-    vars.patch_feats.insert(vars.patch_feats.end(), color_feat.begin(), color_feat.end());
-    return;
+
+    hog_feat.insert(hog_feat.end(), color_feat.begin(), color_feat.end());
+    return hog_feat;
 }
 
 cv::Mat KCF_Tracker::gaussian_shaped_labels(double sigma, int dim1, int dim2)

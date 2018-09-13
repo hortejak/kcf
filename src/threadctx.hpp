@@ -21,7 +21,6 @@ struct ThreadCtx {
     {
         this->xf_sqr_norm = DynMem(num_of_scales * sizeof(float));
         this->yf_sqr_norm = DynMem(sizeof(float));
-        this->patch_feats.reserve(uint(num_of_feats));
 
         uint cells_size = roi.width * roi.height * sizeof(float);
 
@@ -48,8 +47,6 @@ struct ThreadCtx {
 
         this->ifft2_res = cv::Mat(roi, CV_32FC(num_of_feats), this->data_i_features.hostMem());
         this->response = cv::Mat(roi, CV_32FC(num_of_scales), this->data_i_1ch.hostMem());
-
-        this->patch_feats.reserve(num_of_feats);
 
 #ifdef CUFFT
         this->zf.create(roi.height, width_freq, num_of_feats, num_of_scales, this->stream);
@@ -81,7 +78,6 @@ struct ThreadCtx {
 #endif
 
     DynMem xf_sqr_norm, yf_sqr_norm;
-    std::vector<cv::Mat> patch_feats;
 
     cv::Mat in_all, fw_all, ifft2_res, response;
     ComplexMat zf, kzf, kf, xyf;
