@@ -114,8 +114,6 @@ void cuFFT::set_window(const cv::Mat &window)
 
 void cuFFT::forward(const cv::Mat &real_input, ComplexMat &complex_result, float *real_input_arr, cudaStream_t stream)
 {
-    (void)real_input;
-
     if (BIG_BATCH_MODE && real_input.rows == int(m_height * m_num_of_scales)) {
         CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal *>(real_input_arr),
                                      complex_result.get_p_data()));
