@@ -1,13 +1,19 @@
 # Makefile to build all the available variants
 
 BUILDS = opencvfft-st opencvfft-async opencvfft-openmp fftw fftw-async fftw-openmp fftw-big fftw-big-openmp cufftw cufftw-big cufftw-big-openmp cufft cufft-openmp cufft-big cufft-big-openmp
-TESTSEQ = bag ball1 car1
+TESTSEQ = bag ball1 car1 book
 TESTFLAGS = default fit128
 
 all: $(foreach build,$(BUILDS),build-$(build)/kcf_vot)
 
 CMAKE_OPTS += -G Ninja
-#CMAKE_OPTS += -DOpenCV_DIR=~/opt/opencv-2.4/share/OpenCV
+
+## Useful setting - uncomment and modify as needed
+# CMAKE_OPTS += -DOpenCV_DIR=~/opt/opencv-2.4/share/OpenCV
+# CMAKE_OPTS += -DCUDA_VERBOSE_BUILD=ON -DCUDA_NVCC_FLAGS="--verbose;--save-temps"
+# export CC=gcc-5
+# export CXX=g++-5
+# export CUDA_BIN_PATH=/usr/local/cuda-9.0
 
 CMAKE_OTPS_opencvfft-st      = -DFFT=OpenCV
 CMAKE_OTPS_opencvfft-async   = -DFFT=OpenCV -DASYNC=ON
@@ -64,7 +70,7 @@ test-$(1): test-$(1)-$(2)
 test-$(1)-$(2): $(foreach f,$(TESTFLAGS),build-$(1)/kcf_vot-$(2)-$(f).log)
 $(foreach f,$(TESTFLAGS),build-$(1)/kcf_vot-$(2)-$(f).log): build-$(1)/kcf_vot $$(filter-out %/output.txt,$$(wildcard vot2016/$(2)/*)) | vot2016/$(2)
 	$$< $$(if $$(@:%fit128.log=),,--fit=128) vot2016/$(2) > $$@
-# 	cat $$@
+	$(if $(TRAVIS),,cat $$@)
 endef
 
 $(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(eval $(call testcase,$(build),$(seq)))))

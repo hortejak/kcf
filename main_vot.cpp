@@ -2,6 +2,7 @@
 #include <getopt.h>
 #include <libgen.h>
 #include <unistd.h>
+#include <iomanip>
 
 #include "kcf.h"
 #include "vot.hpp"
@@ -144,11 +145,14 @@ int main(int argc, char *argv[])
     cv::Rect bb_rect;
     double avg_time = 0., sum_accuracy = 0.;
     int frames = 0;
-    while (vot_io.getNextImage(image) == 1) {
+
+    std::cout << std::fixed << std::setprecision(2);
+
+    while (vot_io.getNextImage(image) == 1){
         double time_profile_counter = cv::getCPUTickCount();
         tracker.track(image);
         time_profile_counter = cv::getCPUTickCount() - time_profile_counter;
-         std::cout << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms. per frame, "
+         std::cout << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms per frame, "
                       "response : " << tracker.getFilterResponse();
         avg_time += time_profile_counter/((double)cvGetTickFrequency()*1000);
         frames++;
@@ -213,7 +217,7 @@ int main(int argc, char *argv[])
         //        cv::imwrite(ss.c_str(), image, compression_params);
     }
 
-    std::cout << "Average processing speed: " << avg_time/frames <<  "ms (" << 1./(avg_time/frames)*1000 << " fps)";
+    std::cout << "Average processing speed: " << avg_time / frames << "ms (" << 1. / (avg_time / frames) * 1000 << " fps)";
     if (groundtruth_stream.is_open()) {
         std::cout << "; Average accuracy: " << sum_accuracy/frames << std::endl;
         groundtruth_stream.close();
