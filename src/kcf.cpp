@@ -1,7 +1,6 @@
 #include "kcf.h"
 #include <numeric>
 #include <thread>
-#include <future>
 #include <algorithm>
 
 #ifdef FFTW
@@ -96,53 +95,52 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
     } else if (!(fit_size_x == -1 && fit_size_y == -1)) {
         if (fit_size_x % p_cell_size != 0 || fit_size_y % p_cell_size != 0) {
-            std::cerr << "Fit size does not fit to hog cell size. The dimensions have to be divisible by HOG cell "
-                         "size, which is: "
-                      << p_cell_size << std::endl;
-            ;
+            std::cerr << "Error: Fit size is not multiple of HOG cell size (" << p_cell_size << ")" << std::endl;
             std::exit(EXIT_FAILURE);
         }
-        double tmp = (p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
-        if (fabs(tmp - fit_size_x) > p_floating_error) p_scale_factor_x = fit_size_x / tmp;
-        tmp = (p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size;
-        if (fabs(tmp - fit_size_y) > p_floating_error) p_scale_factor_y = fit_size_y / tmp;
+        p_scale_factor_x = (double)fit_size_x / round(p_pose.w * (1. + p_padding));
+        p_scale_factor_y = (double)fit_size_y / round(p_pose.h * (1. + p_padding));
         std::cout << "resizing image horizontaly by factor of " << p_scale_factor_x << " and verticaly by factor of "
                   << p_scale_factor_y << std::endl;
         p_fit_to_pw2 = true;
         p_pose.scale_x(p_scale_factor_x);
         p_pose.scale_y(p_scale_factor_y);
-        if (fabs(p_scale_factor_x - 1) > p_floating_error && fabs(p_scale_factor_y - 1) > p_floating_error) {
+        if (fabs(p_scale_factor_x - 1) > p_floating_error || fabs(p_scale_factor_y - 1) > p_floating_error) {
             if (p_scale_factor_x < 1 && p_scale_factor_y < 1) {
                 cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
                 cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
             } else {
-                cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y,
-                           cv::INTER_LINEAR);
+                cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
                 cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
             }
         }
     }
 
     // compute win size + fit to fhog cell size
-    p_windows_size.width = int(round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size);
-    p_windows_size.height = int(round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size);
+    p_windows_size.width = round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
+    p_windows_size.height = round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size;
+    p_roi.width = p_windows_size.width / p_cell_size;
+    p_roi.height = p_windows_size.height / p_cell_size;
 
     p_scales.clear();
-    if (m_use_scale)
-        for (int i = -p_num_scales / 2; i <= p_num_scales / 2; ++i)
+    if (m_use_scale) {
+        for (int i = -int(p_num_scales) / 2; i <= int(p_num_scales) / 2; ++i)
             p_scales.push_back(std::pow(p_scale_step, i));
-    else
+    } else {
         p_scales.push_back(1.);
+        p_num_scales = 1;
+    }
 
     if (m_use_angle) {
         for (int i = p_angle_min; i <= p_angle_max; i += p_angle_step)
             p_angles.push_back(i);
     } else {
         p_angles.push_back(0);
+        p_num_angles = 1;
     }
 
 #ifdef CUFFT
-    if (p_windows_size.height / p_cell_size * (p_windows_size.width / p_cell_size / 2 + 1) > 1024) {
+    if (p_roi.height * (p_roi.width / 2 + 1) > 1024) {
         std::cerr << "Window after forward FFT is too big for CUDA kernels. Plese use -f to set "
                      "the window dimensions so its size is less or equal to "
                   << 1024 * p_cell_size * p_cell_size * 2 + 1
@@ -157,41 +155,30 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         std::exit(EXIT_FAILURE);
     }
 
-    p_roi_width = p_windows_size.width / p_cell_size;
-    p_roi_height = p_windows_size.height / p_cell_size;
-
     CudaSafeCall(cudaSetDeviceFlags(cudaDeviceMapHost));
 
-    p_rot_labels_data = DynMem(
-        ((uint(p_windows_size.width) / p_cell_size) * (uint(p_windows_size.height) / p_cell_size)) * sizeof(float));
-    p_rot_labels = cv::Mat(p_windows_size.height / int(p_cell_size), p_windows_size.width / int(p_cell_size), CV_32FC1,
-                           p_rot_labels_data.hostMem());
-#else
-    p_xf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.height / p_cell_size)) / 2 + 1,
-                p_num_of_feats);
+    p_rot_labels_data = DynMem(p_roi.width * p_roi.height * sizeof(float));
+    p_rot_labels = cv::Mat(p_roi, CV_32FC1, p_rot_labels_data.hostMem());
 #endif
 
 #if defined(CUFFT) || defined(FFTW)
-    p_model_xf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.width / p_cell_size)) / 2 + 1,
-                      uint(p_num_of_feats));
-    p_yf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.width / p_cell_size)) / 2 + 1, 1);
-    p_xf.create(uint(p_windows_size.height) / p_cell_size, (uint(p_windows_size.width) / p_cell_size) / 2 + 1,
-                p_num_of_feats);
+    uint width = p_roi.width / 2 + 1;
 #else
-    p_model_xf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.width / p_cell_size)),
-                      uint(p_num_of_feats));
-    p_yf.create(uint(p_windows_size.height / p_cell_size), (uint(p_windows_size.width / p_cell_size)), 1);
-    p_xf.create(uint(p_windows_size.height) / p_cell_size, (uint(p_windows_size.width) / p_cell_size), p_num_of_feats);
+    uint width = p_roi.width;
 #endif
+    p_model_xf.create(p_roi.height, width, p_num_of_feats);
+    p_yf.create(p_roi.height, width, 1);
+    p_xf.create(p_roi.height, width, p_num_of_feats);
 
-    int max = m_use_big_batch ? 2 : p_num_scales;
-    for (int i = 0; i < max; ++i) {
-        if (m_use_big_batch && i == 1) {
-            p_threadctxs.emplace_back(new ThreadCtx(p_windows_size, p_cell_size,
-                                                    p_num_of_feats * p_scales.size() * p_angles.size(), p_scales.size(),
-                                                    p_angles.size()));
-        } else {
-            p_threadctxs.emplace_back(new ThreadCtx(p_windows_size, p_cell_size, p_num_of_feats));
+    int max1 = m_use_big_batch ? 2 : p_num_scales;
+    int max2 = m_use_big_batch ? 1 : p_num_angles;
+    for (int i = 0; i < max1; ++i) {
+        for (int j = 0; j < max2; ++j) {
+            if (m_use_big_batch && i == 1)
+                p_threadctxs.emplace_back(p_roi, p_num_of_feats * p_num_scales * p_num_angles, 1, 0, p_num_scales,
+                                          p_num_angles);
+            else
+                p_threadctxs.emplace_back(p_roi, p_num_of_feats, p_scales[i], p_angles[j]);
         }
     }
 
@@ -210,18 +197,16 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 
     p_output_sigma = std::sqrt(p_pose.w * p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
 
-    fft.init(uint(p_windows_size.width / p_cell_size), uint(p_windows_size.height / p_cell_size), uint(p_num_of_feats),
-             uint(p_scales.size() * p_angles.size()), m_use_big_batch);
-    fft.set_window(cosine_window_function(p_windows_size.width / p_cell_size, p_windows_size.height / p_cell_size));
+    fft.init(p_roi.width, p_roi.height, p_num_of_feats, p_num_scales * p_num_angles, m_use_big_batch);
+    fft.set_window(cosine_window_function(p_roi.width, p_roi.height));
 
     // window weights, i.e. labels
-    fft.forward(
-        gaussian_shaped_labels(p_output_sigma, p_windows_size.width / p_cell_size, p_windows_size.height / p_cell_size),
-        p_yf, m_use_cuda ? p_rot_labels_data.deviceMem() : nullptr, p_threadctxs.front()->stream);
+    fft.forward(gaussian_shaped_labels(p_output_sigma, p_roi.width, p_roi.height), p_yf,
+                m_use_cuda ? p_rot_labels_data.deviceMem() : nullptr, p_threadctxs.front().stream);
     DEBUG_PRINTM(p_yf);
 
     // obtain a sub-window for training initial model
-    p_threadctxs.front()->patch_feats.clear();
+    p_threadctxs.front().patch_feats.clear();
 
     int size_x_scaled = floor(p_windows_size.width);
     int size_y_scaled = floor(p_windows_size.height);
@@ -235,18 +220,18 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         geometric_transformations(patch_rgb, p_windows_size.width, p_windows_size.height, 0, false);
     }
 
-    get_features(patch_rgb, patch_gray, *p_threadctxs.front());
-    fft.forward_window(p_threadctxs.front()->patch_feats, p_model_xf, p_threadctxs.front()->fw_all,
-                       m_use_cuda ? p_threadctxs.front()->data_features.deviceMem() : nullptr,
-                       p_threadctxs.front()->stream);
+    get_features(patch_rgb, patch_gray, p_threadctxs.front());
+    fft.forward_window(p_threadctxs.front().patch_feats, p_model_xf, p_threadctxs.front().fw_all,
+                       m_use_cuda ? p_threadctxs.front().data_features.deviceMem() : nullptr,
+                       p_threadctxs.front().stream);
     DEBUG_PRINTM(p_model_xf);
 
 #if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
-    p_threadctxs.front()->model_xf = p_model_xf;
-    p_threadctxs.front()->model_xf.set_stream(p_threadctxs.front()->stream);
-    p_yf.set_stream(p_threadctxs.front()->stream);
-    p_model_xf.set_stream(p_threadctxs.front()->stream);
-    p_xf.set_stream(p_threadctxs.front()->stream);
+    p_threadctxs.front().model_xf = p_model_xf;
+    p_threadctxs.front().model_xf.set_stream(p_threadctxs.front().stream);
+    p_yf.set_stream(p_threadctxs.front().stream);
+    p_model_xf.set_stream(p_threadctxs.front().stream);
+    p_xf.set_stream(p_threadctxs.front().stream);
 #endif
 
     if (m_use_linearkernel) {
@@ -255,28 +240,28 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         p_model_alphaf_den = (p_model_xf * xfconj);
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
-#if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
-        gaussian_correlation(*p_threadctxs.front(), p_threadctxs.front()->model_xf, p_threadctxs.front()->model_xf,
+#if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
+        gaussian_correlation(p_threadctxs.front(), p_threadctxs.front().model_xf, p_threadctxs.front().model_xf,
                              p_kernel_sigma, true);
 #else
-        gaussian_correlation(*p_threadctxs.front(), p_model_xf, p_model_xf, p_kernel_sigma, true);
+        gaussian_correlation(p_threadctxs.front(), p_model_xf, p_model_xf, p_kernel_sigma, true);
 #endif
-        DEBUG_PRINTM(p_threadctxs.front()->kf);
-        p_model_alphaf_num = p_yf * p_threadctxs.front()->kf;
+        DEBUG_PRINTM(p_threadctxs.front().kf);
+        p_model_alphaf_num = p_yf * p_threadctxs.front().kf;
         DEBUG_PRINTM(p_model_alphaf_num);
-        p_model_alphaf_den = p_threadctxs.front()->kf * (p_threadctxs.front()->kf + float(p_lambda));
+        p_model_alphaf_den = p_threadctxs.front().kf * (p_threadctxs.front().kf + float(p_lambda));
         DEBUG_PRINTM(p_model_alphaf_den);
     }
     p_model_alphaf = p_model_alphaf_num / p_model_alphaf_den;
     DEBUG_PRINTM(p_model_alphaf);
     //        p_model_alphaf = p_yf / (kf + p_lambda);   //equation for fast training
 
-#if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
+#if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
     for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
-        (*it)->model_xf = p_model_xf;
-        (*it)->model_xf.set_stream((*it)->stream);
-        (*it)->model_alphaf = p_model_alphaf;
-        (*it)->model_alphaf.set_stream((*it)->stream);
+        it->model_xf = p_model_xf;
+        it->model_xf.set_stream(it->stream);
+        it->model_alphaf = p_model_alphaf;
+        it->model_alphaf.set_stream(it->stream);
     }
 #endif
 }
@@ -321,6 +306,11 @@ BBox_c KCF_Tracker::getBBox()
     return tmp;
 }
 
+double KCF_Tracker::getFilterResponse() const
+{
+    return this->max_response;
+}
+
 void KCF_Tracker::track(cv::Mat &img)
 {
     if (m_debug || m_visual_debug) std::cout << "\nNEW FRAME" << std::endl;
@@ -345,91 +335,67 @@ void KCF_Tracker::track(cv::Mat &img)
             cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
         }
     }
-
-    double max_response = -1.;
-    uint scale_index = 0;
-    uint angle_index = 0;
+    max_response = -1.;
+    ThreadCtx *max = nullptr;
     cv::Point2i *max_response_pt = nullptr;
     cv::Mat *max_response_map = nullptr;
 
-    if (m_use_multithreading) {
-        std::vector<std::future<void>> async_res(p_scales.size());
-        for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
-            uint index = uint(std::distance(p_threadctxs.begin(), it));
-            async_res[index] = std::async(std::launch::async, [this, &input_gray, &input_rgb, index, it]() -> void {
-                return scale_track(*(*it), input_rgb, input_gray, this->p_scales[index]);
-            });
-        }
-        for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
-            uint index = uint(std::distance(p_threadctxs.begin(), it));
-            async_res[index].wait();
-            if ((*it)->max_response > max_response) {
-                max_response = (*it)->max_response;
-                max_response_pt = &(*it)->max_loc;
-                max_response_map = &(*it)->response;
-                scale_index = index;
-            }
-        }
-    } else {
-        uint start = m_use_big_batch ? 1 : 0;
-        uint end1 = m_use_big_batch ? 2 : uint(p_scales.size());
-        uint end2 = m_use_big_batch ? 1 : uint(p_angles.size());
-        NORMAL_OMP_PARALLEL_FOR
-        for (uint i = start; i < end1; ++i) {
-            auto it = p_threadctxs.begin();
-            std::advance(it, i);
-            for (size_t j = 0; j < end2; ++j) {
-                scale_track(*(*it), input_rgb, input_gray, this->p_scales[i], this->p_angles[j]);
+#ifdef ASYNC
+    for (auto &it : p_threadctxs)
+        it.async_res = std::async(std::launch::async, [this, &input_gray, &input_rgb, &it]() -> void {
+            scale_track(it, input_rgb, input_gray);
+        });
+    for (auto const &it : p_threadctxs)
+        it.async_res.wait();
+#else  // !ASYNC
+    NORMAL_OMP_PARALLEL_FOR
+    for (uint i = m_use_big_batch ? 1 : 0; i < p_threadctxs.size(); ++i)
+        scale_track(p_threadctxs[i], input_rgb, input_gray);
+#endif
 
-                if (m_use_big_batch) {
-                    for (uint x = 0; x < p_scales.size(); ++x) {
-                        for (uint k = 0; k < p_angles.size(); ++k) {
-                            if ((*it)->max_responses[x + k] > max_response) {
-                                max_response = (*it)->max_responses[x + k];
-                                max_response_pt = &(*it)->max_locs[x + k];
-                                max_response_map = &(*it)->response_maps[x + k];
-                                scale_index = x;
-                                angle_index = k;
-                            }
-                        }
-                    }
-                } else {
-                    NORMAL_OMP_CRITICAL
-                    {
-                        if ((*it)->max_response > max_response) {
-                            max_response = (*it)->max_response;
-                            max_response_pt = &(*it)->max_loc;
-                            max_response_map = &(*it)->response;
-                            scale_index = i;
-                            angle_index = j;
-                        }
-                    }
-                }
+#ifndef BIG_BATCH
+    for (auto &it : p_threadctxs) {
+        if (it.max_response > max_response) {
+            max_response = it.max_response;
+            max_response_pt = &it.max_loc;
+            max_response_map = &it.response;
+            max = &it;
+        }
+    }
+#else
+    for (uint j = 0; j < p_num_scales; ++j) {
+        for (uint k = 0; k < p_num_angles; ++k) {
+            if (p_threadctxs.back().max_responses[j + k] > max_response) {
+                max_response = p_threadctxs.back().max_responses[j + k];
+                max_response_pt = &p_threadctxs.back().max_locs[j + k];
+                max_response_map = &p_threadctxs.back().response_maps[j + k];
             }
         }
-        if (m_visual_debug) {
-            cv::Mat all_responses(cv::Size(p_angles.size() * p_debug_image_size, p_scales.size() * p_debug_image_size),
-                                  p_debug_scale_responses[0].type(), cv::Scalar::all(0));
-            cv::Mat all_subwindows(cv::Size(p_angles.size() * p_debug_image_size, p_scales.size() * p_debug_image_size),
-                                   p_debug_subwindows[0].type(), cv::Scalar::all(0));
-            for (size_t i = 0; i < p_scales.size(); ++i) {
-                for (size_t j = 0; j < p_angles.size(); ++j) {
-                    cv::Mat in_roi(all_responses, cv::Rect(j * p_debug_image_size, i * p_debug_image_size,
-                                                           p_debug_image_size, p_debug_image_size));
-                    p_debug_scale_responses[5 * i + j].copyTo(in_roi);
-                    in_roi = all_subwindows(cv::Rect(j * p_debug_image_size, i * p_debug_image_size, p_debug_image_size,
-                                                     p_debug_image_size));
-                    p_debug_subwindows[5 * i + j].copyTo(in_roi);
-                }
+    }
+    max = &p_threadctxs.back();
+#endif
+    if (m_visual_debug) {
+        cv::Mat all_responses(cv::Size(p_num_angles* p_debug_image_size, p_num_scales * p_debug_image_size),
+                              p_debug_scale_responses[0].type(), cv::Scalar::all(0));
+        cv::Mat all_subwindows(cv::Size(p_num_angles* p_debug_image_size, p_num_scales* p_debug_image_size),
+                               p_debug_subwindows[0].type(), cv::Scalar::all(0));
+        for (size_t i = 0; i < p_num_scales; ++i) {
+            for (size_t j = 0; j < p_num_angles; ++j) {
+                cv::Mat in_roi(all_responses, cv::Rect(j * p_debug_image_size, i * p_debug_image_size,
+                                                       p_debug_image_size, p_debug_image_size));
+                p_debug_scale_responses[5 * i + j].copyTo(in_roi);
+                in_roi = all_subwindows(
+                    cv::Rect(j * p_debug_image_size, i * p_debug_image_size, p_debug_image_size, p_debug_image_size));
+                p_debug_subwindows[5 * i + j].copyTo(in_roi);
             }
-            cv::namedWindow("All subwindows", CV_WINDOW_AUTOSIZE);
-            cv::imshow("All subwindows", all_subwindows);
-            cv::namedWindow("All responses", CV_WINDOW_AUTOSIZE);
-            cv::imshow("All responses", all_responses);
-            cv::waitKey();
-            p_debug_scale_responses.clear();
-            p_debug_subwindows.clear();
         }
+        cv::namedWindow("All subwindows", CV_WINDOW_AUTOSIZE);
+        cv::imshow("All subwindows", all_subwindows);
+        cv::namedWindow("All responses", CV_WINDOW_AUTOSIZE);
+        cv::imshow("All responses", all_responses);
+        cv::waitKey();
+        p_debug_scale_responses.clear();
+        p_debug_subwindows.clear();
     }
 
     DEBUG_PRINTM(*max_response_map);
@@ -444,7 +410,8 @@ void KCF_Tracker::track(cv::Mat &img)
     cv::Point2f new_location(max_response_pt->x, max_response_pt->y);
     DEBUG_PRINT(new_location);
 
-    if (m_use_subpixel_localization) new_location = sub_pixel_peak(*max_response_pt, *max_response_map);
+    if (m_use_subpixel_localization)
+        new_location = sub_pixel_peak(*max_response_pt, *max_response_map);
     DEBUG_PRINT(new_location);
 
     if (m_visual_debug) std::cout << "Old p_pose, cx: " << p_pose.cx << " cy: " << p_pose.cy << std::endl;
@@ -467,21 +434,22 @@ void KCF_Tracker::track(cv::Mat &img)
     }
 
     // sub grid scale interpolation
-    double new_scale = p_scales[uint(scale_index)];
-    if (m_use_subgrid_scale) new_scale = sub_grid_scale(scale_index);
+    if (m_use_subgrid_scale) {
+        auto it = std::find_if(p_threadctxs.begin(), p_threadctxs.end(), [max](ThreadCtx &ctx) { return &ctx == max; });
+        p_current_scale *= sub_grid_scale(std::distance(p_threadctxs.begin(), it));
+    } else {
+        p_current_scale *= max->scale;
+    }
 
-    p_current_scale *= new_scale;
 
     if (p_current_scale < p_min_max_scale[0]) p_current_scale = p_min_max_scale[0];
     if (p_current_scale > p_min_max_scale[1]) p_current_scale = p_min_max_scale[1];
 
-    p_current_angle = (p_current_angle + p_angles[angle_index]) < 0
-                          ? -std::abs(p_current_angle + p_angles[angle_index]) % 360
-                          : (p_current_angle + p_angles[angle_index]) % 360;
+    p_current_angle = (p_current_angle + max->angle) < 0
+                          ? -std::abs(p_current_angle + max->angle) % 360
+                          : (p_current_angle + max->angle) % 360;
 
     // obtain a subwindow for training at newly estimated target position
-    p_threadctxs.front()->patch_feats.clear();
-
     int size_x_scaled = floor(p_windows_size.width * p_current_scale);
     int size_y_scaled = floor(p_windows_size.height * p_current_scale);
 
@@ -494,10 +462,10 @@ void KCF_Tracker::track(cv::Mat &img)
         geometric_transformations(patch_rgb, p_windows_size.width, p_windows_size.height, p_current_angle, false);
     }
 
-    get_features(patch_rgb, patch_gray, *p_threadctxs.front());
-    fft.forward_window(p_threadctxs.front()->patch_feats, p_xf, p_threadctxs.front()->fw_all,
-                       m_use_cuda ? p_threadctxs.front()->data_features.deviceMem() : nullptr,
-                       p_threadctxs.front()->stream);
+    p_threadctxs.front().patch_feats.clear();
+    get_features(patch_rgb, patch_gray, p_threadctxs.front());
+    fft.forward_window(p_threadctxs.front().patch_feats, p_xf, p_threadctxs.front().fw_all,
+                       m_use_cuda ? p_threadctxs.front().data_features.deviceMem() : nullptr, p_threadctxs.front().stream);
 
     // subsequent frames, interpolate model
     p_model_xf = p_model_xf * float((1. - p_interp_factor)) + p_xf * float(p_interp_factor);
@@ -510,32 +478,32 @@ void KCF_Tracker::track(cv::Mat &img)
         alphaf_den = (p_xf * xfconj);
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
-        gaussian_correlation(*p_threadctxs.front(), p_xf, p_xf, p_kernel_sigma, true);
+        gaussian_correlation(p_threadctxs.front(), p_xf, p_xf, p_kernel_sigma,
+                             true);
         //        ComplexMat alphaf = p_yf / (kf + p_lambda); //equation for fast training
         //        p_model_alphaf = p_model_alphaf * (1. - p_interp_factor) + alphaf * p_interp_factor;
-        alphaf_num = p_yf * p_threadctxs.front()->kf;
-        alphaf_den = p_threadctxs.front()->kf * (p_threadctxs.front()->kf + float(p_lambda));
+        alphaf_num = p_yf * p_threadctxs.front().kf;
+        alphaf_den = p_threadctxs.front().kf * (p_threadctxs.front().kf + float(p_lambda));
     }
 
     p_model_alphaf_num = p_model_alphaf_num * float((1. - p_interp_factor)) + alphaf_num * float(p_interp_factor);
     p_model_alphaf_den = p_model_alphaf_den * float((1. - p_interp_factor)) + alphaf_den * float(p_interp_factor);
     p_model_alphaf = p_model_alphaf_num / p_model_alphaf_den;
 
-#if !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
+#if  !defined(BIG_BATCH) && defined(CUFFT) && (defined(ASYNC) || defined(OPENMP))
     for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
-        (*it)->model_xf = p_model_xf;
-        (*it)->model_xf.set_stream((*it)->stream);
-        (*it)->model_alphaf = p_model_alphaf;
-        (*it)->model_alphaf.set_stream((*it)->stream);
+        it->model_xf = p_model_xf;
+        it->model_xf.set_stream(it->stream);
+        it->model_alphaf = p_model_alphaf;
+        it->model_alphaf.set_stream(it->stream);
     }
 #endif
 }
 
-void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray, double scale, int angle)
+void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray)
 {
     if (m_use_big_batch) {
         vars.patch_feats.clear();
-        std::cout << "WE ARE HERE BOIS" << std::endl;
         BIG_BATCH_OMP_PARALLEL_FOR
         for (uint i = 0; i < this->p_scales.size(); ++i) {
             for (uint j = 0; j < this->p_angles.size(); ++j) {
@@ -558,17 +526,17 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
             }
         }
     } else {
-        int size_x_scaled = floor(this->p_windows_size.width * this->p_current_scale * scale);
-        int size_y_scaled = floor(this->p_windows_size.height * this->p_current_scale * scale);
+        int size_x_scaled = floor(this->p_windows_size.width * this->p_current_scale * vars.scale);
+        int size_y_scaled = floor(this->p_windows_size.height * this->p_current_scale * vars.scale);
 
         cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
-        geometric_transformations(patch_gray, p_windows_size.width, p_windows_size.height, p_current_scale * scale);
+        geometric_transformations(patch_gray, p_windows_size.width, p_windows_size.height, p_current_scale * vars.scale);
 
         cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
         if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
             patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
-            geometric_transformations(patch_rgb, p_windows_size.width, p_windows_size.height, p_current_scale * scale,
-                                      p_current_angle + angle);
+            geometric_transformations(patch_rgb, p_windows_size.width, p_windows_size.height, p_current_scale * vars.scale,
+                                      p_current_angle + vars.angle);
         }
         vars.patch_feats.clear();
         get_features(patch_rgb, patch_gray, vars);
@@ -620,7 +588,7 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
 
         DEBUG_PRINT(vars.max_loc);
 
-        double weight = scale < 1. ? scale : 1. / scale;
+        double weight = vars.scale < 1. ? vars.scale : 1. / vars.scale;
         vars.max_response = vars.max_val * weight;
     }
     return;
@@ -630,9 +598,8 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
 
 void KCF_Tracker::get_features(cv::Mat &patch_rgb, cv::Mat &patch_gray, ThreadCtx &vars)
 {
-
     // get hog(Histogram of Oriented Gradients) features
-    FHoG::extract(patch_gray, vars, 2, p_cell_size, 9);
+    vars.patch_feats = FHoG::extract(patch_gray, 2, p_cell_size, 9);
 
     // get color rgb features (simple r,g,b channels)
     std::vector<cv::Mat> color_feat;
@@ -880,13 +847,11 @@ void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat 
     fft.inverse(vars.xyf, vars.ifft2_res, m_use_cuda ? vars.data_i_features.deviceMem() : nullptr, vars.stream);
 #ifdef CUFFT
     if (auto_correlation)
-        cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(),
-                                  vars.xf_sqr_norm.deviceMem(), vars.xf_sqr_norm.deviceMem(), sigma, xf.n_channels,
-                                  xf.n_scales, p_roi_height, p_roi_width, vars.stream);
+        cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(), vars.xf_sqr_norm.deviceMem(), vars.xf_sqr_norm.deviceMem(),
+                                  sigma, xf.n_channels, xf.n_scales, p_roi.height, p_roi.width, vars.stream);
     else
-        cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(),
-                                  vars.xf_sqr_norm.deviceMem(), vars.yf_sqr_norm.deviceMem(), sigma, xf.n_channels,
-                                  xf.n_scales, p_roi_height, p_roi_width, vars.stream);
+        cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(), vars.xf_sqr_norm.deviceMem(), vars.yf_sqr_norm.deviceMem(),
+                                  sigma, xf.n_channels, xf.n_scales, p_roi.height, p_roi.width, vars.stream);
 #else
     // ifft2 and sum over 3rd dimension, we dont care about individual channels
     DEBUG_PRINTM(vars.ifft2_res);
@@ -894,7 +859,7 @@ void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat 
     if (xf.channels() != p_num_scales * p_num_of_feats)
         xy_sum.create(vars.ifft2_res.size(), CV_32FC1);
     else
-        xy_sum.create(vars.ifft2_res.size(), CV_32FC(int(p_scales.size())));
+        xy_sum.create(vars.ifft2_res.size(), CV_32FC(p_scales.size()));
     xy_sum.setTo(0);
     for (int y = 0; y < vars.ifft2_res.rows; ++y) {
         float *row_ptr = vars.ifft2_res.ptr<float>(y);
@@ -915,19 +880,18 @@ void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat 
     cv::split(xy_sum, scales);
 
     float numel_xf_inv = 1.f / (xf.cols * xf.rows * (xf.channels() / xf.n_scales));
-    for (uint i = 0; i < uint(xf.n_scales); ++i) {
-        cv::Mat in_roi(vars.in_all, cv::Rect(0, int(i) * scales[0].rows, scales[0].cols, scales[0].rows));
-        cv::exp(-1. / (sigma * sigma) *
-                    cv::max((double(vars.xf_sqr_norm.hostMem()[i] + vars.yf_sqr_norm.hostMem()[0]) - 2 * scales[i]) *
-                                double(numel_xf_inv),
-                            0),
-                in_roi);
+    for (uint i = 0; i < xf.n_scales; ++i) {
+        cv::Mat in_roi(vars.in_all, cv::Rect(0, i * scales[0].rows, scales[0].cols, scales[0].rows));
+        cv::exp(
+            -1. / (sigma * sigma) *
+                cv::max((double(vars.xf_sqr_norm.hostMem()[i] + vars.yf_sqr_norm.hostMem()[0]) - 2 * scales[i]) * double(numel_xf_inv), 0),
+            in_roi);
         DEBUG_PRINTM(in_roi);
     }
 #endif
     DEBUG_PRINTM(vars.in_all);
-    fft.forward(vars.in_all, auto_correlation ? vars.kf : vars.kzf,
-                m_use_cuda ? vars.gauss_corr_res.deviceMem() : nullptr, vars.stream);
+    fft.forward(vars.in_all, auto_correlation ? vars.kf : vars.kzf, m_use_cuda ? vars.gauss_corr_res.deviceMem() : nullptr,
+                vars.stream);
     return;
 }
 
@@ -990,46 +954,40 @@ cv::Point2f KCF_Tracker::sub_pixel_peak(cv::Point &max_loc, cv::Mat &response)
     return sub_peak;
 }
 
-double KCF_Tracker::sub_grid_scale(int index)
+double KCF_Tracker::sub_grid_scale(uint index)
 {
     cv::Mat A, fval;
-    if (index < 0 || index > int(p_scales.size()) - 1) {
+    if (index >= p_scales.size()) {
         // interpolate from all values
         // fit 1d quadratic function f(x) = a*x^2 + b*x + c
-        A.create(int(p_scales.size()), 3, CV_32FC1);
-        fval.create(int(p_scales.size()), 1, CV_32FC1);
-        for (auto it = p_threadctxs.begin(); it != p_threadctxs.end(); ++it) {
-            uint i = uint(std::distance(p_threadctxs.begin(), it));
-            int j = int(i);
-            A.at<float>(j, 0) = float(p_scales[i] * p_scales[i]);
-            A.at<float>(j, 1) = float(p_scales[i]);
-            A.at<float>(j, 2) = 1;
-            fval.at<float>(j) =
-                m_use_big_batch ? float(p_threadctxs.back()->max_responses[i]) : float((*it)->max_response);
+        A.create(p_scales.size(), 3, CV_32FC1);
+        fval.create(p_scales.size(), 1, CV_32FC1);
+        for (size_t i = 0; i < p_scales.size(); ++i) {
+            A.at<float>(i, 0) = float(p_scales[i] * p_scales[i]);
+            A.at<float>(i, 1) = float(p_scales[i]);
+            A.at<float>(i, 2) = 1;
+            fval.at<float>(i) = m_use_big_batch ? p_threadctxs.back().max_responses[i] : p_threadctxs[i].max_response;
         }
     } else {
         // only from neighbours
-        if (index == 0 || index == int(p_scales.size()) - 1) return p_scales[uint(index)];
+        if (index == 0 || index == p_scales.size() - 1)
+           return p_scales[index];
 
-        A = (cv::Mat_<float>(3, 3) << p_scales[uint(index) - 1] * p_scales[uint(index) - 1], p_scales[uint(index) - 1],
-             1, p_scales[uint(index)] * p_scales[uint(index)], p_scales[uint(index)], 1,
-             p_scales[uint(index) + 1] * p_scales[uint(index) + 1], p_scales[uint(index) + 1], 1);
-        auto it1 = p_threadctxs.begin();
-        std::advance(it1, index - 1);
-        auto it2 = p_threadctxs.begin();
-        std::advance(it2, index);
-        auto it3 = p_threadctxs.begin();
-        std::advance(it3, index + 1);
-        fval = (cv::Mat_<float>(3, 1) << (m_use_big_batch ? p_threadctxs.back()->max_responses[uint(index) - 1]
-                                                          : (*it1)->max_response),
-                (m_use_big_batch ? p_threadctxs.back()->max_responses[uint(index)] : (*it2)->max_response),
-                (m_use_big_batch ? p_threadctxs.back()->max_responses[uint(index) + 1] : (*it3)->max_response));
+        A = (cv::Mat_<float>(3, 3) <<
+             p_scales[index - 1] * p_scales[index - 1], p_scales[index - 1], 1,
+             p_scales[index + 0] * p_scales[index + 0], p_scales[index + 0], 1,
+             p_scales[index + 1] * p_scales[index + 1], p_scales[index + 1], 1);
+        fval = (cv::Mat_<float>(3, 1) <<
+                (m_use_big_batch ? p_threadctxs.back().max_responses[index - 1] : p_threadctxs[index - 1].max_response),
+                (m_use_big_batch ? p_threadctxs.back().max_responses[index + 0] : p_threadctxs[index + 0].max_response),
+                (m_use_big_batch ? p_threadctxs.back().max_responses[index + 1] : p_threadctxs[index + 1].max_response));
     }
 
     cv::Mat x;
     cv::solve(A, fval, x, cv::DECOMP_SVD);
     float a = x.at<float>(0), b = x.at<float>(1);
-    double scale = p_scales[uint(index)];
-    if (a > 0 || a < 0) scale = double(-b / (2 * a));
+    double scale = p_scales[index];
+    if (a > 0 || a < 0)
+        scale = -b / (2 * a);
     return scale;
 }

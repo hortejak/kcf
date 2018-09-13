@@ -1,6 +1,8 @@
 # Makefile to build all the available variants
 
 BUILDS = opencvfft-st opencvfft-async opencvfft-openmp fftw fftw-async fftw-openmp fftw-big fftw-big-openmp cufftw cufftw-big cufftw-big-openmp cufft cufft-openmp cufft-big cufft-big-openmp
+TESTSEQ = bag ball1 car1
+TESTFLAGS = default fit128
 
 all: $(foreach build,$(BUILDS),build-$(build)/kcf_vot)
 
@@ -26,14 +28,86 @@ CMAKE_OTPS_cufft-big-openmp  = -DFFT=cuFFT -DBIG_BATCH=ON -DOPENMP=ON
 .SECONDARY: $(BUILDS:%=build-%/build.ninja)
 
 build-%/build.ninja:
+	@echo '############################################################'
 	mkdir -p $(@D)
 	cd $(@D) && cmake $(CMAKE_OPTS) $(CMAKE_OTPS_$*) ..
 
 .PHONY: FORCE
-build-%/kcf_vot: build-%/build.ninja FORCE
+build-%/kcf_vot: build-%/build.ninja $(shell git ls-files)
+	@echo '############################################################'
 	cmake --build $(@D)
 
 $(BUILDS): %: build-%/kcf_vot
 
 clean:
 	rm -rf $(BUILDS:%=build-%)
+
+##########################
+### Tests
+##########################
+
+print-test-results = grep ^Average $(1)|sed -E -e 's|build-(.*)/kcf_vot-(.*).log:|\2;\1;|'|sort|column -t -s';'
+
+test: $(BUILDS:%=test-%)
+	@echo; echo "Summary test results:"
+	@$(call print-test-results,$(foreach build,$(BUILDS),\
+				   $(foreach seq,$(TESTSEQ),\
+				   $(foreach f,$(TESTFLAGS),build-$(build)/kcf_vot-$(seq)-$(f).log))))
+
+$(BUILDS:%=test-%): test-%:
+	@$(call print-test-results,$(foreach seq,$(TESTSEQ),\
+				   $(foreach f,$(TESTFLAGS),build-$*/kcf_vot-$(seq)-$(f).log)))
+
+# Usage: testcase <build> <seq>
+define testcase
+test-$(1): test-$(1)-$(2)
+test-$(1)-$(2): $(foreach f,$(TESTFLAGS),build-$(1)/kcf_vot-$(2)-$(f).log)
+$(foreach f,$(TESTFLAGS),build-$(1)/kcf_vot-$(2)-$(f).log): build-$(1)/kcf_vot $$(filter-out %/output.txt,$$(wildcard vot2016/$(2)/*)) | vot2016/$(2)
+	$$< $$(if $$(@:%fit128.log=),,--fit=128) vot2016/$(2) > $$@
+# 	cat $$@
+endef
+
+$(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(eval $(call testcase,$(build),$(seq)))))
+
+vot2016 $(TESTSEQ:%=vot2016/%): vot2016.zip
+	unzip -d vot2016 -q $^
+	for i in $$(ls -d vot2016/*/); do ( echo Creating $${i}images.txt; cd $$i; ls *.jpg > images.txt ); done
+
+.INTERMEDIATE: vot2016.zip
+.SECONDARY:    vot2016.zip
+vot2016.zip:
+	wget http://data.votchallenge.net/vot2016/vot2016.zip
+
+###################
+# Ninja generator #
+###################
+
+# Building all $(BUILDS) with make is slow, even when run with in
+# parallel (make -j). The target below generates build.ninja file that
+# compiles all variants in the same ways as this makefile, but faster.
+# The down side is that the build needs about 10 GB of memory.
+
+ninja: build.ninja
+	ninja
+
+# Ninja generator - to have faster parallel builds
+.PHONY: build.ninja
+build.ninja:
+	$(file >$@,$(ninja-rule))
+	$(foreach build,$(BUILDS),$(file >>$@,$(call ninja-build,$(build),$(CMAKE_OTPS_$(build)))))
+
+define ninja-rule
+rule cmake
+  command = cd $$$$(dirname $$out) && cmake $(CMAKE_OPTS) $$opts ..
+  description = CMake $$out
+rule ninja
+  # Absolute path in -C allows Emacs to properly jump to error message locations
+  command = ninja -C `realpath $$$$(dirname $$out)`
+  description = Ninja $$out
+endef
+
+define ninja-build
+build build-$(1)/build.ninja: cmake
+  opts = $(2)
+build build-$(1)/kcf_vot: ninja build-$(1)/build.ninja build.ninja
+endef

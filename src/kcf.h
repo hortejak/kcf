@@ -51,7 +51,7 @@ class KCF_Tracker {
     bool m_debug{false};
     bool m_visual_debug{false};
     bool m_use_scale{true};
-    bool m_use_angle{true}; // Doesn't work with FFTW-BIG version
+    bool m_use_angle{false}; // Doesn't work with FFTW-BIG version
     bool m_use_color{true};
 #ifdef ASYNC
     bool m_use_multithreading{true};
@@ -94,18 +94,21 @@ class KCF_Tracker {
     // frame-to-frame object tracking
     void track(cv::Mat &img);
     BBox_c getBBox();
+    double getFilterResponse() const; // Measure of tracking accuracy
 
   private:
     Fft &fft;
 
     BBox_c p_pose;
+    double max_response = -1.;
+
     bool p_resize_image = false;
     bool p_fit_to_pw2 = false;
 
     const double p_downscale_factor = 0.5;
     double p_scale_factor_x = 1;
     double p_scale_factor_y = 1;
-    double p_floating_error = 0.0001;
+    const double p_floating_error = 0.0001;
 
     double p_padding = 1.5;
     double p_output_sigma_factor = 0.1;
@@ -115,12 +118,13 @@ class KCF_Tracker {
     double p_interp_factor = 0.02; // def = 0.02, linear interpolation factor for adaptation
     int p_cell_size = 4;           // 4 for hog (= bin_size)
     cv::Size p_windows_size;
-    int p_num_scales{7};
+    uint p_num_scales {7};
     double p_scale_step = 1.02;
     double p_current_scale = 1.;
     double p_min_max_scale[2];
     std::vector<double> p_scales;
     int p_current_angle = 0;
+    uint p_num_angles {5};
     int p_angle_min = -20, p_angle_max = 20;
     int p_angle_step = 10;
     std::vector<int> p_angles;
@@ -131,15 +135,13 @@ class KCF_Tracker {
     std::vector<cv::Mat> p_debug_scale_responses;
     std::vector<cv::Mat> p_debug_subwindows;
 
-    // for big batch
+    //for big batch
     int p_num_of_feats = 31 + (m_use_color ? 3 : 0) + (m_use_cnfeat ? 10 : 0);
+    cv::Size p_roi;
 
-    // for CUDA
-    int p_roi_height, p_roi_width;
+    std::vector<ThreadCtx> p_threadctxs;
 
-    std::list<std::unique_ptr<ThreadCtx>> p_threadctxs;
-
-    // CUDA compability
+    //CUDA compability
     cv::Mat p_rot_labels;
     DynMem p_rot_labels_data;
 
@@ -150,9 +152,9 @@ class KCF_Tracker {
     ComplexMat p_model_alphaf_den;
     ComplexMat p_model_xf;
     ComplexMat p_xf;
-    // helping functions
-    void scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray, double scale, int angle = 0);
-    cv::Mat get_subwindow(const cv::Mat &input, int cx, int cy, int size_x, int size_y);
+    //helping functions
+    void scale_track(ThreadCtx & vars, cv::Mat & input_rgb, cv::Mat & input_gray);
+    cv::Mat get_subwindow(const cv::Mat & input, int cx, int cy, int size_x, int size_y);
     cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);
     void gaussian_correlation(struct ThreadCtx &vars, const ComplexMat &xf, const ComplexMat &yf, double sigma,
                               bool auto_correlation = false);
@@ -161,7 +163,7 @@ class KCF_Tracker {
     void get_features(cv::Mat &patch_rgb, cv::Mat &patch_gray, ThreadCtx &vars);
     void geometric_transformations(cv::Mat &patch, int size_x, int size_y, int angle = 0, bool allow_debug = true);
     cv::Point2f sub_pixel_peak(cv::Point &max_loc, cv::Mat &response);
-    double sub_grid_scale(int index = -1);
+    double sub_grid_scale(uint index);
 };
 
 #endif // KCF_HEADER_6565467831231

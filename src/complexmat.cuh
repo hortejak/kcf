@@ -106,8 +106,7 @@ class ComplexMat {
     // text output
     friend std::ostream &operator<<(std::ostream &os, const ComplexMat &mat)
     {
-        float *data_cpu =
-            reinterpret_cast<float *>(malloc(mat.rows * mat.cols * mat.n_channels * sizeof(cufftComplex)));
+        float *data_cpu = reinterpret_cast<float*>(malloc(mat.rows * mat.cols * mat.n_channels * sizeof(cufftComplex)));
         CudaSafeCall(cudaMemcpy(data_cpu, mat.p_data, mat.rows * mat.cols * mat.n_channels * sizeof(cufftComplex),
                                 cudaMemcpyDeviceToHost));
         // for (int i = 0; i < mat.n_channels; ++i){

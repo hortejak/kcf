@@ -27,6 +27,13 @@ template <typename T> class DynMem_ {
         this->ptr = new float[size];
 #endif
     }
+    DynMem_(DynMem_&& other) {
+        this->ptr = other.ptr;
+        this->ptr_d = other.ptr_d;
+
+        other.ptr = nullptr;
+        other.ptr_d = nullptr;
+    }
     ~DynMem_()
     {
 #ifdef CUFFT

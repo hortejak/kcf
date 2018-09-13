@@ -148,8 +148,9 @@ int main(int argc, char *argv[])
         double time_profile_counter = cv::getCPUTickCount();
         tracker.track(image);
         time_profile_counter = cv::getCPUTickCount() - time_profile_counter;
-        std::cout << "  -> speed : " << time_profile_counter / ((double)cvGetTickFrequency() * 1000) << "ms. per frame";
-        avg_time += time_profile_counter / ((double)cvGetTickFrequency() * 1000);
+         std::cout << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms. per frame, "
+                      "response : " << tracker.getFilterResponse();
+        avg_time += time_profile_counter/((double)cvGetTickFrequency()*1000);
         frames++;
 
         bb = tracker.getBBox();
@@ -212,12 +213,12 @@ int main(int argc, char *argv[])
         //        cv::imwrite(ss.c_str(), image, compression_params);
     }
 
-    std::cout << "Average processing speed " << avg_time / frames << "ms. (" << 1. / (avg_time / frames) * 1000
-              << " fps)" << std::endl;
+    std::cout << "Average processing speed: " << avg_time/frames <<  "ms (" << 1./(avg_time/frames)*1000 << " fps)";
     if (groundtruth_stream.is_open()) {
-        std::cout << "Average accuracy: " << sum_accuracy / frames << std::endl;
+        std::cout << "; Average accuracy: " << sum_accuracy/frames << std::endl;
         groundtruth_stream.close();
     }
+    std::cout << std::endl;
 
     return EXIT_SUCCESS;
 }
