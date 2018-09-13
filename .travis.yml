@@ -14,7 +14,7 @@ addons:
       - cuda-command-line-tools-8-0 cuda-cufft-dev-8-0
 
 env:
-  - CUDA_BIN_PATH=/usr/local/cuda-8.0 CXXFLAGS=-Werror
+  - CUDA_BIN_PATH=/usr/local/cuda-8.0 CXXFLAGS=-Werror CMAKE_OPTS=-DCUDA_ARCH_LIST=6.2
 
 script: make
 
