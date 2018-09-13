@@ -485,28 +485,28 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
     account the fact that, if the target doesn't move, the peak
     will appear at the top-left corner, not at the center (this is
     discussed in the paper). the responses wrap around cyclically. */
-    if (BIG_BATCH_MODE) {
-        cv::split(vars.response, vars.response_maps);
+#ifdef BIG_BATCH
+    cv::split(vars.response, vars.response_maps);
 
-        for (size_t i = 0; i < p_scales.size(); ++i) {
-            double min_val, max_val;
-            cv::Point2i min_loc, max_loc;
-            cv::minMaxLoc(vars.response_maps[i], &min_val, &max_val, &min_loc, &max_loc);
-            DEBUG_PRINT(max_loc);
-            double weight = p_scales[i] < 1. ? p_scales[i] : 1. / p_scales[i];
-            vars.max_responses[i] = max_val * weight;
-            vars.max_locs[i] = max_loc;
-        }
-    } else {
-        double min_val;
-        cv::Point2i min_loc;
-        cv::minMaxLoc(vars.response, &min_val, &vars.max_val, &min_loc, &vars.max_loc);
-
-        DEBUG_PRINT(vars.max_loc);
-
-        double weight = vars.scale < 1. ? vars.scale : 1. / vars.scale;
-        vars.max_response = vars.max_val * weight;
+    for (size_t i = 0; i < p_scales.size(); ++i) {
+        double min_val, max_val;
+        cv::Point2i min_loc, max_loc;
+        cv::minMaxLoc(vars.response_maps[i], &min_val, &max_val, &min_loc, &max_loc);
+        DEBUG_PRINT(max_loc);
+        double weight = p_scales[i] < 1. ? p_scales[i] : 1. / p_scales[i];
+        vars.max_responses[i] = max_val * weight;
+        vars.max_locs[i] = max_loc;
     }
+#else
+    double min_val;
+    cv::Point2i min_loc;
+    cv::minMaxLoc(vars.response, &min_val, &vars.max_val, &min_loc, &vars.max_loc);
+
+    DEBUG_PRINT(vars.max_loc);
+
+    double weight = vars.scale < 1. ? vars.scale : 1. / vars.scale;
+    vars.max_response = vars.max_val * weight;
+#endif
     return;
 }
 
@@ -861,7 +861,11 @@ double KCF_Tracker::sub_grid_scale(uint index)
             A.at<float>(i, 0) = float(p_scales[i] * p_scales[i]);
             A.at<float>(i, 1) = float(p_scales[i]);
             A.at<float>(i, 2) = 1;
-            fval.at<float>(i) = BIG_BATCH_MODE ? p_threadctxs.back().max_responses[i] : p_threadctxs[i].max_response;
+#ifdef BIG_BATCH
+            fval.at<float>(i) = p_threadctxs.back().max_responses[i];
+#else
+            fval.at<float>(i) = p_threadctxs[i].max_response;
+#endif
         }
     } else {
         // only from neighbours
@@ -872,10 +876,17 @@ double KCF_Tracker::sub_grid_scale(uint index)
              p_scales[index - 1] * p_scales[index - 1], p_scales[index - 1], 1,
              p_scales[index + 0] * p_scales[index + 0], p_scales[index + 0], 1,
              p_scales[index + 1] * p_scales[index + 1], p_scales[index + 1], 1);
+#ifdef BIG_BATCH
         fval = (cv::Mat_<float>(3, 1) <<
-                (BIG_BATCH_MODE ? p_threadctxs.back().max_responses[index - 1] : p_threadctxs[index - 1].max_response),
-                (BIG_BATCH_MODE ? p_threadctxs.back().max_responses[index + 0] : p_threadctxs[index + 0].max_response),
-                (BIG_BATCH_MODE ? p_threadctxs.back().max_responses[index + 1] : p_threadctxs[index + 1].max_response));
+                p_threadctxs.back().max_responses[index - 1],
+                p_threadctxs.back().max_responses[index + 0],
+                p_threadctxs.back().max_responses[index + 1]);
+#else
+        fval = (cv::Mat_<float>(3, 1) <<
+                p_threadctxs[index - 1].max_response,
+                p_threadctxs[index + 0].max_response,
+                p_threadctxs[index + 1].max_response);
+#endif
     }
 
     cv::Mat x;

@@ -58,11 +58,13 @@ struct ThreadCtx {
         this->kf.create(roi.height, width_freq, num_of_scales);
 #endif
 
+#ifdef BIG_BATCH
         if (num_of_scales > 1) {
             this->max_responses.reserve(num_of_scales);
             this->max_locs.reserve(num_of_scales);
             this->response_maps.reserve(num_of_scales);
         }
+#endif
     }
     ThreadCtx(ThreadCtx &&) = default;
     ~ThreadCtx()
@@ -94,11 +96,12 @@ struct ThreadCtx {
     cv::Point2i max_loc;
     double max_val, max_response;
 
-    // Big batch variables
+#ifdef BIG_BATCH
     // Stores value of responses, location of maximal response and response maps for each scale
     std::vector<double> max_responses;
     std::vector<cv::Point2i> max_locs;
     std::vector<cv::Mat> response_maps;
+#endif
 };
 
 #endif // SCALE_VARS_HPP
