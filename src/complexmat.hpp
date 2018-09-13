@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <functional>
+#include "dynmem.hpp"
 
 template <typename T> class ComplexMat_ {
   public:
@@ -74,18 +75,17 @@ template <typename T> class ComplexMat_ {
         return sum_sqr_norm;
     }
 
-    void sqr_norm(T *sums_sqr_norms) const
+    void sqr_norm(DynMem_<T> &result) const
     {
         int n_channels_per_scale = n_channels / n_scales;
         int scale_offset = n_channels_per_scale * rows * cols;
-        T sum_sqr_norm;
         for (uint scale = 0; scale < n_scales; ++scale) {
-            sum_sqr_norm = 0;
+            T sum_sqr_norm = 0;
             for (int i = 0; i < n_channels_per_scale; ++i)
                 for (auto lhs = p_data.begin() + i * rows * cols + scale * scale_offset;
                      lhs != p_data.begin() + (i + 1) * rows * cols + scale * scale_offset; ++lhs)
                     sum_sqr_norm += lhs->real() * lhs->real() + lhs->imag() * lhs->imag();
-            sums_sqr_norms[scale] = sum_sqr_norm / static_cast<T>(cols * rows);
+            result.hostMem()[scale] = sum_sqr_norm / static_cast<T>(cols * rows);
         }
         return;
     }

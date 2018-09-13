@@ -728,27 +728,19 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
 void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat &xf, const ComplexMat &yf,
                                        double sigma, bool auto_correlation)
 {
-#ifdef CUFFT
-    xf.sqr_norm(vars.xf_sqr_norm.deviceMem());
-    if (!auto_correlation) yf.sqr_norm(vars.yf_sqr_norm.deviceMem());
-#else
-    xf.sqr_norm(vars.xf_sqr_norm.hostMem());
+    xf.sqr_norm(vars.xf_sqr_norm);
     if (auto_correlation) {
         vars.yf_sqr_norm.hostMem()[0] = vars.xf_sqr_norm.hostMem()[0];
     } else {
-        yf.sqr_norm(vars.yf_sqr_norm.hostMem());
+        yf.sqr_norm(vars.yf_sqr_norm);
     }
-#endif
     vars.xyf = auto_correlation ? xf.sqr_mag() : xf.mul2(yf.conj());
     DEBUG_PRINTM(vars.xyf);
     fft.inverse(vars.xyf, vars.ifft2_res, m_use_cuda ? vars.data_i_features.deviceMem() : nullptr, vars.stream);
 #ifdef CUFFT
-    if (auto_correlation)
-        cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(), vars.xf_sqr_norm.deviceMem(), vars.xf_sqr_norm.deviceMem(),
-                                  sigma, xf.n_channels, xf.n_scales, p_roi.height, p_roi.width, vars.stream);
-    else
-        cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(), vars.xf_sqr_norm.deviceMem(), vars.yf_sqr_norm.deviceMem(),
-                                  sigma, xf.n_channels, xf.n_scales, p_roi.height, p_roi.width, vars.stream);
+    cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(),
+                              vars.xf_sqr_norm.deviceMem(), vars.xf_sqr_norm.deviceMem(), sigma, xf.n_channels,
+                              xf.n_scales, p_roi.height, p_roi.width, vars.stream);
 #else
     // ifft2 and sum over 3rd dimension, we dont care about individual channels
     DEBUG_PRINTM(vars.ifft2_res);
