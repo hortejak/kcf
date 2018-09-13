@@ -175,9 +175,9 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_yf.create(p_roi.height, width, 1);
     p_xf.create(p_roi.height, width, p_num_of_feats);
 
-    int max = m_use_big_batch ? 2 : p_num_scales;
+    int max = BIG_BATCH_MODE ? 2 : p_num_scales;
     for (int i = 0; i < max; ++i) {
-        if (m_use_big_batch && i == 1)
+        if (BIG_BATCH_MODE && i == 1)
             p_threadctxs.emplace_back(p_roi, p_num_of_feats * p_num_scales, 1, p_num_scales);
         else
             p_threadctxs.emplace_back(p_roi, p_num_of_feats, p_scales[i], 1);
@@ -445,7 +445,7 @@ void KCF_Tracker::track(cv::Mat &img)
 void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray)
 {
     std::vector<cv::Mat> patch_feats;
-    if (m_use_big_batch) {
+    if (BIG_BATCH_MODE) {
         BIG_BATCH_OMP_PARALLEL_FOR
         for (uint i = 0; i < p_num_scales; ++i) {
             patch_feats = get_features(input_rgb, input_gray, this->p_pose.cx, this->p_pose.cy,
@@ -463,7 +463,7 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
     DEBUG_PRINTM(vars.zf);
 
     if (m_use_linearkernel) {
-        vars.kzf = m_use_big_batch ? (vars.zf.mul2(this->p_model_alphaf)).sum_over_channels()
+        vars.kzf = BIG_BATCH_MODE ? (vars.zf.mul2(this->p_model_alphaf)).sum_over_channels()
                                    : (p_model_alphaf * vars.zf).sum_over_channels();
         fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch.deviceMem() : nullptr, vars.stream);
     } else {
@@ -474,7 +474,7 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
         gaussian_correlation(vars, vars.zf, this->p_model_xf, this->p_kernel_sigma);
         DEBUG_PRINTM(this->p_model_alphaf);
         DEBUG_PRINTM(vars.kzf);
-        vars.kzf = m_use_big_batch ? vars.kzf.mul(this->p_model_alphaf) : this->p_model_alphaf * vars.kzf;
+        vars.kzf = BIG_BATCH_MODE ? vars.kzf.mul(this->p_model_alphaf) : this->p_model_alphaf * vars.kzf;
 #endif
         fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch.deviceMem() : nullptr, vars.stream);
     }
@@ -485,7 +485,7 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
     account the fact that, if the target doesn't move, the peak
     will appear at the top-left corner, not at the center (this is
     discussed in the paper). the responses wrap around cyclically. */
-    if (m_use_big_batch) {
+    if (BIG_BATCH_MODE) {
         cv::split(vars.response, vars.response_maps);
 
         for (size_t i = 0; i < p_scales.size(); ++i) {
@@ -861,7 +861,7 @@ double KCF_Tracker::sub_grid_scale(uint index)
             A.at<float>(i, 0) = float(p_scales[i] * p_scales[i]);
             A.at<float>(i, 1) = float(p_scales[i]);
             A.at<float>(i, 2) = 1;
-            fval.at<float>(i) = m_use_big_batch ? p_threadctxs.back().max_responses[i] : p_threadctxs[i].max_response;
+            fval.at<float>(i) = BIG_BATCH_MODE ? p_threadctxs.back().max_responses[i] : p_threadctxs[i].max_response;
         }
     } else {
         // only from neighbours
@@ -873,9 +873,9 @@ double KCF_Tracker::sub_grid_scale(uint index)
              p_scales[index + 0] * p_scales[index + 0], p_scales[index + 0], 1,
              p_scales[index + 1] * p_scales[index + 1], p_scales[index + 1], 1);
         fval = (cv::Mat_<float>(3, 1) <<
-                (m_use_big_batch ? p_threadctxs.back().max_responses[index - 1] : p_threadctxs[index - 1].max_response),
-                (m_use_big_batch ? p_threadctxs.back().max_responses[index + 0] : p_threadctxs[index + 0].max_response),
-                (m_use_big_batch ? p_threadctxs.back().max_responses[index + 1] : p_threadctxs[index + 1].max_response));
+                (BIG_BATCH_MODE ? p_threadctxs.back().max_responses[index - 1] : p_threadctxs[index - 1].max_response),
+                (BIG_BATCH_MODE ? p_threadctxs.back().max_responses[index + 0] : p_threadctxs[index + 0].max_response),
+                (BIG_BATCH_MODE ? p_threadctxs.back().max_responses[index + 1] : p_threadctxs[index + 1].max_response));
     }
 
     cv::Mat x;

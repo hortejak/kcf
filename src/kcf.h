@@ -66,11 +66,6 @@ public:
     bool m_use_subgrid_scale {true};
     bool m_use_cnfeat {true};
     bool m_use_linearkernel {false};
-#ifdef BIG_BATCH
-    bool m_use_big_batch {true};
-#else
-    bool m_use_big_batch {false};
-#endif
 #ifdef CUFFT
     bool m_use_cuda {true};
 #else
