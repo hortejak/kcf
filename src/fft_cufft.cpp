@@ -1,12 +1,11 @@
 #include "fft_cufft.h"
 
-void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales, bool big_batch_mode)
+void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales)
 {
     m_width = width;
     m_height = height;
     m_num_of_feats = num_of_feats;
     m_num_of_scales = num_of_scales;
-    m_big_batch_mode = big_batch_mode;
 
     std::cout << "FFT: cuFFT" << std::endl;
 
@@ -16,7 +15,7 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
     }
 #ifdef BIG_BATCH
     // FFT forward all scales
-    if (m_num_of_scales > 1 && m_big_batch_mode) {
+    if (m_num_of_scales > 1 && BIG_BATCH_MODE) {
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
         int howmany = m_num_of_scales;
@@ -42,7 +41,7 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
     }
 #ifdef BIG_BATCH
     // FFT forward window all scales all feats
-    if (m_num_of_scales > 1 && m_big_batch_mode) {
+    if (m_num_of_scales > 1 && BIG_BATCH_MODE) {
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
         int howmany = m_num_of_scales * m_num_of_feats;
@@ -68,7 +67,7 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
     }
     // FFT inverse all scales
 #ifdef BIG_BATCH
-    if (m_num_of_scales > 1 && m_big_batch_mode) {
+    if (m_num_of_scales > 1 && BIG_BATCH_MODE) {
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
         int howmany = m_num_of_feats * m_num_of_scales;
@@ -94,7 +93,7 @@ void cuFFT::init(unsigned width, unsigned height, unsigned num_of_feats, unsigne
     }
 #ifdef BIG_BATCH
     // FFT inverse one channel all scales
-    if (m_num_of_scales > 1 && m_big_batch_mode) {
+    if (m_num_of_scales > 1 && BIG_BATCH_MODE) {
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
         int howmany = m_num_of_scales;
@@ -117,7 +116,7 @@ void cuFFT::forward(const cv::Mat &real_input, ComplexMat &complex_result, float
 {
     (void)real_input;
 
-    if (m_big_batch_mode && real_input.rows == int(m_height * m_num_of_scales)) {
+    if (BIG_BATCH_MODE && real_input.rows == int(m_height * m_num_of_scales)) {
         CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal *>(real_input_arr),
                                      complex_result.get_p_data()));
     } else {
@@ -202,7 +201,7 @@ cuFFT::~cuFFT()
     CufftErrorCheck(cufftDestroy(plan_i_1ch));
     CufftErrorCheck(cufftDestroy(plan_i_features));
 
-    if (m_big_batch_mode) {
+    if (BIG_BATCH_MODE) {
         CufftErrorCheck(cufftDestroy(plan_f_all_scales));
         CufftErrorCheck(cufftDestroy(plan_fw_all_scales));
         CufftErrorCheck(cufftDestroy(plan_i_1ch_all_scales));

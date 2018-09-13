@@ -199,7 +199,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 
     p_output_sigma = std::sqrt(p_pose.w * p_pose.h) * p_output_sigma_factor / p_cell_size;
 
-    fft.init(p_roi.width, p_roi.height, p_num_of_feats, p_num_scales, m_use_big_batch);
+    fft.init(p_roi.width, p_roi.height, p_num_of_feats, p_num_scales);
     fft.set_window(cosine_window_function(p_roi.width, p_roi.height));
 
     // window weights, i.e. labels
