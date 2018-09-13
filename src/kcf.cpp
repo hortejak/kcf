@@ -197,7 +197,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     std::cout << "init: FFT size " << p_roi.width << "x" << p_roi.height << std::endl;
     std::cout << "init: min max scales factors: " << p_min_max_scale[0] << " " << p_min_max_scale[1] << std::endl;
 
-    p_output_sigma = std::sqrt(p_pose.w * p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
+    p_output_sigma = std::sqrt(p_pose.w * p_pose.h) * p_output_sigma_factor / p_cell_size;
 
     fft.init(p_roi.width, p_roi.height, p_num_of_feats, p_num_scales, m_use_big_batch);
     fft.set_window(cosine_window_function(p_roi.width, p_roi.height));
@@ -578,7 +578,7 @@ cv::Mat KCF_Tracker::gaussian_shaped_labels(double sigma, int dim1, int dim2)
         float *row_ptr = labels.ptr<float>(j);
         double y_s = y * y;
         for (int x = range_x[0], i = 0; x < range_x[1]; ++x, ++i) {
-            row_ptr[i] = float(std::exp(-0.5 * (y_s + x * x) / sigma_s)); //-1/2*e^((y^2+x^2)/sigma^2)
+            row_ptr[i] = std::exp(-0.5 * (y_s + x * x) / sigma_s); //-1/2*e^((y^2+x^2)/sigma^2)
         }
     }
 
