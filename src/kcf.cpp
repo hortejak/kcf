@@ -402,12 +402,13 @@ void KCF_Tracker::track(cv::Mat &img)
 
     clamp2(p_current_scale, p_min_max_scale[0], p_min_max_scale[1]);
 
+    ThreadCtx &ctx = p_threadctxs.front();
     // obtain a subwindow for training at newly estimated target position
-    p_threadctxs.front().patch_feats.clear();
+    ctx.patch_feats.clear();
     get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy, p_windows_size.width, p_windows_size.height,
-                 p_threadctxs.front(), p_current_scale);
-    fft.forward_window(p_threadctxs.front().patch_feats, p_xf, p_threadctxs.front().fw_all,
-                       m_use_cuda ? p_threadctxs.front().data_features.deviceMem() : nullptr, p_threadctxs.front().stream);
+                 ctx, p_current_scale);
+    fft.forward_window(ctx.patch_feats, p_xf, ctx.fw_all,
+                       m_use_cuda ? ctx.data_features.deviceMem() : nullptr, ctx.stream);
 
     // subsequent frames, interpolate model
     p_model_xf = p_model_xf * float((1. - p_interp_factor)) + p_xf * float(p_interp_factor);
@@ -420,12 +421,12 @@ void KCF_Tracker::track(cv::Mat &img)
         alphaf_den = (p_xf * xfconj);
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
-        gaussian_correlation(p_threadctxs.front(), p_xf, p_xf, p_kernel_sigma,
+        gaussian_correlation(ctx, p_xf, p_xf, p_kernel_sigma,
                              true);
         //        ComplexMat alphaf = p_yf / (kf + p_lambda); //equation for fast training
         //        p_model_alphaf = p_model_alphaf * (1. - p_interp_factor) + alphaf * p_interp_factor;
-        alphaf_num = p_yf * p_threadctxs.front().kf;
-        alphaf_den = p_threadctxs.front().kf * (p_threadctxs.front().kf + float(p_lambda));
+        alphaf_num = p_yf * ctx.kf;
+        alphaf_den = ctx.kf * (ctx.kf + float(p_lambda));
     }
 
     p_model_alphaf_num = p_model_alphaf_num * float((1. - p_interp_factor)) + alphaf_num * float(p_interp_factor);
