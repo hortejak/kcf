@@ -180,8 +180,9 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_min_max_scale[0] = std::pow(p_scale_step, std::ceil(std::log(min_size_ratio) / log(p_scale_step)));
     p_min_max_scale[1] = std::pow(p_scale_step, std::floor(std::log(max_size_ratio) / log(p_scale_step)));
 
-    std::cout << "init: img size " << img.cols << " " << img.rows << std::endl;
-    std::cout << "init: win size. " << p_windows_size.width << " " << p_windows_size.height << std::endl;
+    std::cout << "init: img size " << img.cols << "x" << img.rows << std::endl;
+    std::cout << "init: win size " << p_windows_size.width << "x" << p_windows_size.height << std::endl;
+    std::cout << "init: FFT size " << p_roi.width << "x" << p_roi.height << std::endl;
     std::cout << "init: min max scales factors: " << p_min_max_scale[0] << " " << p_min_max_scale[1] << std::endl;
 
     p_output_sigma = std::sqrt(p_pose.w * p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
