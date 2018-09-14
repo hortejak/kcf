@@ -52,7 +52,7 @@ clean:
 ### Tests
 ##########################
 
-print-test-results = grep ^Average $(1)|sed -E -e 's|build-(.*)/kcf_vot-(.*).log:|\2;\1;|'|sort|column -t -s';'
+print-test-results = grep ^Average $(1)|sed -E -e "s|build-(.*)/kcf_vot-(.*).log:|\2;\1;|"|sort|column -t -s";"
 
 test: $(BUILDS:%=test-%)
 	@echo; echo "Summary test results:"
@@ -96,18 +96,27 @@ vot2016.zip:
 ninja: build.ninja
 	ninja
 
+define nl
+
+
+endef
+
+define echo
+echo $(1) '$(subst $(nl),\n,$(subst \,\\,$(2)))';
+endef
+
 # Ninja generator - to have faster parallel builds and tests
 .PHONY: build.ninja
 build.ninja:
-	@: $(file >$@,$(ninja-rule))
-	$(foreach build,$(BUILDS),\
-		$(file >>$@,$(call ninja-build,$(build),$(CMAKE_OTPS_$(build)))))
-	$(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),\
-		$(file >>$@,$(call ninja-testcase,$(build),$(seq),$(f))))))
-	$(file >>$@,build test: print_results $(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
-	$(foreach build,$(BUILDS),$(file >>$@,build test-$(build): print_results $(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
-	$(foreach seq,$(TESTSEQ),$(file >>$@,build test-$(seq): print_results $(foreach build,$(BUILDS),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
-	$(foreach seq,$(TESTSEQ),$(file >>$@,build vot2016/$(seq): make))
+	@$(call echo,>$@,$(ninja-rule))
+	@$(foreach build,$(BUILDS),\
+		$(call echo,>>$@,$(call ninja-build,$(build),$(CMAKE_OTPS_$(build)))))
+	@$(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),\
+		$(call echo,>>$@,$(call ninja-testcase,$(build),$(seq),$(f)))$(nl))))
+	@$(call echo,>>$@,build test: print_results $(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
+	@$(foreach build,$(BUILDS),$(call echo,>>$@,build test-$(build): print_results $(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
+	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build test-$(seq): print_results $(foreach build,$(BUILDS),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
+	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build vot2016/$(seq): make))
 
 
 define ninja-rule
