@@ -118,7 +118,7 @@ void cuFFT::forward(const cv::Mat &real_input, ComplexMat &complex_result, float
         CufftErrorCheck(cufftExecR2C(plan_f_all_scales, reinterpret_cast<cufftReal *>(real_input_arr),
                                      complex_result.get_p_data()));
     } else {
-NORMAL_OMP_CRITICAL
+        NORMAL_OMP_CRITICAL
         {
             CufftErrorCheck(cufftSetStream(plan_f, stream));
             CufftErrorCheck(
@@ -146,7 +146,7 @@ void cuFFT::forward_window(std::vector<cv::Mat> patch_feats, ComplexMat &complex
             cv::Mat in_roi(fw_all, cv::Rect(0, int(i * m_height), int(m_width), int(m_height)));
             in_roi = patch_feats[i].mul(m_window);
         }
-NORMAL_OMP_CRITICAL
+        NORMAL_OMP_CRITICAL
         {
             CufftErrorCheck(cufftSetStream(plan_fw, stream));
             CufftErrorCheck(
@@ -163,7 +163,7 @@ void cuFFT::inverse(ComplexMat &complex_input, cv::Mat &real_result, float *real
     cufftComplex *in = reinterpret_cast<cufftComplex *>(complex_input.get_p_data());
 
     if (n_channels == 1) {
-NORMAL_OMP_CRITICAL
+        NORMAL_OMP_CRITICAL
         {
             CufftErrorCheck(cufftSetStream(plan_i_1ch, stream));
             CufftErrorCheck(cufftExecC2R(plan_i_1ch, in, reinterpret_cast<cufftReal *>(real_result_arr)));
@@ -181,7 +181,7 @@ NORMAL_OMP_CRITICAL
         CufftErrorCheck(cufftExecC2R(plan_i_features_all_scales, in, reinterpret_cast<cufftReal *>(real_result_arr)));
         return;
     }
-NORMAL_OMP_CRITICAL
+    NORMAL_OMP_CRITICAL
     {
         CufftErrorCheck(cufftSetStream(plan_i_features, stream));
         CufftErrorCheck(cufftExecC2R(plan_i_features, in, reinterpret_cast<cufftReal *>(real_result_arr)));
