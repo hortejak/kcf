@@ -58,7 +58,7 @@ vot2016 $(TESTSEQ:%=vot2016/%): vot2016.zip
 .INTERMEDIATE: vot2016.zip
 .SECONDARY:    vot2016.zip
 vot2016.zip:
-	wget http://data.votchallenge.net/vot2016/vot2016.zip
+	wget -O $@ http://data.votchallenge.net/vot2016/vot2016.zip
 
 ###################
 # Ninja generator #
@@ -95,6 +95,7 @@ build.ninja.new:
 	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build test-$(seq): PRINT_RESULTS $(foreach build,$(BUILDS),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
 	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build vot2016/$(seq): MAKE))
 
+ninja-test = build-$(1)/kcf_vot-$(2)-$(3).log
 
 define ninja-rule
 rule CMAKE
@@ -103,6 +104,7 @@ rule NINJA
   # Absolute path in -C allows Emacs to properly jump to error message locations
   command = ninja -C $(CURDIR)/$$$$(dirname $$out) && touch $$out
   description = Ninja $$out
+  restat = 1
 rule TEST_SEQ
   command = build-$$build/kcf_vot $$flags $$seq > $$out
 rule PRINT_RESULTS
@@ -110,12 +112,17 @@ rule PRINT_RESULTS
   command = $(call print-test-results,$$in)
 rule MAKE
   command = make $$out
+  pool = make
+pool make
+  depth = 1
 rule CLEAN
 #  command = /usr/bin/ninja -t clean -r NINJA
   description = Cleaning all built files...
   command = rm -rf $(BUILDS:%=build-%)
 build clean: CLEAN
 endef
+
+
 
 define ninja-build
 build build-$(1)/build.ninja: CMAKE
@@ -124,11 +131,9 @@ build build-$(1)/kcf_vot: NINJA build-$(1)/build.ninja $(shell git ls-files)
 default build-$(1)/kcf_vot
 endef
 
-ninja-test = build-$(1)/kcf_vot-$(2)-$(3).log
-
 # Usage: ninja-testcase <build> <seq> <flags>
 define ninja-testcase
-build build-$(1)/kcf_vot-$(2)-$(3).log: TEST_SEQ build-$(1)/kcf_vot $(filter-out %/output.txt,$(wildcard vot2016/$(2)/*)) || vot2016/$(2)
+build build-$(1)/kcf_vot-$(2)-$(3).log: TEST_SEQ build-$(1)/kcf_vot $(filter-out %/output.txt,$(wildcard vot2016/$(2)/*)) vot2016/$(2)
   build = $(1)
   seq = vot2016/$(2)
   flags = $(if $(3:fit128=),,--fit=128)
