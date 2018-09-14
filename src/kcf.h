@@ -131,7 +131,6 @@ class KCF_Tracker {
 
     // for visual debug
     int p_debug_image_size = 100;
-    int p_count = 0;
     std::vector<cv::Mat> p_debug_scale_responses;
     std::vector<cv::Mat> p_debug_subwindows;
 
