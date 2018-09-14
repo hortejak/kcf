@@ -38,7 +38,9 @@ matrix:
       script: make CC=clang-3.8 CXX=clang++-3.8 $(grep -v openmp .kcf_builds)
     - compiler: clang
       name: clang & test
-      script: make all test BUILDS="$(echo $(grep -v cufft .kcf_builds))"
+      script:
+        - make all build.ninja BUILDS="$(echo $(grep -v cufft .kcf_builds))"
+        - ninja test
       after_script: find vot2016 -name output.txt -print0 | xargs -0 rm -f
       addons:
         apt: { sources: *common_sources, packages: [*common_packages, unzip] }
