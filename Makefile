@@ -101,7 +101,7 @@ rule CMAKE
   command = cd $$$$(dirname $$out) && cmake $(CMAKE_OPTS) $$opts ..
 rule NINJA
   # Absolute path in -C allows Emacs to properly jump to error message locations
-  command = ninja -C `realpath $$$$(dirname $$out)` && touch $$out
+  command = ninja -C $(CURDIR)/$$$$(dirname $$out) && touch $$out
   description = Ninja $$out
 rule TEST_SEQ
   command = build-$$build/kcf_vot $$flags $$seq > $$out
