@@ -21,7 +21,6 @@ struct ThreadCtx {
     {
         this->xf_sqr_norm = DynMem(num_of_scales * num_of_angles * sizeof(float));
         this->yf_sqr_norm = DynMem(sizeof(float));
-        this->patch_feats.reserve(uint(num_of_feats));
 
         uint cells_size = roi.width * roi.height * sizeof(float);
 
@@ -49,8 +48,6 @@ struct ThreadCtx {
         this->ifft2_res = cv::Mat(roi, CV_32FC(num_of_feats), this->data_i_features.hostMem());
         this->response = cv::Mat(roi, CV_32FC(num_of_scales * num_of_angles), this->data_i_1ch.hostMem());
 
-        this->patch_feats.reserve(num_of_feats);
-
 #ifdef CUFFT
         this->zf.create(roi.height, width_freq, num_of_feats, num_of_scales * num_of_angles, this->stream);
         this->kzf.create(roi.height, width_freq, num_of_scales * num_of_angles, this->stream);
@@ -61,11 +58,13 @@ struct ThreadCtx {
         this->kf.create(roi.height, width_freq, num_of_scales * num_of_angles);
 #endif
 
+#ifdef BIG_BATCH
         if (num_of_scales > 1) {
             this->max_responses.reserve(num_of_scales * num_of_angles);
             this->max_locs.reserve(num_of_scales * num_of_angles);
             this->response_maps.reserve(num_of_scales * num_of_angles);
         }
+#endif
     }
     ThreadCtx(ThreadCtx &&) = default;
     ~ThreadCtx()
@@ -82,7 +81,6 @@ struct ThreadCtx {
 #endif
 
     DynMem xf_sqr_norm, yf_sqr_norm;
-    std::vector<cv::Mat> patch_feats;
 
     cv::Mat in_all, fw_all, ifft2_res, response;
     ComplexMat zf, kzf, kf, xyf;
@@ -99,11 +97,12 @@ struct ThreadCtx {
     cv::Point2i max_loc;
     double max_val, max_response;
 
-    // Big batch variables
+#ifdef BIG_BATCH
     // Stores value of responses, location of maximal response and response maps for each scale
     std::vector<double> max_responses;
     std::vector<cv::Point2i> max_locs;
     std::vector<cv::Mat> response_maps;
+#endif
 };
 
 #endif // SCALE_VARS_HPP

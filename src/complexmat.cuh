@@ -3,6 +3,7 @@
 
 #include <opencv2/opencv.hpp>
 
+#include "dynmem.hpp"
 #include "cuda_runtime.h"
 #include "cufft.h"
 
@@ -79,7 +80,7 @@ class ComplexMat {
         return;
     }
 
-    void sqr_norm(float *result) const;
+    void sqr_norm(DynMem &result) const;
 
     ComplexMat sqr_mag() const;
 

@@ -27,15 +27,15 @@ __global__ void sqr_norm_kernel(int n, float *out, float *data, float rows, floa
     }
 }
 
-void ComplexMat::sqr_norm(float *result) const
+void ComplexMat::sqr_norm(DynMem &result) const
 {
-    CudaSafeCall(cudaMemsetAsync(result, 0, n_scales * sizeof(float), this->stream));
+    CudaSafeCall(cudaMemsetAsync(result.deviceMem(), 0, n_scales * sizeof(float), this->stream));
 
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels / n_scales, n_scales);
 
     sqr_norm_kernel<<<numBlocks, threadsPerBlock, rows * cols * sizeof(float), this->stream>>>(
-        n_channels / n_scales, result, this->p_data, rows, cols);
+        n_channels / n_scales, result.deviceMem(), this->p_data, rows, cols);
     CudaCheckError();
 
     return;

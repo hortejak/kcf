@@ -56,17 +56,12 @@ class KCF_Tracker {
 #ifdef ASYNC
     bool m_use_multithreading{true};
 #else
-    bool m_use_multithreading{false};
-#endif // ASYNC
-    bool m_use_subpixel_localization{true};
-    bool m_use_subgrid_scale{true};
-    bool m_use_cnfeat{true};
-    bool m_use_linearkernel{false};
-#ifdef BIG_BATCH
-    bool m_use_big_batch{true};
-#else
-    bool m_use_big_batch{false};
-#endif
+    bool m_use_multithreading {false};
+#endif //ASYNC
+    bool m_use_subpixel_localization {true};
+    bool m_use_subgrid_scale {true};
+    bool m_use_cnfeat {true};
+    bool m_use_linearkernel {false};
 #ifdef CUFFT
     bool m_use_cuda{true};
 #else
@@ -131,7 +126,6 @@ class KCF_Tracker {
 
     // for visual debug
     int p_debug_image_size = 100;
-    int p_count = 0;
     std::vector<cv::Mat> p_debug_scale_responses;
     std::vector<cv::Mat> p_debug_subwindows;
 
@@ -160,7 +154,7 @@ class KCF_Tracker {
                               bool auto_correlation = false);
     cv::Mat circshift(const cv::Mat &patch, int x_rot, int y_rot);
     cv::Mat cosine_window_function(int dim1, int dim2);
-    void get_features(cv::Mat &patch_rgb, cv::Mat &patch_gray, ThreadCtx &vars);
+    std::vector<cv::Mat> get_features(cv::Mat &patch_rgb, cv::Mat &patch_gray);
     void geometric_transformations(cv::Mat &patch, int size_x, int size_y, int angle = 0, bool allow_debug = true);
     cv::Point2f sub_pixel_peak(cv::Point &max_loc, cv::Mat &response);
     double sub_grid_scale(uint index);

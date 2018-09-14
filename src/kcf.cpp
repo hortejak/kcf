@@ -28,6 +28,18 @@
                   << (obj) << std::endl;                                                                               \
     }
 
+template <typename T>
+T clamp(const T& n, const T& lower, const T& upper)
+{
+    return std::max(lower, std::min(n, upper));
+}
+
+template <typename T>
+void clamp2(T& n, const T& lower, const T& upper)
+{
+    n = std::max(lower, std::min(n, upper));
+}
+
 KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor,
                          double output_sigma_factor, int cell_size)
     : fft(*new FFT()), p_padding(padding), p_output_sigma_factor(output_sigma_factor), p_kernel_sigma(kernel_sigma),
@@ -170,11 +182,11 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_yf.create(p_roi.height, width, 1);
     p_xf.create(p_roi.height, width, p_num_of_feats);
 
-    int max1 = m_use_big_batch ? 2 : p_num_scales;
-    int max2 = m_use_big_batch ? 1 : p_num_angles;
+    int max1 = BIG_BATCH_MODE ? 2 : p_num_scales;
+    int max2 = BIG_BATCH_MODE ? 1 : p_num_angles;
     for (int i = 0; i < max1; ++i) {
         for (int j = 0; j < max2; ++j) {
-            if (m_use_big_batch && i == 1)
+            if (BIG_BATCH_MODE && i == 1)
                 p_threadctxs.emplace_back(p_roi, p_num_of_feats * p_num_scales * p_num_angles, 1, 0, p_num_scales,
                                           p_num_angles);
             else
@@ -191,13 +203,14 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_min_max_scale[0] = std::pow(p_scale_step, std::ceil(std::log(min_size_ratio) / log(p_scale_step)));
     p_min_max_scale[1] = std::pow(p_scale_step, std::floor(std::log(max_size_ratio) / log(p_scale_step)));
 
-    std::cout << "init: img size " << img.cols << " " << img.rows << std::endl;
-    std::cout << "init: win size. " << p_windows_size.width << " " << p_windows_size.height << std::endl;
+    std::cout << "init: img size " << img.cols << "x" << img.rows << std::endl;
+    std::cout << "init: win size " << p_windows_size.width << "x" << p_windows_size.height << std::endl;
+    std::cout << "init: FFT size " << p_roi.width << "x" << p_roi.height << std::endl;
     std::cout << "init: min max scales factors: " << p_min_max_scale[0] << " " << p_min_max_scale[1] << std::endl;
 
-    p_output_sigma = std::sqrt(p_pose.w * p_pose.h) * p_output_sigma_factor / static_cast<double>(p_cell_size);
+    p_output_sigma = std::sqrt(p_pose.w * p_pose.h) * p_output_sigma_factor / p_cell_size;
 
-    fft.init(p_roi.width, p_roi.height, p_num_of_feats, p_num_scales * p_num_angles, m_use_big_batch);
+    fft.init(p_roi.width, p_roi.height, p_num_of_feats, p_num_scales);
     fft.set_window(cosine_window_function(p_roi.width, p_roi.height));
 
     // window weights, i.e. labels
@@ -206,22 +219,20 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     DEBUG_PRINTM(p_yf);
 
     // obtain a sub-window for training initial model
-    p_threadctxs.front().patch_feats.clear();
-
     int size_x_scaled = floor(p_windows_size.width);
     int size_y_scaled = floor(p_windows_size.height);
 
     cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
     geometric_transformations(patch_gray, p_windows_size.width, p_windows_size.height, 0, false);
 
-    cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
+    cv::Mat patch_rgb;
     if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
         patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
         geometric_transformations(patch_rgb, p_windows_size.width, p_windows_size.height, 0, false);
     }
 
-    get_features(patch_rgb, patch_gray, p_threadctxs.front());
-    fft.forward_window(p_threadctxs.front().patch_feats, p_model_xf, p_threadctxs.front().fw_all,
+    std::vector<cv::Mat> patch_feats = get_features(patch_rgb, patch_gray);
+    fft.forward_window(patch_feats, p_model_xf, p_threadctxs.front().fw_all,
                        m_use_cuda ? p_threadctxs.front().data_features.deviceMem() : nullptr,
                        p_threadctxs.front().stream);
     DEBUG_PRINTM(p_model_xf);
@@ -349,7 +360,7 @@ void KCF_Tracker::track(cv::Mat &img)
         it.async_res.wait();
 #else  // !ASYNC
     NORMAL_OMP_PARALLEL_FOR
-    for (uint i = m_use_big_batch ? 1 : 0; i < p_threadctxs.size(); ++i)
+    for (uint i =  BIG_BATCH_MODE ? 1 : 0; i < p_threadctxs.size(); ++i)
         scale_track(p_threadctxs[i], input_rgb, input_gray);
 #endif
 
@@ -422,15 +433,11 @@ void KCF_Tracker::track(cv::Mat &img)
     if (m_visual_debug) std::cout << "New p_pose, cx: " << p_pose.cx << " cy: " << p_pose.cy << std::endl;
 
     if (p_fit_to_pw2) {
-        if (p_pose.cx < 0) p_pose.cx = 0;
-        if (p_pose.cx > (img.cols * p_scale_factor_x) - 1) p_pose.cx = (img.cols * p_scale_factor_x) - 1;
-        if (p_pose.cy < 0) p_pose.cy = 0;
-        if (p_pose.cy > (img.rows * p_scale_factor_y) - 1) p_pose.cy = (img.rows * p_scale_factor_y) - 1;
+        clamp2(p_pose.cx, 0.0, (img.cols * p_scale_factor_x) - 1);
+        clamp2(p_pose.cy, 0.0, (img.rows * p_scale_factor_y) - 1);
     } else {
-        if (p_pose.cx < 0) p_pose.cx = 0;
-        if (p_pose.cx > img.cols - 1) p_pose.cx = img.cols - 1;
-        if (p_pose.cy < 0) p_pose.cy = 0;
-        if (p_pose.cy > img.rows - 1) p_pose.cy = img.rows - 1;
+        clamp2(p_pose.cx, 0.0, img.cols - 1.0);
+        clamp2(p_pose.cy, 0.0, img.rows - 1.0);
     }
 
     // sub grid scale interpolation
@@ -441,6 +448,7 @@ void KCF_Tracker::track(cv::Mat &img)
         p_current_scale *= max->scale;
     }
 
+    clamp2(p_current_scale, p_min_max_scale[0], p_min_max_scale[1]);
 
     if (p_current_scale < p_min_max_scale[0]) p_current_scale = p_min_max_scale[0];
     if (p_current_scale > p_min_max_scale[1]) p_current_scale = p_min_max_scale[1];
@@ -462,10 +470,9 @@ void KCF_Tracker::track(cv::Mat &img)
         geometric_transformations(patch_rgb, p_windows_size.width, p_windows_size.height, p_current_angle, false);
     }
 
-    p_threadctxs.front().patch_feats.clear();
-    get_features(patch_rgb, patch_gray, p_threadctxs.front());
-    fft.forward_window(p_threadctxs.front().patch_feats, p_xf, p_threadctxs.front().fw_all,
-                       m_use_cuda ? p_threadctxs.front().data_features.deviceMem() : nullptr, p_threadctxs.front().stream);
+    ThreadCtx &ctx = p_threadctxs.front();
+    std::vector<cv::Mat> patch_feats = get_features(patch_rgb, patch_gray);
+    fft.forward_window(patch_feats, p_xf, ctx.fw_all, m_use_cuda ? ctx.data_features.deviceMem() : nullptr, ctx.stream);
 
     // subsequent frames, interpolate model
     p_model_xf = p_model_xf * float((1. - p_interp_factor)) + p_xf * float(p_interp_factor);
@@ -478,12 +485,12 @@ void KCF_Tracker::track(cv::Mat &img)
         alphaf_den = (p_xf * xfconj);
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
-        gaussian_correlation(p_threadctxs.front(), p_xf, p_xf, p_kernel_sigma,
+        gaussian_correlation(ctx, p_xf, p_xf, p_kernel_sigma,
                              true);
         //        ComplexMat alphaf = p_yf / (kf + p_lambda); //equation for fast training
         //        p_model_alphaf = p_model_alphaf * (1. - p_interp_factor) + alphaf * p_interp_factor;
-        alphaf_num = p_yf * p_threadctxs.front().kf;
-        alphaf_den = p_threadctxs.front().kf * (p_threadctxs.front().kf + float(p_lambda));
+        alphaf_num = p_yf * ctx.kf;
+        alphaf_den = ctx.kf * (ctx.kf + float(p_lambda));
     }
 
     p_model_alphaf_num = p_model_alphaf_num * float((1. - p_interp_factor)) + alphaf_num * float(p_interp_factor);
@@ -502,8 +509,8 @@ void KCF_Tracker::track(cv::Mat &img)
 
 void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray)
 {
-    if (m_use_big_batch) {
-        vars.patch_feats.clear();
+    std::vector<cv::Mat> patch_feats;
+    if (BIG_BATCH_MODE) {
         BIG_BATCH_OMP_PARALLEL_FOR
         for (uint i = 0; i < this->p_scales.size(); ++i) {
             for (uint j = 0; j < this->p_angles.size(); ++j) {
@@ -515,14 +522,16 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
                 geometric_transformations(patch_gray, p_windows_size.width, p_windows_size.height,
                                           p_current_scale * this->p_scales[i], p_current_angle + this->p_angles[j]);
 
-                cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
+                cv::Mat patch_rgb;
                 if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
                     patch_rgb =
                         get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
                     geometric_transformations(patch_rgb, p_windows_size.width, p_windows_size.height,
                                               p_current_scale * this->p_scales[i], p_current_angle + this->p_angles[j]);
                 }
-                get_features(patch_rgb, patch_gray, vars);
+                std::vector<cv::Mat> tmp = get_features(patch_rgb, patch_gray);
+                BIG_BATCH_OMP_ORDERED
+                patch_feats.insert(patch_feats.end(), tmp.begin(), tmp.end());
             }
         }
     } else {
@@ -532,22 +541,21 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
         cv::Mat patch_gray = get_subwindow(input_gray, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
         geometric_transformations(patch_gray, p_windows_size.width, p_windows_size.height, p_current_scale * vars.scale);
 
-        cv::Mat patch_rgb = cv::Mat::zeros(size_y_scaled, size_x_scaled, CV_32F);
+        cv::Mat patch_rgb;
         if ((m_use_color || m_use_cnfeat) && input_rgb.channels() == 3) {
             patch_rgb = get_subwindow(input_rgb, this->p_pose.cx, this->p_pose.cy, size_x_scaled, size_y_scaled);
             geometric_transformations(patch_rgb, p_windows_size.width, p_windows_size.height, p_current_scale * vars.scale,
                                       p_current_angle + vars.angle);
         }
-        vars.patch_feats.clear();
-        get_features(patch_rgb, patch_gray, vars);
+        patch_feats = get_features(patch_rgb, patch_gray);
     }
 
-    fft.forward_window(vars.patch_feats, vars.zf, vars.fw_all, m_use_cuda ? vars.data_features.deviceMem() : nullptr,
+    fft.forward_window(patch_feats, vars.zf, vars.fw_all, m_use_cuda ? vars.data_features.deviceMem() : nullptr,
                        vars.stream);
     DEBUG_PRINTM(vars.zf);
 
     if (m_use_linearkernel) {
-        vars.kzf = m_use_big_batch ? (vars.zf.mul2(this->p_model_alphaf)).sum_over_channels()
+        vars.kzf = BIG_BATCH_MODE ? (vars.zf.mul2(this->p_model_alphaf)).sum_over_channels()
                                    : (p_model_alphaf * vars.zf).sum_over_channels();
         fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch.deviceMem() : nullptr, vars.stream);
     } else {
@@ -558,7 +566,7 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
         gaussian_correlation(vars, vars.zf, this->p_model_xf, this->p_kernel_sigma);
         DEBUG_PRINTM(this->p_model_alphaf);
         DEBUG_PRINTM(vars.kzf);
-        vars.kzf = m_use_big_batch ? vars.kzf.mul(this->p_model_alphaf) : this->p_model_alphaf * vars.kzf;
+        vars.kzf = BIG_BATCH_MODE ? vars.kzf.mul(this->p_model_alphaf) : this->p_model_alphaf * vars.kzf;
 #endif
         fft.inverse(vars.kzf, vars.response, m_use_cuda ? vars.data_i_1ch.deviceMem() : nullptr, vars.stream);
     }
@@ -569,37 +577,37 @@ void KCF_Tracker::scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &inpu
     account the fact that, if the target doesn't move, the peak
     will appear at the top-left corner, not at the center (this is
     discussed in the paper). the responses wrap around cyclically. */
-    if (m_use_big_batch) {
-        cv::split(vars.response, vars.response_maps);
+#ifdef BIG_BATCH
+    cv::split(vars.response, vars.response_maps);
 
-        for (size_t i = 0; i < p_scales.size(); ++i) {
-            double min_val, max_val;
-            cv::Point2i min_loc, max_loc;
-            cv::minMaxLoc(vars.response_maps[i], &min_val, &max_val, &min_loc, &max_loc);
-            DEBUG_PRINT(max_loc);
-            double weight = p_scales[i] < 1. ? p_scales[i] : 1. / p_scales[i];
-            vars.max_responses[i] = max_val * weight;
-            vars.max_locs[i] = max_loc;
-        }
-    } else {
-        double min_val;
-        cv::Point2i min_loc;
-        cv::minMaxLoc(vars.response, &min_val, &vars.max_val, &min_loc, &vars.max_loc);
-
-        DEBUG_PRINT(vars.max_loc);
-
-        double weight = vars.scale < 1. ? vars.scale : 1. / vars.scale;
-        vars.max_response = vars.max_val * weight;
+    for (size_t i = 0; i < p_scales.size(); ++i) {
+        double min_val, max_val;
+        cv::Point2i min_loc, max_loc;
+        cv::minMaxLoc(vars.response_maps[i], &min_val, &max_val, &min_loc, &max_loc);
+        DEBUG_PRINT(max_loc);
+        double weight = p_scales[i] < 1. ? p_scales[i] : 1. / p_scales[i];
+        vars.max_responses[i] = max_val * weight;
+        vars.max_locs[i] = max_loc;
     }
+#else
+    double min_val;
+    cv::Point2i min_loc;
+    cv::minMaxLoc(vars.response, &min_val, &vars.max_val, &min_loc, &vars.max_loc);
+
+    DEBUG_PRINT(vars.max_loc);
+
+    double weight = vars.scale < 1. ? vars.scale : 1. / vars.scale;
+    vars.max_response = vars.max_val * weight;
+#endif
     return;
 }
 
 // ****************************************************************************
 
-void KCF_Tracker::get_features(cv::Mat &patch_rgb, cv::Mat &patch_gray, ThreadCtx &vars)
+std::vector<cv::Mat> KCF_Tracker::get_features(cv::Mat &patch_rgb, cv::Mat &patch_gray)
 {
     // get hog(Histogram of Oriented Gradients) features
-    vars.patch_feats = FHoG::extract(patch_gray, 2, p_cell_size, 9);
+    std::vector<cv::Mat> hog_feat = FHoG::extract(patch_gray, 2, p_cell_size, 9);
 
     // get color rgb features (simple r,g,b channels)
     std::vector<cv::Mat> color_feat;
@@ -620,9 +628,9 @@ void KCF_Tracker::get_features(cv::Mat &patch_rgb, cv::Mat &patch_gray, ThreadCt
         std::vector<cv::Mat> cn_feat = CNFeat::extract(patch_rgb);
         color_feat.insert(color_feat.end(), cn_feat.begin(), cn_feat.end());
     }
-    BIG_BATCH_OMP_ORDERED
-    vars.patch_feats.insert(vars.patch_feats.end(), color_feat.begin(), color_feat.end());
-    return;
+
+    hog_feat.insert(hog_feat.end(), color_feat.begin(), color_feat.end());
+    return hog_feat;
 }
 
 cv::Mat KCF_Tracker::gaussian_shaped_labels(double sigma, int dim1, int dim2)
@@ -637,7 +645,7 @@ cv::Mat KCF_Tracker::gaussian_shaped_labels(double sigma, int dim1, int dim2)
         float *row_ptr = labels.ptr<float>(j);
         double y_s = y * y;
         for (int x = range_x[0], i = 0; x < range_x[1]; ++x, ++i) {
-            row_ptr[i] = float(std::exp(-0.5 * (y_s + x * x) / sigma_s)); //-1/2*e^((y^2+x^2)/sigma^2)
+            row_ptr[i] = std::exp(-0.5 * (y_s + x * x) / sigma_s); //-1/2*e^((y^2+x^2)/sigma^2)
         }
     }
 
@@ -831,27 +839,19 @@ void KCF_Tracker::geometric_transformations(cv::Mat &patch, int size_x, int size
 void KCF_Tracker::gaussian_correlation(struct ThreadCtx &vars, const ComplexMat &xf, const ComplexMat &yf, double sigma,
                                        bool auto_correlation)
 {
-#ifdef CUFFT
-    xf.sqr_norm(vars.xf_sqr_norm.deviceMem());
-    if (!auto_correlation) yf.sqr_norm(vars.yf_sqr_norm.deviceMem());
-#else
-    xf.sqr_norm(vars.xf_sqr_norm.hostMem());
+    xf.sqr_norm(vars.xf_sqr_norm);
     if (auto_correlation) {
         vars.yf_sqr_norm.hostMem()[0] = vars.xf_sqr_norm.hostMem()[0];
     } else {
-        yf.sqr_norm(vars.yf_sqr_norm.hostMem());
+        yf.sqr_norm(vars.yf_sqr_norm);
     }
-#endif
     vars.xyf = auto_correlation ? xf.sqr_mag() : xf.mul2(yf.conj());
     DEBUG_PRINTM(vars.xyf);
     fft.inverse(vars.xyf, vars.ifft2_res, m_use_cuda ? vars.data_i_features.deviceMem() : nullptr, vars.stream);
 #ifdef CUFFT
-    if (auto_correlation)
-        cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(), vars.xf_sqr_norm.deviceMem(), vars.xf_sqr_norm.deviceMem(),
-                                  sigma, xf.n_channels, xf.n_scales, p_roi.height, p_roi.width, vars.stream);
-    else
-        cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(), vars.xf_sqr_norm.deviceMem(), vars.yf_sqr_norm.deviceMem(),
-                                  sigma, xf.n_channels, xf.n_scales, p_roi.height, p_roi.width, vars.stream);
+    cuda_gaussian_correlation(vars.data_i_features.deviceMem(), vars.gauss_corr_res.deviceMem(),
+                              vars.xf_sqr_norm.deviceMem(), vars.xf_sqr_norm.deviceMem(), sigma, xf.n_channels,
+                              xf.n_scales, p_roi.height, p_roi.width, vars.stream);
 #else
     // ifft2 and sum over 3rd dimension, we dont care about individual channels
     DEBUG_PRINTM(vars.ifft2_res);
@@ -966,7 +966,11 @@ double KCF_Tracker::sub_grid_scale(uint index)
             A.at<float>(i, 0) = float(p_scales[i] * p_scales[i]);
             A.at<float>(i, 1) = float(p_scales[i]);
             A.at<float>(i, 2) = 1;
-            fval.at<float>(i) = m_use_big_batch ? p_threadctxs.back().max_responses[i] : p_threadctxs[i].max_response;
+#ifdef BIG_BATCH
+            fval.at<float>(i) = p_threadctxs.back().max_responses[i];
+#else
+            fval.at<float>(i) = p_threadctxs[i].max_response;
+#endif
         }
     } else {
         // only from neighbours
@@ -977,10 +981,17 @@ double KCF_Tracker::sub_grid_scale(uint index)
              p_scales[index - 1] * p_scales[index - 1], p_scales[index - 1], 1,
              p_scales[index + 0] * p_scales[index + 0], p_scales[index + 0], 1,
              p_scales[index + 1] * p_scales[index + 1], p_scales[index + 1], 1);
+#ifdef BIG_BATCH
         fval = (cv::Mat_<float>(3, 1) <<
-                (m_use_big_batch ? p_threadctxs.back().max_responses[index - 1] : p_threadctxs[index - 1].max_response),
-                (m_use_big_batch ? p_threadctxs.back().max_responses[index + 0] : p_threadctxs[index + 0].max_response),
-                (m_use_big_batch ? p_threadctxs.back().max_responses[index + 1] : p_threadctxs[index + 1].max_response));
+                p_threadctxs.back().max_responses[index - 1],
+                p_threadctxs.back().max_responses[index + 0],
+                p_threadctxs.back().max_responses[index + 1]);
+#else
+        fval = (cv::Mat_<float>(3, 1) <<
+                p_threadctxs[index - 1].max_response,
+                p_threadctxs[index + 0].max_response,
+                p_threadctxs[index + 1].max_response);
+#endif
     }
 
     cv::Mat x;
