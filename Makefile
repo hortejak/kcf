@@ -106,8 +106,12 @@ echo $(1) '$(subst $(nl),\n,$(subst \,\\,$(2)))';
 endef
 
 # Ninja generator - to have faster parallel builds and tests
-.PHONY: build.ninja
-build.ninja:
+.PHONY: build.ninja build.ninja.new
+
+build.ninja: build.ninja.new
+	@cmp -s $@ $< || mv -v $< $@
+
+build.ninja.new:
 	@$(call echo,>$@,$(ninja-rule))
 	@$(foreach build,$(BUILDS),\
 		$(call echo,>>$@,$(call ninja-build,$(build),$(CMAKE_OTPS_$(build)))))
@@ -139,7 +143,7 @@ endef
 define ninja-build
 build build-$(1)/build.ninja: cmake
   opts = $(2)
-build build-$(1)/kcf_vot: ninja build-$(1)/build.ninja build.ninja
+build build-$(1)/kcf_vot: ninja build-$(1)/build.ninja $(shell git ls-files)
 default build-$(1)/kcf_vot
 endef
 
