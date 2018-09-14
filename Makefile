@@ -4,7 +4,17 @@ BUILDS = opencvfft-st opencvfft-async opencvfft-openmp fftw fftw-async fftw-open
 TESTSEQ = bag ball1 car1 book
 TESTFLAGS = default fit128
 
-all: $(foreach build,$(BUILDS),build-$(build)/kcf_vot)
+all: $(BUILDS)
+
+ninja: build.ninja
+	ninja
+
+$(BUILDS): build.ninja
+	ninja build-$@/build.ninja
+	ninja -C build-$@
+
+clean: build.ninja
+	ninja $@
 
 CMAKE_OPTS += -G Ninja
 
@@ -31,23 +41,6 @@ CMAKE_OTPS_cufft             = -DFFT=cuFFT  $(if $(CUDA_ARCH_LIST),-DCUDA_ARCH_L
 CMAKE_OTPS_cufft-openmp	     = -DFFT=cuFFT  $(if $(CUDA_ARCH_LIST),-DCUDA_ARCH_LIST='$(CUDA_ARCH_LIST)') -DOPENMP=ON
 CMAKE_OTPS_cufft-big         = -DFFT=cuFFT  $(if $(CUDA_ARCH_LIST),-DCUDA_ARCH_LIST='$(CUDA_ARCH_LIST)') -DBIG_BATCH=ON
 CMAKE_OTPS_cufft-big-openmp  = -DFFT=cuFFT  $(if $(CUDA_ARCH_LIST),-DCUDA_ARCH_LIST='$(CUDA_ARCH_LIST)') -DBIG_BATCH=ON -DOPENMP=ON
-
-.SECONDARY: $(BUILDS:%=build-%/build.ninja)
-
-build-%/build.ninja:
-	@echo '############################################################'
-	mkdir -p $(@D)
-	cd $(@D) && cmake $(CMAKE_OPTS) $(CMAKE_OTPS_$*) ..
-
-.PHONY: FORCE
-build-%/kcf_vot: build-%/build.ninja $(shell git ls-files)
-	@echo '############################################################'
-	cmake --build $(@D)
-
-$(BUILDS): %: build-%/kcf_vot
-
-clean:
-	rm -rf $(BUILDS:%=build-%)
 
 ##########################
 ### Tests
@@ -76,9 +69,6 @@ vot2016.zip:
 # compiles all variants in the same ways as this makefile, but faster.
 # The down side is that the build needs about 10 GB of memory.
 
-ninja: build.ninja
-	ninja
-
 define nl
 
 
@@ -100,33 +90,37 @@ build.ninja.new:
 		$(call echo,>>$@,$(call ninja-build,$(build),$(CMAKE_OTPS_$(build)))))
 	@$(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),\
 		$(call echo,>>$@,$(call ninja-testcase,$(build),$(seq),$(f)))$(nl))))
-	@$(call echo,>>$@,build test: print_results $(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
-	@$(foreach build,$(BUILDS),$(call echo,>>$@,build test-$(build): print_results $(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
-	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build test-$(seq): print_results $(foreach build,$(BUILDS),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
-	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build vot2016/$(seq): make))
+	@$(call echo,>>$@,build test: PRINT_RESULTS $(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
+	@$(foreach build,$(BUILDS),$(call echo,>>$@,build test-$(build): PRINT_RESULTS $(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
+	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build test-$(seq): PRINT_RESULTS $(foreach build,$(BUILDS),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
+	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build vot2016/$(seq): MAKE))
 
 
 define ninja-rule
-rule cmake
+rule CMAKE
   command = cd $$$$(dirname $$out) && cmake $(CMAKE_OPTS) $$opts ..
-  description = CMake $$out
-rule ninja
+rule NINJA
   # Absolute path in -C allows Emacs to properly jump to error message locations
   command = ninja -C `realpath $$$$(dirname $$out)` && touch $$out
   description = Ninja $$out
-rule test_seq
+rule TEST_SEQ
   command = build-$$build/kcf_vot $$flags $$seq > $$out
-rule print_results
+rule PRINT_RESULTS
   description = Print results
   command = $(call print-test-results,$$in)
-rule make
+rule MAKE
   command = make $$out
+rule CLEAN
+#  command = /usr/bin/ninja -t clean -r NINJA
+  description = Cleaning all built files...
+  command = rm -rf $(BUILDS:%=build-%)
+build clean: CLEAN
 endef
 
 define ninja-build
-build build-$(1)/build.ninja: cmake
+build build-$(1)/build.ninja: CMAKE
   opts = $(2)
-build build-$(1)/kcf_vot: ninja build-$(1)/build.ninja $(shell git ls-files)
+build build-$(1)/kcf_vot: NINJA build-$(1)/build.ninja $(shell git ls-files)
 default build-$(1)/kcf_vot
 endef
 
@@ -134,7 +128,7 @@ ninja-test = build-$(1)/kcf_vot-$(2)-$(3).log
 
 # Usage: ninja-testcase <build> <seq> <flags>
 define ninja-testcase
-build build-$(1)/kcf_vot-$(2)-$(3).log: test_seq build-$(1)/kcf_vot $(filter-out %/output.txt,$(wildcard vot2016/$(2)/*)) || vot2016/$(2)
+build build-$(1)/kcf_vot-$(2)-$(3).log: TEST_SEQ build-$(1)/kcf_vot $(filter-out %/output.txt,$(wildcard vot2016/$(2)/*)) || vot2016/$(2)
   build = $(1)
   seq = vot2016/$(2)
   flags = $(if $(3:fit128=),,--fit=128)
