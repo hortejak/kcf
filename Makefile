@@ -103,7 +103,7 @@ rule CMAKE
 rule NINJA
   # Absolute path in -C allows Emacs to properly jump to error message locations
   command = ninja -C $(CURDIR)/$$$$(dirname $$out) && touch $$out
-  description = Ninja $$out
+  description = ninja $$out
 rule TEST_SEQ
   command = ( build-$$build/kcf_vot $$flags $$seq || echo failed ) > $$out
 rule PRINT_RESULTS
@@ -122,12 +122,12 @@ build clean: CLEAN
 build build.ninja: REGENERATE Makefile
 endef
 
-
+GIT_LS_FILES := $(shell git ls-files)
 
 define ninja-build
 build build-$(1)/build.ninja: CMAKE
   opts = $(2)
-build build-$(1)/kcf_vot: NINJA build-$(1)/build.ninja $(shell git ls-files)
+build build-$(1)/kcf_vot: NINJA build-$(1)/build.ninja $(GIT_LS_FILES)
 default build-$(1)/kcf_vot
 endef
 
