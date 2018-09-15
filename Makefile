@@ -46,7 +46,7 @@ CMAKE_OTPS_cufft-big-openmp  = -DFFT=cuFFT  $(if $(CUDA_ARCH_LIST),-DCUDA_ARCH_L
 ### Tests
 ##########################
 
-print-test-results = grep ^Average $(1)|sed -E -e "s|build-(.*)/kcf_vot-(.*).log:|\2;\1;|"|sort|column -t -s";"
+print-test-results = for i in $(1); do echo ! `echo $$$$i|sed -Ee "s|build-(.*)/kcf_vot-(.*)-(.*).log|\2;\3;\1;|"`  `sed -e "/^\$$$$/d" $$$$i|tail -n1|sed -e "/fps/ s/.*/& ok/")`; done|sort|column -t -s";"
 
 test $(BUILDS:%=test-%) $(SEQ:%=test-%): build.ninja
 	ninja $@
@@ -79,12 +79,9 @@ echo $(1) '$(subst $(nl),\n,$(subst \,\\,$(2)))';
 endef
 
 # Ninja generator - to have faster parallel builds and tests
-.PHONY: build.ninja build.ninja.new
+.PHONY: build.ninja
 
-build.ninja: build.ninja.new
-	@cmp -s $@ $< || mv -v $< $@
-
-build.ninja.new:
+build.ninja:
 	@$(call echo,>$@,$(ninja-rule))
 	@$(foreach build,$(BUILDS),\
 		$(call echo,>>$@,$(call ninja-build,$(build),$(CMAKE_OTPS_$(build)))))
@@ -98,15 +95,17 @@ build.ninja.new:
 ninja-test = build-$(1)/kcf_vot-$(2)-$(3).log
 
 define ninja-rule
+rule REGENERATE
+  command = make $$out BUILDS="$(BUILDS)" TESTSEQ="$(TESTSEQ)" TESTFLAGS="$(TESTFLAGS)"
+  generator = 1
 rule CMAKE
   command = cd $$$$(dirname $$out) && cmake $(CMAKE_OPTS) $$opts ..
 rule NINJA
   # Absolute path in -C allows Emacs to properly jump to error message locations
   command = ninja -C $(CURDIR)/$$$$(dirname $$out) && touch $$out
   description = Ninja $$out
-  restat = 1
 rule TEST_SEQ
-  command = build-$$build/kcf_vot $$flags $$seq > $$out
+  command = ( build-$$build/kcf_vot $$flags $$seq || echo failed ) > $$out
 rule PRINT_RESULTS
   description = Print results
   command = $(call print-test-results,$$in)
@@ -120,6 +119,7 @@ rule CLEAN
   description = Cleaning all built files...
   command = rm -rf $(BUILDS:%=build-%)
 build clean: CLEAN
+build build.ninja: REGENERATE Makefile
 endef
 
 
