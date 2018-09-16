@@ -46,8 +46,6 @@ CMAKE_OTPS_cufft-big-openmp  = -DFFT=cuFFT  $(if $(CUDA_ARCH_LIST),-DCUDA_ARCH_L
 ### Tests
 ##########################
 
-print-test-results = for i in $(1); do echo ! `echo $$$$i|sed -Ee "s|build-(.*)/kcf_vot-(.*)-(.*).log|\2;\3;\1;|"`  `sed -e "/^\$$$$/d" $$$$i|tail -n1|sed -e "/fps/ s/.*/& ok/")`; done|sort|column -t -s";"
-
 test $(BUILDS:%=test-%) $(SEQ:%=test-%): build.ninja
 	ninja $@
 
@@ -81,15 +79,15 @@ endef
 # Ninja generator - to have faster parallel builds and tests
 .PHONY: build.ninja
 
-build.ninja:
+build.ninja: Makefile
 	@$(call echo,>$@,$(ninja-rule))
 	@$(foreach build,$(BUILDS),\
 		$(call echo,>>$@,$(call ninja-build,$(build),$(CMAKE_OTPS_$(build)))))
 	@$(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),\
 		$(call echo,>>$@,$(call ninja-testcase,$(build),$(seq),$(f)))$(nl))))
-	@$(call echo,>>$@,build test: PRINT_RESULTS $(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
-	@$(foreach build,$(BUILDS),$(call echo,>>$@,build test-$(build): PRINT_RESULTS $(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
-	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build test-$(seq): PRINT_RESULTS $(foreach build,$(BUILDS),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))))
+	@$(call echo,>>$@,build test: PRINT_RESULTS $(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))) | print-test-results)
+	@$(foreach build,$(BUILDS),$(call echo,>>$@,build test-$(build): PRINT_RESULTS $(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f)))) | print-test-results))
+	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build test-$(seq): PRINT_RESULTS $(foreach build,$(BUILDS),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f)))) | print-test-results))
 	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build vot2016/$(seq): MAKE))
 
 ninja-test = build-$(1)/kcf_vot-$(2)-$(3).log
@@ -102,13 +100,15 @@ rule CMAKE
   command = cd $$$$(dirname $$out) && cmake $(CMAKE_OPTS) $$opts ..
 rule NINJA
   # Absolute path in -C allows Emacs to properly jump to error message locations
-  command = ninja -C $(CURDIR)/$$$$(dirname $$out) && touch $$out
+  command = ninja -C $(CURDIR)/$$$$(dirname $$out)
   description = ninja $$out
+  restat = 1
 rule TEST_SEQ
-  command = ( build-$$build/kcf_vot $$flags $$seq || echo failed ) > $$out
+  # Errors are ignored - they will be reported by PRINT_RESULTS
+  command = build-$$build/kcf_vot $$flags $$seq > $$out || :
 rule PRINT_RESULTS
   description = Print results
-  command = $(call print-test-results,$$in)
+  command = ./wvtool -w125 -v run ./print-test-results $$in
 rule MAKE
   command = make $$out
   pool = make
