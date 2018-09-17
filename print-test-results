@@ -1,0 +1,23 @@
+#!/bin/bash
+set -e
+
+expected_accuracy=([bag]=0.53 [ball1]=0.70 [car1]=0.35 [book]=0.19)
+
+for i in "$@"; do
+    [[ "$i" =~ build-(.*)/kcf_vot-(.*)-(.*).log ]]
+    build=${BASH_REMATCH[1]}
+    flags=${BASH_REMATCH[3]}
+    seq=${BASH_REMATCH[2]}
+
+    result=$(grep 'Average accuracy:' $i || :)
+    if [[ "$result" =~ Average\ accuracy:\ ([0-9.]+) ]]; then
+	if [[ $(echo "${BASH_REMATCH[1]} >= ${expected_accuracy[$seq]}"|bc) -eq 1 ]]; then
+	    status=ok
+	else
+	    status=BAD
+	fi
+    else
+	status=FAILED
+    fi
+    echo ! "$seq;$flags;$build;$result;$status"
+done | sort | column -t -s";"
