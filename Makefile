@@ -72,9 +72,13 @@ define nl
 
 endef
 
-define echo
-echo $(1) '$(subst $(nl),\n,$(subst \,\\,$(2)))';
-endef
+# Define echo depending on whether make supports the $(file) function.
+$(file >.test.file)
+ifneq ($(wildcard .test.file),)
+  echo = $(file $(1),$(2))
+else
+  echo = echo $(1) '$(subst $(nl),\n,$(subst \,\\,$(2)))';
+endif
 
 # Ninja generator - to have faster parallel builds and tests
 .PHONY: build.ninja
