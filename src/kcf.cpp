@@ -222,6 +222,9 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     d.threadctxs.emplace_back(p_roi, p_num_of_feats * p_num_scales, p_num_scales);
 #endif
 
+    gaussian_correlation.reset(new GaussianCorrelation(p_roi, IF_BIG_BATCH(p_num_scales, 1),
+                                                       p_num_of_feats * IF_BIG_BATCH(p_num_scales, 1)));
+
     p_current_scale = 1.;
 
     double min_size_ratio = std::max(5. * p_cell_size / p_windows_size.width, 5. * p_cell_size / p_windows_size.height);
