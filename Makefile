@@ -56,7 +56,7 @@ vot2016 $(TESTSEQ:%=vot2016/%): vot2016.zip
 .INTERMEDIATE: vot2016.zip
 .SECONDARY:    vot2016.zip
 vot2016.zip:
-	wget -O $@ http://data.votchallenge.net/vot2016/vot2016.zip
+	wget --progress=dot:giga -O $@ http://data.votchallenge.net/vot2016/vot2016.zip
 
 ###################
 # Ninja generator #
