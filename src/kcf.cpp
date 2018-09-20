@@ -101,6 +101,7 @@ void KCF_Tracker::train(cv::Mat input_gray, cv::Mat input_rgb, double interp_fac
 
 void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int fit_size_y)
 {
+    kcf_debug = m_debug;
     // check boundary, enforce min size
     double x1 = bbox.x, x2 = bbox.x + bbox.width, y1 = bbox.y, y2 = bbox.y + bbox.height;
     if (x1 < 0) x1 = 0.;
@@ -522,7 +523,7 @@ void KCF_Tracker::get_features(MatDynMem &result_3d, cv::Mat &input_rgb, cv::Mat
 
     for (uint i = 0; i < hog_feat.size(); ++i) {
         cv::Mat result_plane(result_3d.dims - 1, result_3d.size + 1, result_3d.cv::Mat::type(), result_3d.ptr<void>(i));
-        result_plane = hog_feat[i];
+        hog_feat[i].copyTo(result_plane);
     }
 }
 
