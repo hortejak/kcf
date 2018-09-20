@@ -66,7 +66,7 @@ KCF_Tracker::~KCF_Tracker()
 void KCF_Tracker::train(cv::Mat input_gray, cv::Mat input_rgb, double interp_factor)
 {
     // obtain a sub-window for training
-    int sizes[3] = {p_num_of_feats, p_windows_size.height, p_windows_size.width};
+    int sizes[3] = {p_num_of_feats, p_roi.height, p_roi.width};
     MatDynMem patch_feats(3, sizes, CV_32FC1);
     MatDynMem temp(3, sizes, CV_32FC1);
     get_features(patch_feats, input_rgb, input_gray, p_pose.cx, p_pose.cy,
@@ -469,8 +469,8 @@ void KCF_Tracker::get_features(MatDynMem &result_3d, cv::Mat &input_rgb, cv::Mat
                                int size_x, int size_y, double scale) const
 {
     assert(result_3d.size[0] == p_num_of_feats);
-    assert(result_3d.size[1] == size_x);
-    assert(result_3d.size[2] == size_y);
+    assert(result_3d.size[1] == size_y / p_cell_size);
+    assert(result_3d.size[2] == size_x / p_cell_size);
 
     int size_x_scaled = floor(size_x * scale);
     int size_y_scaled = floor(size_y * scale);
