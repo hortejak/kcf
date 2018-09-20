@@ -101,10 +101,10 @@ rule REGENERATE
   command = make $$out BUILDS="$(BUILDS)" TESTSEQ="$(TESTSEQ)" TESTFLAGS="$(TESTFLAGS)"
   generator = 1
 rule CMAKE
-  command = cd $$$$(dirname $$out) && cmake $(CMAKE_OPTS) $$opts ..
+  command = cd $$subdir && cmake $(CMAKE_OPTS) $$opts ..
 rule NINJA
   # Absolute path in -C allows Emacs to properly jump to error message locations
-  command = ninja -C $(CURDIR)/$$$$(dirname $$out)
+  command = ninja -C $(CURDIR)/$$subdir
   description = ninja $$out
   restat = 1
 rule TEST_SEQ
@@ -131,7 +131,9 @@ GIT_LS_FILES := $(shell git ls-files)
 define ninja-build
 build build-$(1)/build.ninja: CMAKE
   opts = $(2)
+  subdir = build-$(1)
 build build-$(1)/kcf_vot: NINJA build-$(1)/build.ninja $(GIT_LS_FILES)
+  subdir = build-$(1)
 default build-$(1)/kcf_vot
 endef
 
