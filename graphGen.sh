@@ -34,11 +34,11 @@ do
     (echo ${tracker_version}-${arguments}-${dataset}; grep -e '->' $log | grep -o '[0-9.]*ms' ) > $data_file
 done
 
-if (($SORT == 1))
-then
-    getavg() { grep Average $1 | grep -o '[0-9.]*ms'; }
-    set -- $(for i in $@; do echo $i $(getavg $i); done | sort -n -k2 | cut -f1 -d' ')
-fi
+getavg() { grep Average $1 | grep -o '[0-9.]*ms'; }
+set -- $(for i in $@; do avg=$(getavg $i); test "$avg" && echo $i $avg; done \
+	| if (($SORT == 1)); then sort -n -k2; else cat; fi \
+	| cut -f1 -d' ')
+
 
 paste ${@//.log/.dat} > all
 
