@@ -380,7 +380,7 @@ void KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2f &new_location) const
     }
 #endif
     cv::Point2i &max_response_pt = IF_BIG_BATCH(d.threadctxs[0].max[max_idx].loc,        d.threadctxs[max_idx].max.loc);
-    cv::Mat max_response_map     = IF_BIG_BATCH(d.threadctxs[0].response.plane(max_idx), d.threadctxs[max_idx].response);
+    cv::Mat max_response_map     = IF_BIG_BATCH(d.threadctxs[0].response.plane(max_idx), d.threadctxs[max_idx].response.plane(0));
 
     DEBUG_PRINTM(max_response_map);
     DEBUG_PRINT(max_response_pt);
@@ -504,7 +504,7 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
         max[i].loc = max_loc;
     }
 #else
-    cv::minMaxLoc(response, &min_val, &max_val, &min_loc, &max_loc);
+    cv::minMaxLoc(response.plane(0), &min_val, &max_val, &min_loc, &max_loc);
 
     DEBUG_PRINT(max_loc);
 
