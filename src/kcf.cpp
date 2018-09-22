@@ -3,6 +3,9 @@
 #include <thread>
 #include <algorithm>
 #include "threadctx.hpp"
+#include <ios>
+#include <stdarg.h>
+#include <stdio.h>
 
 #ifdef FFTW
 #include "fft_fftw.h"
@@ -19,16 +22,55 @@
 #include <omp.h>
 #endif // OPENMP
 
-static bool kcf_debug = false;
+class DbgTracer {
+    int indentLvl = 0;
 
-#define DEBUG_PRINT(obj)                                                                                               \
-    if (kcf_debug) {                                                                                                     \
-        std::cout << #obj << " @" << __LINE__ << std::endl << (obj) << std::endl;                                      \
+  public:
+    bool debug = false;
+
+    std::string indent() { return std::string(indentLvl * 4, ' '); }
+
+    class FTrace {
+        DbgTracer &t;
+        const char *funcName;
+
+      public:
+        FTrace(DbgTracer &dt, const char *fn, const char *format, ...) : t(dt), funcName(fn)
+        {
+            if (!t.debug) return;
+            char *arg;
+            va_list vl;
+            va_start(vl, format);
+            if (-1 == vasprintf(&arg, format, vl))
+                throw std::runtime_error("vasprintf error");
+            va_end(vl);
+
+            std::cerr << t.indent() << funcName << "(" << arg << ") {" << std::endl;
+            dt.indentLvl++;
+        }
+        ~FTrace()
+        {
+            if (!t.debug) return;
+            t.indentLvl--;
+            std::cerr << t.indent() << "}" << std::endl;
+        }
+    };
+};
+
+DbgTracer __dbgTracer;
+
+#define TRACE(...) const DbgTracer::FTrace __tracer(__dbgTracer, __PRETTY_FUNCTION__, ##__VA_ARGS__)
+
+#define DEBUG_PRINT(obj)                                                \
+    if (__dbgTracer.debug) {                                            \
+        std::cerr << __dbgTracer.indent() << #obj /*<< " @" << __LINE__*/ << " " << /*std::endl <<*/ (obj) << \
+               std::endl;                                               \
     }
-#define DEBUG_PRINTM(obj)                                                                                              \
-    if (kcf_debug) {                                                                                                     \
-        std::cout << #obj << " @" << __LINE__ << " " << (obj).size() << " CH: " << (obj).channels() << std::endl       \
-                  /*<< (obj)*/ << std::endl;                                                                               \
+#define DEBUG_PRINTM(obj)                                               \
+    if (__dbgTracer.debug) {                                            \
+        std::cerr << __dbgTracer.indent() << #obj << /*" @" << __LINE__ <<*/ " " << (obj).size() << \
+               " CH: " << (obj).channels() << std::endl                 \
+               /* << (obj) << std::endl */;                             \
     }
 
 template <typename T>
@@ -102,7 +144,9 @@ void KCF_Tracker::train(cv::Mat input_gray, cv::Mat input_rgb, double interp_fac
 
 void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int fit_size_y)
 {
-    kcf_debug = m_debug;
+    __dbgTracer.debug = m_debug;
+    TRACE("");
+
     // check boundary, enforce min size
     double x1 = bbox.x, x2 = bbox.x + bbox.width, y1 = bbox.y, y2 = bbox.y + bbox.height;
     if (x1 < 0) x1 = 0.;
@@ -358,8 +402,8 @@ void KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2f &new_location) const
 
 void KCF_Tracker::track(cv::Mat &img)
 {
-    kcf_debug = m_debug;
-    if (m_debug) std::cout << "NEW FRAME" << '\n';
+    __dbgTracer.debug = m_debug;
+    TRACE("");
 
     cv::Mat input_gray, input_rgb = img.clone();
     if (img.channels() == 3) {
@@ -415,6 +459,8 @@ void KCF_Tracker::track(cv::Mat &img)
 
 void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input_gray)
 {
+    TRACE("");
+
     // TODO: Move matrices to thread ctx
     MatScaleFeats patch_feats(IF_BIG_BATCH(kcf.p_num_scales, 1), kcf.p_num_of_feats, kcf.p_roi);
     MatScaleFeats temp(IF_BIG_BATCH(kcf.p_num_scales, 1), kcf.p_num_of_feats, kcf.p_roi);
@@ -691,6 +737,7 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
 void KCF_Tracker::GaussianCorrelation::operator()(const KCF_Tracker &kcf, ComplexMat &result, const ComplexMat &xf,
                                                   const ComplexMat &yf, double sigma, bool auto_correlation)
 {
+    TRACE("");
     xf.sqr_norm(xf_sqr_norm);
     if (auto_correlation) {
         yf_sqr_norm = xf_sqr_norm;

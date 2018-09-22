@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 2.8)
 
 set(KCF_LIB_SRC kcf.cpp kcf.h fft.cpp threadctx.hpp pragmas.h dynmem.hpp)
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  set_property(SOURCE kcf.cpp APPEND_STRING PROPERTY COMPILE_FLAGS " -Wno-gnu-zero-variadic-macro-arguments ")
+endif()
+
 find_package(PkgConfig)
 
 SET(FFT "OpenCV" CACHE STRING "Select FFT implementation")
