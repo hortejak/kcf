@@ -486,10 +486,6 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
 {
     TRACE("");
 
-    // TODO: Move matrices to thread ctx
-    MatScaleFeats patch_feats(IF_BIG_BATCH(kcf.p_num_scales, 1), kcf.p_num_of_feats, kcf.p_roi);
-    MatScaleFeats temp(IF_BIG_BATCH(kcf.p_num_scales, 1), kcf.p_num_of_feats, kcf.p_roi);
-
     BIG_BATCH_OMP_PARALLEL_FOR
     for (uint i = 0; i < IF_BIG_BATCH(kcf.p_num_scales, 1); ++i)
     {
