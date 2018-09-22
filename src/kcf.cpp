@@ -82,11 +82,27 @@ std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<T> &p) {
 }
 std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<cv::Mat> &p) {
     os << p.obj.size << " " << p.obj.channels() << "ch " << static_cast<const void*>(p.obj.data);
+    os << " = [ ";
+    constexpr size_t num = 10;
+    for (size_t i = 0; i < std::min(num, p.obj.total()); ++i)
+        os << *p.obj.ptr<float>(i) << ", ";
+    os << (num < p.obj.total() ? "... ]" : "]");
     return os;
 }
+#if defined(CUFFT)
+std::ostream &operator<<(std::ostream &os, const cufftComplex &p) {
+    (void)p; // TODO
+    return os;
+}
+#endif
 template <>
 std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat> &p) {
     os << "<cplx> " << p.obj.size() << " " << p.obj.channels() << "ch " << p.obj.get_p_data();
+    os << " = [ ";
+    constexpr int num = 10;
+    for (int i = 0; i < std::min(num, p.obj.size().area()); ++i)
+        os << p.obj.get_p_data()[i] << ", ";
+    os << (num < p.obj.size().area() ? "... ]" : "]");
     return os;
 }
 
@@ -493,8 +509,10 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
                          kcf.p_windows_size.width, kcf.p_windows_size.height,
                          kcf.p_current_scale * IF_BIG_BATCH(kcf.p_scales[i], scale))
                 .copyTo(patch_feats.features(i));
+        DEBUG_PRINT(patch_feats.features(i));
     }
 
+    DEBUG_PRINT(patch_feats);
     kcf.fft.forward_window(patch_feats, zf, temp);
     DEBUG_PRINTM(zf);
 
@@ -505,6 +523,7 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
         DEBUG_PRINTM(kcf.p_model_alphaf);
         DEBUG_PRINTM(kzf);
         kzf = kzf.mul(kcf.p_model_alphaf);
+        DEBUG_PRINTM(kzf);
     }
     kcf.fft.inverse(kzf, response);
 
