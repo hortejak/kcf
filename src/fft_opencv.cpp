@@ -16,7 +16,7 @@ void FftOpencv::forward(const MatScales &real_input, ComplexMat &complex_result)
     Fft::forward(real_input, complex_result);
 
     cv::Mat tmp;
-    cv::dft(real_input, tmp, cv::DFT_COMPLEX_OUTPUT);
+    cv::dft(real_input.plane(0), tmp, cv::DFT_COMPLEX_OUTPUT);
     complex_result = ComplexMat(tmp);
 }
 
@@ -40,7 +40,7 @@ void FftOpencv::inverse(ComplexMat &  complex_input, MatScales & real_result)
     Fft::inverse(complex_input, real_result);
 
     if (complex_input.n_channels == 1) {
-        cv::dft(complex_input.to_cv_mat(), real_result, cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
+        cv::dft(complex_input.to_cv_mat(), real_result.plane(0), cv::DFT_INVERSE | cv::DFT_REAL_OUTPUT | cv::DFT_SCALE);
     } else {
         std::vector<cv::Mat> mat_channels = complex_input.to_cv_mat_vector();
         std::vector<cv::Mat> ifft_mats(ulong(complex_input.n_channels));

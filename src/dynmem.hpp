@@ -119,6 +119,12 @@ public:
         assert(int(idx) < size[0]);
         return cv::Mat(size[1], size[2], cv::Mat::type(), ptr(idx));
     }
+    const cv::Mat plane(uint idx) const {
+        assert(dims == 3);
+        assert(int(idx) < size[0]);
+        return cv::Mat(size[1], size[2], cv::Mat::type(), const_cast<uchar*>(ptr(idx)));
+    }
+
 };
 
 class MatFeats : public Mat3d
