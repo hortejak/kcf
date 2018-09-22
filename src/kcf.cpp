@@ -55,23 +55,48 @@ class DbgTracer {
             std::cerr << t.indent() << "}" << std::endl;
         }
     };
+
+    template <typename T>
+    void traceVal(const char *name, const T& obj, int line)
+    {
+        (void)line;
+        if (debug)
+            std::cerr << indent() << name /*<< " @" << line */ << " " << print(obj) << std::endl;
+    }
+
+    template <typename T> struct Printer {
+        const T &obj;
+        Printer(const T &_obj) : obj(_obj) {}
+    };
+
+    template <typename T> Printer<T> print(const T& obj) { return Printer<T>(obj); }
+    Printer<cv::Mat> print(const MatScales& obj) { return Printer<cv::Mat>(obj); }
+    Printer<cv::Mat> print(const MatFeats& obj) { return Printer<cv::Mat>(obj); }
+    Printer<cv::Mat> print(const MatScaleFeats& obj) { return Printer<cv::Mat>(obj); }
 };
+
+template <typename T>
+std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<T> &p) {
+    os << p.obj;
+    return os;
+}
+std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<cv::Mat> &p) {
+    os << p.obj.size << " " << p.obj.channels() << "ch " << static_cast<const void*>(p.obj.data);
+    return os;
+}
+template <>
+std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat> &p) {
+    os << "<cplx> " << p.obj.size() << " " << p.obj.channels() << "ch " << p.obj.get_p_data();
+    return os;
+}
 
 DbgTracer __dbgTracer;
 
 #define TRACE(...) const DbgTracer::FTrace __tracer(__dbgTracer, __PRETTY_FUNCTION__, ##__VA_ARGS__)
 
-#define DEBUG_PRINT(obj)                                                \
-    if (__dbgTracer.debug) {                                            \
-        std::cerr << __dbgTracer.indent() << #obj /*<< " @" << __LINE__*/ << " " << /*std::endl <<*/ (obj) << \
-               std::endl;                                               \
-    }
-#define DEBUG_PRINTM(obj)                                               \
-    if (__dbgTracer.debug) {                                            \
-        std::cerr << __dbgTracer.indent() << #obj << /*" @" << __LINE__ <<*/ " " << (obj).size() << \
-               " CH: " << (obj).channels() << std::endl                 \
-               /* << (obj) << std::endl */;                             \
-    }
+#define DEBUG_PRINT(obj) __dbgTracer.traceVal(#obj, (obj), __LINE__)
+#define DEBUG_PRINTM(obj) DEBUG_PRINT(obj)
+
 
 template <typename T>
 T clamp(const T& n, const T& lower, const T& upper)

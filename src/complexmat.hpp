@@ -145,6 +145,7 @@ template <typename T> class ComplexMat_ {
     }
 
     std::complex<T> *get_p_data() { return p_data.data(); }
+    const std::complex<T> *get_p_data() const { return p_data.data(); }
 
     // element-wise per channel multiplication, division and addition
     ComplexMat_<T> operator*(const ComplexMat_<T> &rhs) const
