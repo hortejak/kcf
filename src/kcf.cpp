@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "threadctx.hpp"
 #include <ios>
+#include <iomanip>
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -21,6 +22,28 @@
 #ifdef OPENMP
 #include <omp.h>
 #endif // OPENMP
+
+class IOSave
+{
+    std::ios&           stream;
+    std::ios::fmtflags  flags;
+    std::streamsize     precision;
+    char                fill;
+public:
+    IOSave( std::ios& userStream )
+        : stream( userStream )
+        , flags( userStream.flags() )
+        , precision( userStream.precision() )
+        , fill( userStream.fill() )
+    {
+    }
+    ~IOSave()
+    {
+        stream.flags( flags );
+        stream.precision( precision );
+        stream.fill( fill );
+    }
+};
 
 class DbgTracer {
     int indentLvl = 0;
@@ -81,6 +104,8 @@ std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<T> &p) {
     return os;
 }
 std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<cv::Mat> &p) {
+    IOSave s(os);
+    os << std::setprecision(3);
     os << p.obj.size << " " << p.obj.channels() << "ch " << static_cast<const void*>(p.obj.data);
     os << " = [ ";
     constexpr size_t num = 10;
@@ -97,6 +122,8 @@ std::ostream &operator<<(std::ostream &os, const cufftComplex &p) {
 #endif
 template <>
 std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat> &p) {
+    IOSave s(os);
+    os << std::setprecision(3);
     os << "<cplx> " << p.obj.size() << " " << p.obj.channels() << "ch " << p.obj.get_p_data();
     os << " = [ ";
     constexpr int num = 10;
