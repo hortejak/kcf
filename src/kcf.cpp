@@ -181,8 +181,7 @@ void KCF_Tracker::train(cv::Mat input_gray, cv::Mat input_rgb, double interp_fac
     MatScaleFeats temp(1, p_num_of_feats, p_roi);
     get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy,
                  p_windows_size.width, p_windows_size.height,
-                 p_current_scale).copyTo(patch_feats.features(0));
-
+                 p_current_scale).copyTo(patch_feats.scale(0));
     fft.forward_window(patch_feats, p_xf, temp);
     p_model_xf = p_model_xf * (1. - interp_factor) + p_xf * interp_factor;
     DEBUG_PRINTM(p_model_xf);
@@ -535,8 +534,8 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
         kcf.get_features(input_rgb, input_gray, kcf.p_pose.cx, kcf.p_pose.cy,
                          kcf.p_windows_size.width, kcf.p_windows_size.height,
                          kcf.p_current_scale * IF_BIG_BATCH(kcf.p_scales[i], scale))
-                .copyTo(patch_feats.features(i));
-        DEBUG_PRINT(patch_feats.features(i));
+                .copyTo(patch_feats.scale(i));
+        DEBUG_PRINT(patch_feats.scale(i));
     }
 
     DEBUG_PRINT(patch_feats);
