@@ -3,10 +3,7 @@
 #include <thread>
 #include <algorithm>
 #include "threadctx.hpp"
-#include <ios>
-#include <iomanip>
-#include <stdarg.h>
-#include <stdio.h>
+#include "debug.h"
 
 #ifdef FFTW
 #include "fft_fftw.h"
@@ -23,123 +20,7 @@
 #include <omp.h>
 #endif // OPENMP
 
-class IOSave
-{
-    std::ios&           stream;
-    std::ios::fmtflags  flags;
-    std::streamsize     precision;
-    char                fill;
-public:
-    IOSave( std::ios& userStream )
-        : stream( userStream )
-        , flags( userStream.flags() )
-        , precision( userStream.precision() )
-        , fill( userStream.fill() )
-    {
-    }
-    ~IOSave()
-    {
-        stream.flags( flags );
-        stream.precision( precision );
-        stream.fill( fill );
-    }
-};
-
-class DbgTracer {
-    int indentLvl = 0;
-
-  public:
-    bool debug = false;
-
-    std::string indent() { return std::string(indentLvl * 4, ' '); }
-
-    class FTrace {
-        DbgTracer &t;
-        const char *funcName;
-
-      public:
-        FTrace(DbgTracer &dt, const char *fn, const char *format, ...) : t(dt), funcName(fn)
-        {
-            if (!t.debug) return;
-            char *arg;
-            va_list vl;
-            va_start(vl, format);
-            if (-1 == vasprintf(&arg, format, vl))
-                throw std::runtime_error("vasprintf error");
-            va_end(vl);
-
-            std::cerr << t.indent() << funcName << "(" << arg << ") {" << std::endl;
-            dt.indentLvl++;
-        }
-        ~FTrace()
-        {
-            if (!t.debug) return;
-            t.indentLvl--;
-            std::cerr << t.indent() << "}" << std::endl;
-        }
-    };
-
-    template <typename T>
-    void traceVal(const char *name, const T& obj, int line)
-    {
-        (void)line;
-        if (debug)
-            std::cerr << indent() << name /*<< " @" << line */ << " " << print(obj) << std::endl;
-    }
-
-    template <typename T> struct Printer {
-        const T &obj;
-        Printer(const T &_obj) : obj(_obj) {}
-    };
-
-    template <typename T> Printer<T> print(const T& obj) { return Printer<T>(obj); }
-    Printer<cv::Mat> print(const MatScales& obj) { return Printer<cv::Mat>(obj); }
-    Printer<cv::Mat> print(const MatFeats& obj) { return Printer<cv::Mat>(obj); }
-    Printer<cv::Mat> print(const MatScaleFeats& obj) { return Printer<cv::Mat>(obj); }
-};
-
-template <typename T>
-std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<T> &p) {
-    os << p.obj;
-    return os;
-}
-std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<cv::Mat> &p) {
-    IOSave s(os);
-    os << std::setprecision(3);
-    os << p.obj.size << " " << p.obj.channels() << "ch " << static_cast<const void*>(p.obj.data);
-    os << " = [ ";
-    constexpr size_t num = 10;
-    for (size_t i = 0; i < std::min(num, p.obj.total()); ++i)
-        os << *p.obj.ptr<float>(i) << ", ";
-    os << (num < p.obj.total() ? "... ]" : "]");
-    return os;
-}
-#if defined(CUFFT)
-std::ostream &operator<<(std::ostream &os, const cufftComplex &p) {
-    (void)p; // TODO
-    return os;
-}
-#endif
-template <>
-std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat> &p) {
-    IOSave s(os);
-    os << std::setprecision(3);
-    os << "<cplx> " << p.obj.size() << " " << p.obj.channels() << "ch " << p.obj.get_p_data();
-    os << " = [ ";
-    constexpr int num = 10;
-    for (int i = 0; i < std::min(num, p.obj.size().area()); ++i)
-        os << p.obj.get_p_data()[i] << ", ";
-    os << (num < p.obj.size().area() ? "... ]" : "]");
-    return os;
-}
-
 DbgTracer __dbgTracer;
-
-#define TRACE(...) const DbgTracer::FTrace __tracer(__dbgTracer, __PRETTY_FUNCTION__, ##__VA_ARGS__)
-
-#define DEBUG_PRINT(obj) __dbgTracer.traceVal(#obj, (obj), __LINE__)
-#define DEBUG_PRINTM(obj) DEBUG_PRINT(obj)
-
 
 template <typename T>
 T clamp(const T& n, const T& lower, const T& upper)
@@ -175,6 +56,8 @@ KCF_Tracker::~KCF_Tracker()
 
 void KCF_Tracker::train(cv::Mat input_gray, cv::Mat input_rgb, double interp_factor)
 {
+    TRACE("");
+
     // obtain a sub-window for training
     // TODO: Move Mats outside from here
     MatScaleFeats patch_feats(1, p_num_of_feats, p_roi);
@@ -182,7 +65,9 @@ void KCF_Tracker::train(cv::Mat input_gray, cv::Mat input_rgb, double interp_fac
     get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy,
                  p_windows_size.width, p_windows_size.height,
                  p_current_scale).copyTo(patch_feats.scale(0));
+    DEBUG_PRINT(patch_feats);
     fft.forward_window(patch_feats, p_xf, temp);
+    DEBUG_PRINTM(p_xf);
     p_model_xf = p_model_xf * (1. - interp_factor) + p_xf * interp_factor;
     DEBUG_PRINTM(p_model_xf);
 
@@ -573,6 +458,7 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
     cv::minMaxLoc(response.plane(0), &min_val, &max_val, &min_loc, &max_loc);
 
     DEBUG_PRINT(max_loc);
+    DEBUG_PRINT(max_val);
 
     double weight = scale < 1. ? scale : 1. / scale;
     max.response = max_val * weight;
