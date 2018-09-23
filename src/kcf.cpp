@@ -61,6 +61,7 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
     // obtain a sub-window for training
     // TODO: Move Mats outside from here
     MatScaleFeats patch_feats(1, p_num_of_feats, p_roi);
+    DEBUG_PRINT(patch_feats);
     MatScaleFeats temp(1, p_num_of_feats, p_roi);
     get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy,
                  p_windows_size.width, p_windows_size.height,
@@ -85,9 +86,7 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
         (*gaussian_correlation)(*this, kf, p_model_xf, p_model_xf, p_kernel_sigma, true);
         DEBUG_PRINTM(kf);
         p_model_alphaf_num = p_yf * kf;
-        DEBUG_PRINTM(p_model_alphaf_num);
         p_model_alphaf_den = kf * (kf + p_lambda);
-        DEBUG_PRINTM(p_model_alphaf_den);
     }
     p_model_alphaf = p_model_alphaf_num / p_model_alphaf_den;
     DEBUG_PRINTM(p_model_alphaf);
@@ -423,7 +422,6 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
         DEBUG_PRINT(patch_feats.scale(i));
     }
 
-    DEBUG_PRINT(patch_feats);
     kcf.fft.forward_window(patch_feats, zf, temp);
     DEBUG_PRINTM(zf);
 
@@ -431,10 +429,8 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
         kzf = zf.mul(kcf.p_model_alphaf).sum_over_channels();
     } else {
         gaussian_correlation(kcf, kzf, zf, kcf.p_model_xf, kcf.p_kernel_sigma);
-        DEBUG_PRINTM(kcf.p_model_alphaf);
         DEBUG_PRINTM(kzf);
         kzf = kzf.mul(kcf.p_model_alphaf);
-        DEBUG_PRINTM(kzf);
     }
     kcf.fft.inverse(kzf, response);
 
