@@ -54,7 +54,7 @@ KCF_Tracker::~KCF_Tracker()
     delete &d;
 }
 
-void KCF_Tracker::train(cv::Mat input_gray, cv::Mat input_rgb, double interp_factor)
+void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_factor)
 {
     TRACE("");
 
@@ -248,7 +248,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     DEBUG_PRINTM(p_yf);
 
     // train initial model
-    train(input_gray, input_rgb, 1.0);
+    train(input_rgb, input_gray, 1.0);
 }
 
 void KCF_Tracker::setTrackerPose(BBox_c &bbox, cv::Mat &img, int fit_size_x, int fit_size_y)

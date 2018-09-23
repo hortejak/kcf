@@ -157,7 +157,7 @@ private:
     cv::Point2f sub_pixel_peak(cv::Point &max_loc, cv::Mat &response) const;
     double sub_grid_scale(uint index);
     void resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray);
-    void train(cv::Mat input_gray, cv::Mat input_rgb, double interp_factor);
+    void train(cv::Mat input_rgb, cv::Mat input_gray, double interp_factor);
     void findMaxReponse(uint &max_idx, cv::Point2f &new_location) const;
 };
 
