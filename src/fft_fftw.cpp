@@ -98,7 +98,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
         float *out = reinterpret_cast<float *>(out_i.data);
         int rank = 2;
         int n[] = {int(m_height), int(m_width)};
-        int howmany = int(m_num_of_feats);
+        int howmany = 1;
         int idist = int(m_height * (m_width / 2 + 1)), odist = 1;
         int istride = 1, ostride = int(m_num_of_feats);
         int inembed[] = {int(m_height), int(m_width / 2 + 1)}, *onembed = n;
@@ -136,7 +136,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
         int n[] = {int(m_height), int(m_width)};
         int howmany = IF_BIG_BATCH(m_num_of_scales, 1);
         int idist = m_height * (m_width / 2 + 1), odist = 1;
-        int istride = 1, ostride = IF_BIG_BATCH(m_num_of_scales, 1);
+        int istride = 1, ostride = 1;
         int inembed[] = {int(m_height), int(m_width / 2 + 1)}, *onembed = n;
 
         FFTW_PLAN_WITH_THREADS();
