@@ -203,7 +203,7 @@ void Fftw::inverse(ComplexMat &complex_input, MatScales &real_result)
     else
         fftwf_execute_dft_c2r(plan_i_features, in, out);
 
-    real_result *= 1 / (m_width * m_height);
+    real_result *= 1.0 / (m_width * m_height);
 }
 
 Fftw::~Fftw()
