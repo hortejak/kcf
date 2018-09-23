@@ -697,54 +697,36 @@ void KCF_Tracker::GaussianCorrelation::operator()(const KCF_Tracker &kcf, Comple
         yf.sqr_norm(yf_sqr_norm);
     }
     xyf = auto_correlation ? xf.sqr_mag() : xf * yf.conj(); // xf.muln(yf.conj());
-    //DEBUG_PRINTM(xyf);
-    kcf.fft.inverse(xyf, ifft_res);
+    DEBUG_PRINTM(xyf);
+
+    // ifft2 and sum over 3rd dimension, we dont care about individual channels
+    ComplexMat xyf_sum = xyf.sum_over_channels();
+    DEBUG_PRINTM(xyf_sum);
+    kcf.fft.inverse(xyf_sum, ifft_res);
+    DEBUG_PRINTM(ifft_res);
 #ifdef CUFFT
+    // FIXME
     cuda_gaussian_correlation(ifft_res.deviceMem(), k.deviceMem(), xf_sqr_norm.deviceMem(),
                               auto_correlation ? xf_sqr_norm.deviceMem() : yf_sqr_norm.deviceMem(), sigma,
                               xf.n_channels, xf.n_scales, kcf.p_roi.height, kcf.p_roi.width);
 #else
-    // ifft2 and sum over 3rd dimension, we dont care about individual channels
-    //DEBUG_PRINTM(ifft_res);
-    cv::Mat xy_sum;
-    if (xf.channels() != kcf.p_num_scales * kcf.p_num_of_feats)
-        xy_sum.create(ifft_res.size(), CV_32FC1);
-    else
-        xy_sum.create(ifft_res.size(), CV_32FC(kcf.p_scales.size()));
-    xy_sum.setTo(0);
-    for (int y = 0; y < ifft_res.rows; ++y) {
-        float *row_ptr = ifft_res.ptr<float>(y);
-        float *row_ptr_sum = xy_sum.ptr<float>(y);
-        for (int x = 0; x < ifft_res.cols; ++x) {
-            for (int sum_ch = 0; sum_ch < xy_sum.channels(); ++sum_ch) {
-                row_ptr_sum[(x * xy_sum.channels()) + sum_ch] += std::accumulate(
-                    row_ptr + x * ifft_res.channels() + sum_ch * (ifft_res.channels() / xy_sum.channels()),
-                    (row_ptr + x * ifft_res.channels() +
-                     (sum_ch + 1) * (ifft_res.channels() / xy_sum.channels())),
-                    0.f);
-            }
-        }
-    }
-    DEBUG_PRINTM(xy_sum);
-
-    std::vector<cv::Mat> scales;
-    cv::split(xy_sum, scales);
 
     float numel_xf_inv = 1.f / (xf.cols * xf.rows * (xf.channels() / xf.n_scales));
     for (uint i = 0; i < xf.n_scales; ++i) {
-        cv::Mat k_roi = k.plane(i);
-        cv::exp(-1. / (sigma * sigma) * cv::max((xf_sqr_norm[i] + yf_sqr_norm[0] - 2 * scales[i]) * numel_xf_inv, 0),
-                k_roi);
-        DEBUG_PRINTM(k_roi);
+        cv::Mat plane = ifft_res.plane(i);
+        cv::exp(-1. / (sigma * sigma) * cv::max((xf_sqr_norm[i] + yf_sqr_norm[0] - 2 * ifft_res.plane(i))
+                * numel_xf_inv, 0), plane);
+        DEBUG_PRINTM(plane);
     }
 #endif
-    kcf.fft.forward(k, result);
+    kcf.fft.forward(ifft_res, result);
 }
 
 float get_response_circular(cv::Point2i &pt, cv::Mat &response)
 {
     int x = pt.x;
     int y = pt.y;
+    assert(response.dims == 2); // ensure .cols and .rows are valid
     if (x < 0) x = response.cols + x;
     if (y < 0) y = response.rows + y;
     if (x >= response.cols) x = x - response.cols;
