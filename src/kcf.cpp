@@ -311,7 +311,7 @@ void KCF_Tracker::resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray)
     }
 }
 
-void KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2f &new_location) const
+double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2f &new_location) const
 {
     double max = -1.;
 #ifndef BIG_BATCH
@@ -349,6 +349,7 @@ void KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2f &new_location) const
         new_location = max_response_pt;
     }
     DEBUG_PRINT(new_location);
+    return max;
 }
 
 void KCF_Tracker::track(cv::Mat &img)
@@ -383,7 +384,7 @@ void KCF_Tracker::track(cv::Mat &img)
 
     cv::Point2f new_location;
     uint max_idx;
-    findMaxReponse(max_idx, new_location);
+    max_response = findMaxReponse(max_idx, new_location);
 
     p_pose.cx += p_current_scale * p_cell_size * double(new_location.x);
     p_pose.cy += p_current_scale * p_cell_size * double(new_location.y);

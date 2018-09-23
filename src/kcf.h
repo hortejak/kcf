@@ -158,7 +158,7 @@ private:
     double sub_grid_scale(uint index);
     void resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray);
     void train(cv::Mat input_rgb, cv::Mat input_gray, double interp_factor);
-    void findMaxReponse(uint &max_idx, cv::Point2f &new_location) const;
+    double findMaxReponse(uint &max_idx, cv::Point2f &new_location) const;
 };
 
 #endif //KCF_HEADER_6565467831231
