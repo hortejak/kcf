@@ -132,7 +132,7 @@ private:
       public:
         GaussianCorrelation(uint num_scales, cv::Size size)
             : xf_sqr_norm(num_scales)
-            , xyf(Fft::freq_size(size), num_scales)
+            , xyf(Fft::freq_size(size), 1, num_scales)
             , ifft_res(num_scales, size)
             , k(num_scales, size)
         {}

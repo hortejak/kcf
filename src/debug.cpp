@@ -1,4 +1,5 @@
 #include "debug.h"
+#include <string>
 
 std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<cv::Mat> &p)
 {
@@ -18,10 +19,14 @@ std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat> 
     IOSave s(os);
     os << std::setprecision(3);
     os << "<cplx> " << p.obj.size() << " " << p.obj.channels() << "ch "; // << p.obj.get_p_data();
-    os << " = [ ";
     constexpr int num = 10;
-    for (int i = 0; i < std::min(num, p.obj.size().area()); ++i)
-        os << p.obj.get_p_data()[i] << ", ";
-    os << (num < p.obj.size().area() ? "... ]" : "]");
+    for (uint s = 0; s < p.obj.n_scales; ++s) {
+        uint ofs = s * p.obj.rows * p.obj.cols * p.obj.n_channels / p.obj.n_scales;
+        os << " = [ ";
+        for (int i = 0; i < std::min(num, p.obj.size().area()); ++i)
+            os << p.obj.get_p_data()[ofs + i] << ", ";
+        os << (num < p.obj.size().area() ? "... ]" : "]");
+        os << std::endl << std::string(20, ' ');
+    }
     return os;
 }

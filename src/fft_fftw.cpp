@@ -90,40 +90,23 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
                                                      ostride, odist, FFTW_PATIENT);
     }
 #endif
-    // FFT inverse one scale
-    {
-        ComplexMat in_i(m_height, m_width, m_num_of_feats);
-        cv::Mat out_i = cv::Mat::zeros(int(m_height), int(m_width), CV_32FC(int(m_num_of_feats)));
-        fftwf_complex *in = reinterpret_cast<fftwf_complex *>(in_i.get_p_data());
-        float *out = reinterpret_cast<float *>(out_i.data);
-        int rank = 2;
-        int n[] = {int(m_height), int(m_width)};
-        int howmany = 1;
-        int idist = int(m_height * (m_width / 2 + 1)), odist = 1;
-        int istride = 1, ostride = int(m_num_of_feats);
-        int inembed[] = {int(m_height), int(m_width / 2 + 1)}, *onembed = n;
-
-        FFTW_PLAN_WITH_THREADS();
-        plan_i_features = fftwf_plan_many_dft_c2r(rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride,
-                                                  odist, FFTW_PATIENT);
-    }
-    // FFT inverse all scales
 #ifdef BIG_BATCH
-    if (m_num_of_scales > 1) {
+    // FFT inverse all scales
+    {
         ComplexMat in_i_all(m_height, m_width, m_num_of_feats * m_num_of_scales);
         cv::Mat out_i_all = cv::Mat::zeros(m_height, m_width, CV_32FC(m_num_of_feats * m_num_of_scales));
         fftwf_complex *in = reinterpret_cast<fftwf_complex *>(in_i_all.get_p_data());
         float *out = reinterpret_cast<float *>(out_i_all.data);
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
-        int howmany = m_num_of_feats * m_num_of_scales;
+        int howmany = m_num_of_scales;
         int idist = m_height * (m_width / 2 + 1), odist = 1;
-        int istride = 1, ostride = m_num_of_feats * m_num_of_scales;
+        int istride = 1, ostride = 1;
         int inembed[] = {(int)m_height, (int)m_width / 2 + 1}, *onembed = n;
 
         FFTW_PLAN_WITH_THREADS();
-        plan_i_features_all_scales = fftwf_plan_many_dft_c2r(rank, n, howmany, in, inembed, istride, idist, out,
-                                                             onembed, ostride, odist, FFTW_PATIENT);
+        plan_i_all_scales = fftwf_plan_many_dft_c2r(rank, n, howmany, in, inembed, istride, idist, out,
+                                                    onembed, ostride, odist, FFTW_PATIENT);
     }
 #endif
     // FFT inverse one channel
@@ -134,7 +117,7 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
         float *out = reinterpret_cast<float *>(out_i1.data);
         int rank = 2;
         int n[] = {int(m_height), int(m_width)};
-        int howmany = IF_BIG_BATCH(m_num_of_scales, 1);
+        int howmany = 1;
         int idist = m_height * (m_width / 2 + 1), odist = 1;
         int istride = 1, ostride = 1;
         int inembed[] = {int(m_height), int(m_width / 2 + 1)}, *onembed = n;
@@ -155,25 +138,25 @@ void Fftw::forward(const MatScales &real_input, ComplexMat &complex_result)
 {
     Fft::forward(real_input, complex_result);
 
-    if (BIG_BATCH_MODE && real_input.rows == int(m_height * IF_BIG_BATCH(m_num_of_scales, 1))) {
-        fftwf_execute_dft_r2c(plan_f_all_scales, reinterpret_cast<float *>(real_input.data),
-                              reinterpret_cast<fftwf_complex *>(complex_result.get_p_data()));
-    } else {
+    if (real_input.size[0] == 1)
         fftwf_execute_dft_r2c(plan_f, reinterpret_cast<float *>(real_input.data),
                               reinterpret_cast<fftwf_complex *>(complex_result.get_p_data()));
-    }
-    return;
+#ifdef BIG_BATCH
+    else
+        fftwf_execute_dft_r2c(plan_f_all_scales, reinterpret_cast<float *>(real_input.data),
+                              reinterpret_cast<fftwf_complex *>(complex_result.get_p_data()));
+#endif
 }
 
 void Fftw::forward_window(MatScaleFeats  &feat, ComplexMat & complex_result, MatScaleFeats &temp)
 {
     Fft::forward_window(feat, complex_result, temp);
 
-    uint n_channels = feat.size[0];
-    for (uint i = 0; i < n_channels; ++i) {
-        for (uint j = 0; j < uint(feat.size[1]); ++j) {
-            cv::Mat feat_plane = feat.plane(i, j);
-            cv::Mat temp_plane = temp.plane(i, j);
+    uint n_scales = feat.size[0];
+    for (uint s = 0; s < n_scales; ++s) {
+        for (uint ch = 0; ch < uint(feat.size[1]); ++ch) {
+            cv::Mat feat_plane = feat.plane(s, ch);
+            cv::Mat temp_plane = temp.plane(s, ch);
             temp_plane = feat_plane.mul(m_window);
         }
     }
@@ -181,7 +164,7 @@ void Fftw::forward_window(MatScaleFeats  &feat, ComplexMat & complex_result, Mat
     float *in = temp.ptr<float>();
     fftwf_complex *out = reinterpret_cast<fftwf_complex *>(complex_result.get_p_data());
 
-    if (n_channels <= m_num_of_feats)
+    if (n_scales == 1)
         fftwf_execute_dft_r2c(plan_fw, in, out);
     else
         fftwf_execute_dft_r2c(plan_fw_all_scales, in, out);
@@ -196,13 +179,12 @@ void Fftw::inverse(ComplexMat &complex_input, MatScales &real_result)
     fftwf_complex *in = reinterpret_cast<fftwf_complex *>(complex_input.get_p_data());
     float *out = real_result.ptr<float>();
 
-    if (n_channels == 1|| (BIG_BATCH_MODE && n_channels == int(IF_BIG_BATCH(m_num_of_scales, 1))))
+    if (n_channels == 1)
         fftwf_execute_dft_c2r(plan_i_1ch, in, out);
-    else if (BIG_BATCH_MODE && n_channels == int(m_num_of_feats) * int(IF_BIG_BATCH(m_num_of_scales, 1)))
-        fftwf_execute_dft_c2r(plan_i_features_all_scales, in, out);
+#ifdef BIG_BATCH
     else
-        fftwf_execute_dft_c2r(plan_i_features, in, out);
-
+        fftwf_execute_dft_c2r(plan_i_all_scales, in, out);
+#endif
     real_result *= 1.0 / (m_width * m_height);
 }
 
@@ -210,12 +192,11 @@ Fftw::~Fftw()
 {
     fftwf_destroy_plan(plan_f);
     fftwf_destroy_plan(plan_fw);
-    fftwf_destroy_plan(plan_i_features);
     fftwf_destroy_plan(plan_i_1ch);
 
     if (BIG_BATCH_MODE) {
         fftwf_destroy_plan(plan_f_all_scales);
-        fftwf_destroy_plan(plan_i_features_all_scales);
+        fftwf_destroy_plan(plan_i_all_scales);
         fftwf_destroy_plan(plan_fw_all_scales);
     }
 }

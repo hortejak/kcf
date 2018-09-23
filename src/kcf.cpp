@@ -80,9 +80,8 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
         alphaf_den = (p_xf * xfconj);
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
-        const uint num_scales = BIG_BATCH_MODE ? p_num_scales : 1;
         cv::Size sz(Fft::freq_size(p_roi));
-        ComplexMat kf(sz.height, sz.width, num_scales);
+        ComplexMat kf(sz.height, sz.width, 1);
         (*gaussian_correlation)(kf, p_model_xf, p_model_xf, p_kernel_sigma, true, *this);
         DEBUG_PRINTM(kf);
         p_model_alphaf_num = p_yf * kf;
@@ -218,8 +217,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     d.threadctxs.emplace_back(p_roi, p_num_of_feats, p_num_scales);
 #endif
 
-    gaussian_correlation.reset(
-                new GaussianCorrelation(IF_BIG_BATCH(p_num_scales, 1), p_roi));
+    gaussian_correlation.reset(new GaussianCorrelation(1, p_roi));
 
     p_current_scale = 1.;
 
@@ -711,6 +709,7 @@ void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat &result, const Comp
     float numel_xf_inv = 1.f / (xf.cols * xf.rows * (xf.channels() / xf.n_scales));
     for (uint i = 0; i < xf.n_scales; ++i) {
         cv::Mat plane = ifft_res.plane(i);
+        DEBUG_PRINT(ifft_res.plane(i));
         cv::exp(-1. / (sigma * sigma) * cv::max((xf_sqr_norm[i] + yf_sqr_norm[0] - 2 * ifft_res.plane(i))
                 * numel_xf_inv, 0), plane);
         DEBUG_PRINTM(plane);

@@ -47,7 +47,7 @@ private:
     MatScales ifft2_res{num_scales, roi};
 
     ComplexMat zf{uint(freq_size.height), uint(freq_size.width), num_features, num_scales};
-    ComplexMat kzf{uint(freq_size.height), uint(freq_size.width), num_scales};
+    ComplexMat kzf{uint(freq_size.height), uint(freq_size.width), 1, num_scales};
 
 public:
 #ifdef ASYNC

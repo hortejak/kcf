@@ -1,6 +1,7 @@
 
 #include "fft.h"
 #include <cassert>
+#include "debug.h"
 
 Fft::~Fft()
 {
@@ -29,6 +30,8 @@ void Fft::set_window(const MatDynMem &window)
 
 void Fft::forward(const MatScales &real_input, ComplexMat &complex_result)
 {
+    TRACE("");
+    DEBUG_PRINT(real_input);
     assert(real_input.dims == 3);
 #ifdef BIG_BATCH
     assert(real_input.size[0] == 1 || real_input.size[0] == int(m_num_of_scales));
@@ -37,6 +40,10 @@ void Fft::forward(const MatScales &real_input, ComplexMat &complex_result)
 #endif
     assert(real_input.size[1] == int(m_height));
     assert(real_input.size[2] == int(m_width));
+
+    assert(complex_result.cols = freq_size(cv::Size(m_width, m_height)).width);
+    assert(complex_result.rows = freq_size(cv::Size(m_width, m_height)).height);
+    assert(complex_result.channels() == uint(real_input.size[0]));
 
     (void)real_input;
     (void)complex_result;
@@ -67,8 +74,14 @@ void Fft::forward_window(MatScaleFeats &patch_feats, ComplexMat &complex_result,
 
 void Fft::inverse(ComplexMat &complex_input, MatScales &real_result)
 {
+    TRACE("");
+    DEBUG_PRINT(complex_input);
     assert(real_result.dims == 3);
-    assert(real_result.size[0] == IF_BIG_BATCH(int(m_num_of_scales), 1));
+#ifdef BIG_BATCH
+        assert(real_result.size[0] == 1 || real_result.size[0] ==  int(m_num_of_scales));
+#else
+        assert(real_result.size[0] == 1);
+#endif
     assert(real_result.size[1] == int(m_height));
     assert(real_result.size[2] == int(m_width));
 
