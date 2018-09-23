@@ -83,7 +83,7 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
         const uint num_scales = BIG_BATCH_MODE ? p_num_scales : 1;
         cv::Size sz(Fft::freq_size(p_roi));
         ComplexMat kf(sz.height, sz.width, num_scales);
-        (*gaussian_correlation)(*this, kf, p_model_xf, p_model_xf, p_kernel_sigma, true);
+        (*gaussian_correlation)(kf, p_model_xf, p_model_xf, p_kernel_sigma, true, *this);
         DEBUG_PRINTM(kf);
         p_model_alphaf_num = p_yf * kf;
         p_model_alphaf_den = kf * (kf + p_lambda);
@@ -429,7 +429,7 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
     if (kcf.m_use_linearkernel) {
         kzf = zf.mul(kcf.p_model_alphaf).sum_over_channels();
     } else {
-        gaussian_correlation(kcf, kzf, zf, kcf.p_model_xf, kcf.p_kernel_sigma);
+        gaussian_correlation(kzf, zf, kcf.p_model_xf, kcf.p_kernel_sigma, false, kcf);
         DEBUG_PRINTM(kzf);
         kzf = kzf.mul(kcf.p_model_alphaf);
     }
@@ -683,8 +683,8 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     return patch;
 }
 
-void KCF_Tracker::GaussianCorrelation::operator()(const KCF_Tracker &kcf, ComplexMat &result, const ComplexMat &xf,
-                                                  const ComplexMat &yf, double sigma, bool auto_correlation)
+void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat &result, const ComplexMat &xf, const ComplexMat &yf,
+                                                  double sigma, bool auto_correlation, const KCF_Tracker &kcf)
 {
     TRACE("");
     xf.sqr_norm(xf_sqr_norm);

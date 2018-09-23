@@ -136,7 +136,7 @@ private:
             , ifft_res(num_scales, size)
             , k(num_scales, size)
         {}
-        void operator()(const KCF_Tracker &kcf, ComplexMat &result, const ComplexMat &xf, const ComplexMat &yf, double sigma, bool auto_correlation = false);
+        void operator()(ComplexMat &result, const ComplexMat &xf, const ComplexMat &yf, double sigma, bool auto_correlation, const KCF_Tracker &kcf);
 
       private:
         DynMem xf_sqr_norm;
