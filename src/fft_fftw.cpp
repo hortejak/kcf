@@ -93,14 +93,14 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
 #ifdef BIG_BATCH
     // FFT inverse all scales
     {
-        ComplexMat in_i_all(m_height, m_width, m_num_of_feats * m_num_of_scales);
-        cv::Mat out_i_all = cv::Mat::zeros(m_height, m_width, CV_32FC(m_num_of_feats * m_num_of_scales));
+        ComplexMat in_i_all(m_height, m_width / 2 + 1, m_num_of_scales);
+        cv::Mat out_i_all = cv::Mat::zeros(m_height, m_width, CV_32FC(m_num_of_scales));
         fftwf_complex *in = reinterpret_cast<fftwf_complex *>(in_i_all.get_p_data());
         float *out = reinterpret_cast<float *>(out_i_all.data);
         int rank = 2;
         int n[] = {(int)m_height, (int)m_width};
         int howmany = m_num_of_scales;
-        int idist = m_height * (m_width / 2 + 1), odist = 1;
+        int idist = m_height * (m_width / 2 + 1), odist = m_height * m_width;
         int istride = 1, ostride = 1;
         int inembed[] = {(int)m_height, (int)m_width / 2 + 1}, *onembed = n;
 
