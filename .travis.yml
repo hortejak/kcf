@@ -41,12 +41,12 @@ matrix:
       script:
         - make BUILDS="$(echo $(grep -v cufft .kcf_builds))"
         - ninja test
-      after_script: find vot2016 -name output.txt -o -name core -print0 | xargs -0 rm -f
       addons:
         apt: { sources: *common_sources, packages: [*common_packages, unzip] }
 
 before_script:
     - make -qp|grep "^BUILDS ="|grep -o '[a-z-]*' | tee .kcf_builds
 
+before_cache: if [ -d vot2016 ]; then find -name output.txt -o -name core -print0 | xargs -0 rm -f; fi
 cache:
   directories: [ vot2016 ]
