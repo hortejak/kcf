@@ -1,12 +1,7 @@
-
 #ifndef FFT_FFTW_H
 #define FFT_FFTW_H
 
 #include "fft.h"
-
-#if defined(ASYNC)
-#include <mutex>
-#endif
 
 #ifndef CUFFTW
   #include <fftw3.h>
