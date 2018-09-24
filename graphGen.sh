@@ -58,11 +58,12 @@ gnuplot -persist << EOFMarker
 
         set style data boxplot
         set style boxplot nooutliers
+        set grid
         unset key
         if ($USE_FPS == 1) {
-           plot for [i=1:N] file using (i):(1000/column(i))
+           plot [][0:] for [i=1:N] file using (i):(1000/column(i))
         } else {
-          plot for [i=1:N] file using (i):i
+          plot [][0:] for [i=1:N] file using (i):i
         }
 EOFMarker
 
