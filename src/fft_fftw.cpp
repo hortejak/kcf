@@ -107,9 +107,10 @@ void Fftw::forward_window(MatScaleFeats  &feat, ComplexMat & complex_result, Mat
 
     if (n_scales == 1)
         fftwf_execute_dft_r2c(plan_fw, in, out);
+#ifdef BIG_BATCH
     else
         fftwf_execute_dft_r2c(plan_fw_all_scales, in, out);
-    return;
+#endif
 }
 
 void Fftw::inverse(ComplexMat &complex_input, MatScales &real_result)
@@ -135,9 +136,9 @@ Fftw::~Fftw()
     fftwf_destroy_plan(plan_fw);
     fftwf_destroy_plan(plan_i_1ch);
 
-    if (BIG_BATCH_MODE) {
-        fftwf_destroy_plan(plan_f_all_scales);
-        fftwf_destroy_plan(plan_i_all_scales);
-        fftwf_destroy_plan(plan_fw_all_scales);
-    }
+#ifdef BIG_BATCH
+    fftwf_destroy_plan(plan_f_all_scales);
+    fftwf_destroy_plan(plan_fw_all_scales);
+    fftwf_destroy_plan(plan_i_all_scales);
+#endif
 }

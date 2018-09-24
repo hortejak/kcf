@@ -26,8 +26,10 @@ protected:
 
 private:
     cv::Mat m_window;
-    fftwf_plan plan_f, plan_f_all_scales, plan_fw, plan_fw_all_scales, plan_i_all_scales,
-        plan_i_1ch;
+    fftwf_plan plan_f, plan_fw, plan_i_1ch;
+#ifdef BIG_BATCH
+    fftwf_plan plan_f_all_scales, plan_fw_all_scales, plan_i_all_scales;
+#endif
 };
 
 #endif // FFT_FFTW_H
