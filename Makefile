@@ -93,6 +93,9 @@ build.ninja:: $(MAKEFILE_LIST)
 	@$(call echo,>>$@,build test: PRINT_RESULTS $(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))) | print-test-results)
 	@$(foreach build,$(BUILDS),$(call echo,>>$@,build test-$(build): PRINT_RESULTS $(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f)))) | print-test-results))
 	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build test-$(seq): PRINT_RESULTS $(foreach build,$(BUILDS),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f)))) | print-test-results))
+	@$(call echo,>>$@,build plot: PLOT_RESULTS $(foreach build,$(BUILDS),$(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f))))) | graphGen.sh)
+	@$(foreach build,$(BUILDS),$(call echo,>>$@,build plot-$(build): PLOT_RESULTS $(foreach seq,$(TESTSEQ),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f)))) | graphGen.sh))
+	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build plot-$(seq): PLOT_RESULTS $(foreach build,$(BUILDS),$(foreach f,$(TESTFLAGS),$(call ninja-test,$(build),$(seq),$(f)))) | graphGen.sh))
 	@$(foreach seq,$(TESTSEQ),$(call echo,>>$@,build vot2016/$(seq): MAKE))
 
 ninja-test = build-$(1)/kcf_vot-$(2)-$(3).log
@@ -114,6 +117,9 @@ rule TEST_SEQ
 rule PRINT_RESULTS
   description = Print results
   command = ./wvtool -w125 -v run ./print-test-results $$in
+rule PLOT_RESULTS
+  description = Plot results
+  command = ./graphGen.sh -f -s $$in
 rule MAKE
   command = make $$out
   pool = make
