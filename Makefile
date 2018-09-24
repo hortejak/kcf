@@ -110,7 +110,7 @@ rule NINJA
   restat = 1
 rule TEST_SEQ
   # Errors are ignored - they will be reported by PRINT_RESULTS
-  command = build-$$build/kcf_vot $$flags $$seq > $$out || :
+  command = build-$$build/kcf_vot $$flags $$seq $(if $(TRAVIS),2>&1) >$$out $(if $(TRAVIS),| grep -v libdc1394) || :
 rule PRINT_RESULTS
   description = Print results
   command = ./wvtool -w125 -v run ./print-test-results $$in
