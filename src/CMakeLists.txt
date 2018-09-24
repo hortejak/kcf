@@ -2,10 +2,6 @@ cmake_minimum_required(VERSION 2.8)
 
 set(KCF_LIB_SRC kcf.cpp kcf.h fft.cpp threadctx.hpp pragmas.h dynmem.hpp debug.cpp)
 
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  set_property(SOURCE kcf.cpp APPEND_STRING PROPERTY COMPILE_FLAGS " -Wno-gnu-zero-variadic-macro-arguments ")
-endif()
-
 find_package(PkgConfig)
 
 SET(FFT "OpenCV" CACHE STRING "Select FFT implementation")
@@ -94,6 +90,11 @@ add_subdirectory(piotr_fhog)
 add_subdirectory(cn)
 
 add_library(kcf STATIC ${KCF_LIB_SRC})
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  set_property(TARGET kcf APPEND_STRING PROPERTY COMPILE_FLAGS " -Wno-gnu-zero-variadic-macro-arguments ")
+endif()
+
+
 target_link_libraries(kcf fhog cndata ${OpenCV_LIBS})
 set_target_properties(kcf PROPERTIES VERSION 1.0.0 SOVERSION 1)
 
