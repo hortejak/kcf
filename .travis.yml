@@ -16,6 +16,9 @@ addons:
 env:
   - CUDA_BIN_PATH=/usr/local/cuda-8.0 CXXFLAGS=-Werror CUDA_ARCH_LIST=6.2 NINJA_STATUS="[%f/%t] "
 
+before_script:
+    - make -qp|grep "^BUILDS ="|grep -o '[a-z-]*' | tee .kcf_builds
+
 script: make
 
 matrix:
@@ -43,9 +46,6 @@ matrix:
         - ninja test
       addons:
         apt: { sources: *common_sources, packages: [*common_packages, unzip] }
-
-before_script:
-    - make -qp|grep "^BUILDS ="|grep -o '[a-z-]*' | tee .kcf_builds
 
 before_cache: if [ -d vot2016 ]; then find -name output.txt -o -name core -print0 | xargs -0 rm -f; fi
 cache:
