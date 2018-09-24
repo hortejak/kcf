@@ -16,9 +16,6 @@ addons:
 env:
   - CUDA_BIN_PATH=/usr/local/cuda-8.0 CXXFLAGS=-Werror CUDA_ARCH_LIST=6.2 NINJA_STATUS="[%f/%t] "
 
-before_script:
-    - make -qp|grep "^BUILDS ="|grep -o '[a-z-]*' | tee .kcf_builds
-
 script: make
 
 matrix:
@@ -38,11 +35,11 @@ matrix:
           packages:
             - *common_packages
             - clang-3.8
-      script: make CC=clang-3.8 CXX=clang++-3.8 $(grep -v openmp .kcf_builds)
+      script: make CC=clang-3.8 CXX=clang++-3.8 $(make print_BUILDS|grep -v openmp)
     - compiler: clang
       name: clang & test
       script:
-        - make BUILDS="$(echo $(grep -v cufft .kcf_builds))"
+        - make BUILDS="$(make print_BUILDS|grep -v cufft|paste -s)"
         - ninja test
       addons:
         apt: { sources: *common_sources, packages: [*common_packages, unzip] }

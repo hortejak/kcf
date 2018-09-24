@@ -6,6 +6,9 @@ TESTFLAGS = default fit128
 
 all: $(BUILDS)
 
+print_%:
+	@$(foreach v,$($*),echo $(v);)
+
 ninja: build.ninja
 	ninja
 
