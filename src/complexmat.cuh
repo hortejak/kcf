@@ -18,20 +18,15 @@ class ComplexMat {
     bool foreign_data = false;
 
     ComplexMat() : cols(0), rows(0), n_channels(0) {}
-    ComplexMat(uint _rows, uint _cols, uint _n_channels)
-        : cols(_cols), rows(_rows), n_channels(_n_channels)
+
+    ComplexMat(uint _rows, uint _cols, uint _n_channels, uint _n_scales = 1)
+        : cols(_cols), rows(_rows), n_channels(_n_channels * _n_scales), n_scales(_n_scales)
     {
         CudaSafeCall(cudaMalloc(&p_data, n_channels * cols * rows * sizeof(cufftComplex)));
     }
 
-    ComplexMat(uint _rows, uint _cols, uint _n_channels, uint _n_scales)
-        : cols(_cols), rows(_rows), n_channels(_n_channels), n_scales(_n_scales)
-    {
-        CudaSafeCall(cudaMalloc(&p_data, n_channels * cols * rows * sizeof(cufftComplex)));
-    }
-
-    ComplexMat(cv::Size size, uint _n_channels)
-        : cols(size.width), rows(size.height), n_channels(_n_channels)
+    ComplexMat(cv::Size size, uint _n_channels, uint _n_scales = 1)
+        : cols(size.width), rows(size.height), n_channels(_n_channels * _n_channels), n_scales(_n_scales)
     {
         CudaSafeCall(cudaMalloc(&p_data, n_channels * cols * rows * sizeof(cufftComplex)));
     }
@@ -73,8 +68,7 @@ class ComplexMat {
     }
     // cv::Mat API compatibility
     cv::Size size() const { return cv::Size(cols, rows); }
-    int channels() { return n_channels; }
-    int channels() const { return n_channels; }
+    uint channels() const { return n_channels; }
 
     void sqr_norm(DynMem &result) const;
 
