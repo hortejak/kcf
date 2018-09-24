@@ -91,7 +91,7 @@ add_subdirectory(cn)
 
 add_library(kcf STATIC ${KCF_LIB_SRC})
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  set_property(TARGET kcf APPEND_STRING PROPERTY COMPILE_FLAGS " -Wno-gnu-zero-variadic-macro-arguments ")
+  target_compile_options(kcf PRIVATE -Wno-gnu-zero-variadic-macro-arguments)
 endif()
 
 
