@@ -20,7 +20,11 @@ class Fftw : public Fft
     void inverse(ComplexMat &complex_input, MatScales &real_result) override;
     ~Fftw() override;
 
-  private:
+protected:
+    fftwf_plan create_plan_fwd(uint howmany);
+    fftwf_plan create_plan_inv(uint howmany);
+
+private:
     cv::Mat m_window;
     fftwf_plan plan_f, plan_f_all_scales, plan_fw, plan_fw_all_scales, plan_i_all_scales,
         plan_i_1ch;

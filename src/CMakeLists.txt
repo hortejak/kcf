@@ -102,7 +102,7 @@ IF(FFT STREQUAL "fftw")
   target_link_libraries(kcf ${FFTW_LDFLAGS})
   IF(OPENMP)
     target_link_libraries(kcf fftw3_omp)
-  ELSEIF(NOT ASYNC)
+  ELSE()
     target_link_libraries(kcf fftw3_threads)
   ENDIF()
 ENDIF() #FFTW
