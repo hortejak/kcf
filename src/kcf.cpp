@@ -196,7 +196,6 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         std::cerr << "cuFFT supports only Gaussian kernel." << std::endl;
         std::exit(EXIT_FAILURE);
     }
-    CudaSafeCall(cudaSetDeviceFlags(cudaDeviceMapHost));
 #else
     p_xf.create(p_roi.height, p_roi.height / 2 + 1, p_num_of_feats);
 #endif

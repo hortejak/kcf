@@ -2,6 +2,7 @@
 
 cuFFT::cuFFT()
 {
+    CudaSafeCall(cudaSetDeviceFlags(cudaDeviceMapHost));
     cudaErrorCheck(cublasCreate(&cublas));
 }
 
