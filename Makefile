@@ -19,8 +19,6 @@ $(BUILDS): build.ninja
 clean: build.ninja
 	ninja $@
 
-CMAKE_OPTS += -G Ninja
-
 ## Useful setting - uncomment and modify as needed
 # CMAKE_OPTS += -DOpenCV_DIR=~/opt/opencv-2.4/share/OpenCV
 # CMAKE_OPTS += -DCUDA_VERBOSE_BUILD=ON -DCUDA_NVCC_FLAGS="--verbose;--save-temps"
@@ -109,7 +107,7 @@ rule REGENERATE
   description = Regenerating $$out
   generator = 1
 rule CMAKE
-  command = cd $$subdir && cmake $(CMAKE_OPTS) $$opts ..
+  command = cd $$subdir && cmake -G Ninja $(CMAKE_OPTS) $$opts ..
 rule NINJA
   # Absolute path in -C allows Emacs to properly jump to error message locations
   command = ninja -C $(CURDIR)/$$subdir
