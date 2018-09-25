@@ -1,4 +1,5 @@
 #include "fft_fftw.h"
+#include <unistd.h>
 
 #ifdef OPENMP
 #include <omp.h>
@@ -42,12 +43,13 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
 {
     Fft::init(width, height, num_of_feats, num_of_scales);
 
-#if !defined(CUFFTW)
+#if !defined(CUFFTW) && defined(BIG_BATCH)
     fftw_init_threads();
   #if defined(OPENMP)
     fftw_plan_with_nthreads(omp_get_max_threads());
   #else
-    fftw_plan_with_nthreads(4);
+    int np = sysconf(_SC_NPROCESSORS_ONLN);
+    fftw_plan_with_nthreads(np);
   #endif
 #endif
 
