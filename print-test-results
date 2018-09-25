@@ -3,7 +3,7 @@ set -e
 
 declare -A expected_accuracy
 
-expected_accuracy=([bag]=0.53 [ball1]=0.70 [car1]=0.35 [book]=0.19
+expected_accuracy=([bag]=0.53 [ball1-correct]=0.70 [ball1]=0.35 [car1]=0.35 [book]=0.19
 		   [bmx]=0.45 [crossing]=0.72 [racing]=0.52)
 
 for i in "$@"; do
