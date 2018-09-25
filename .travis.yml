@@ -11,7 +11,6 @@ addons:
       - ninja-build
       - libopencv-dev
       - libfftw3-dev
-      - cuda-command-line-tools-8-0 cuda-cufft-dev-8-0 cuda-cublas-dev-8-0
 
 env:
   - CUDA_BIN_PATH=/usr/local/cuda-8.0 CXXFLAGS=-Werror CUDA_ARCH_LIST=6.2 NINJA_STATUS="[%f/%t] "
@@ -27,6 +26,7 @@ matrix:
           packages:
             - *common_packages
             - g++-5
+            - cuda-command-line-tools-8-0 cuda-cufft-dev-8-0 cuda-cublas-dev-8-0
       script: make CC=gcc-5 CXX=g++-5
     - compiler: clang-3.8
       addons:
@@ -35,6 +35,7 @@ matrix:
           packages:
             - *common_packages
             - clang-3.8
+            - cuda-command-line-tools-8-0 cuda-cufft-dev-8-0 cuda-cublas-dev-8-0
       script: make CC=clang-3.8 CXX=clang++-3.8 $(make print_BUILDS|grep -v openmp)
     - compiler: clang
       name: clang & test
