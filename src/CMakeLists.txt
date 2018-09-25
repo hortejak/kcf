@@ -23,6 +23,10 @@ IF(BIG_BATCH)
   MESSAGE(STATUS "Big_batch mode")
 ENDIF()
 
+IF (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") AND NOT OPENMP)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unknown-pragmas")
+ENDIF()
+
 SET(use_cuda OFF)
 
 IF(FFT STREQUAL "OpenCV")
@@ -57,10 +61,11 @@ ENDIF()
 
 IF(ASYNC)
   add_definitions(-DASYNC)
+  find_package(Threads REQUIRED)
   MESSAGE(STATUS "ASYNC")
 ELSEIF(OPENMP)
-    add_definitions(-DOPENMP)
-    MESSAGE(STATUS "OPENMP")
+  add_definitions(-DOPENMP)
+  FIND_PACKAGE(OpenMP REQUIRED CXX)
 ENDIF() #ASYNC
 
 FIND_PACKAGE( OpenCV REQUIRED )
@@ -118,3 +123,20 @@ ENDIF()
 IF(PROFILING)
   target_link_libraries(kcf pfm)
 ENDIF()
+
+IF(OPENMP)
+  target_compile_options(kcf PUBLIC ${OpenMP_CXX_FLAGS})
+  target_link_libraries(kcf ${OpenMP_CXX_LIB_NAMES})
+  target_link_libraries(kcf ${OpenMP_omp_LIBRARY})
+  if (("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") AND NOT OpenMP_CXX_LIB_NAMES)
+    # Older cmake does not set OpenMP_CXX_LIB_NAMES so hardcode it here
+    target_link_libraries(kcf gomp)
+  endif()
+ENDIF()
+
+if(THREADS_HAVE_PTHREAD_ARG)
+  target_compile_options(kcf PUBLIC "-pthread")
+endif()
+if(CMAKE_THREAD_LIBS_INIT)
+  target_link_libraries(kcf "${CMAKE_THREAD_LIBS_INIT}")
+endif()
