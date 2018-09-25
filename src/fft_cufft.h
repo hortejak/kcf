@@ -6,7 +6,7 @@
 #include <cublas_v2.h>
 
 #include "fft.h"
-#include "cuda/cuda_error_check.cuh"
+#include "cuda_error_check.hpp"
 #include "pragmas.h"
 
 struct ThreadCtx;

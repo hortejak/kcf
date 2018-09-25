@@ -9,7 +9,7 @@
 #if defined(CUFFT) || defined(CUFFTW)
 #include "cuda_runtime.h"
 #ifdef CUFFT
-#include "cuda/cuda_error_check.cuh"
+#include "cuda_error_check.hpp"
 #endif
 #endif
 
