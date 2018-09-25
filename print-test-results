@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+declare -A expected_accuracy
 expected_accuracy=([bag]=0.53 [ball1]=0.70 [car1]=0.35 [book]=0.19)
 
 for i in "$@"; do
@@ -11,7 +12,7 @@ for i in "$@"; do
 
     result=$(grep 'Average accuracy:' $i || :)
     if [[ "$result" =~ Average\ accuracy:\ ([0-9.]+) ]]; then
-	if [[ $(echo "${BASH_REMATCH[1]} >= ${expected_accuracy[$seq]}"|bc) -eq 1 ]]; then
+	if [[ $(echo "${BASH_REMATCH[1]} >= ${expected_accuracy[$seq]:-0}"|bc) -eq 1 ]]; then
 	    status=ok
 	else
 	    status=ACCURACY
