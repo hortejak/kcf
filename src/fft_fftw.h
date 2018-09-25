@@ -21,8 +21,8 @@ class Fftw : public Fft
     ~Fftw() override;
 
 protected:
-    fftwf_plan create_plan_fwd(uint howmany);
-    fftwf_plan create_plan_inv(uint howmany);
+    fftwf_plan create_plan_fwd(uint howmany) const;
+    fftwf_plan create_plan_inv(uint howmany) const;
 
 private:
     cv::Mat m_window;

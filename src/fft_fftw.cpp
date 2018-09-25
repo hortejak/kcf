@@ -6,7 +6,7 @@
 
 Fftw::Fftw(){}
 
-fftwf_plan Fftw::create_plan_fwd(uint howmany)
+fftwf_plan Fftw::create_plan_fwd(uint howmany) const
 {
     cv::Mat mat_in = cv::Mat::zeros(howmany * m_height, m_width, CV_32F);
     ComplexMat mat_out(m_height, m_width / 2 + 1, howmany);
@@ -22,7 +22,7 @@ fftwf_plan Fftw::create_plan_fwd(uint howmany)
     return fftwf_plan_many_dft_r2c(rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride, odist, FFTW_PATIENT);
 }
 
-fftwf_plan Fftw::create_plan_inv(uint howmany)
+fftwf_plan Fftw::create_plan_inv(uint howmany) const
 {
     ComplexMat mat_in(m_height, m_width / 2 + 1, howmany);
     cv::Mat mat_out = cv::Mat::zeros(howmany * m_height, m_width, CV_32F);
