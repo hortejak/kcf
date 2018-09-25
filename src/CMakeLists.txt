@@ -8,10 +8,10 @@ SET(FFT "OpenCV" CACHE STRING "Select FFT implementation")
 SET_PROPERTY(CACHE FFT PROPERTY STRINGS OpenCV fftw cuFFTW cuFFT)
 MESSAGE(STATUS "FFT implementation: ${FFT}")
 
-option(OPENMP "Use OpenMP library. Works with FFTW and OpenCV implementation." OFF)
-option(ASYNC "Works only if OPENCV_CUFFT is not ON. Will enable C++ async directive." OFF)
+option(OPENMP "Use OpenMP to paralelize certain portions of code." OFF)
+option(ASYNC "Use C++ std::async to paralelize certain portions of code." OFF)
 option(CUDA_DEBUG "Enables error cheking for cuda and cufft. " OFF)
-option(BIG_BATCH "Enable transforming all features from all scales together." OFF)
+option(BIG_BATCH "Execute all FFT calculation in a single batch. This can improve paralelism and reduce GPU offloading overhead." OFF)
 
 IF(PROFILING)
   add_definitions(-DPROFILING )
