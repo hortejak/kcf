@@ -60,9 +60,9 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
 
     // obtain a sub-window for training
     // TODO: Move Mats outside from here
-    MatScaleFeats patch_feats(1, p_num_of_feats, p_roi);
+    MatScaleFeats patch_feats(1, p_num_of_feats, feature_size);
     DEBUG_PRINT(patch_feats);
-    MatScaleFeats temp(1, p_num_of_feats, p_roi);
+    MatScaleFeats temp(1, p_num_of_feats, feature_size);
     get_features(input_rgb, input_gray, p_current_center.x, p_current_center.y,
                  p_windows_size.width, p_windows_size.height,
                  p_current_scale).copyTo(patch_feats.scale(0));
@@ -80,7 +80,7 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
         alphaf_den = (p_xf * xfconj);
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
-        cv::Size sz(Fft::freq_size(p_roi));
+        cv::Size sz(Fft::freq_size(feature_size));
         ComplexMat kf(sz.height, sz.width, 1);
         (*gaussian_correlation)(kf, p_model_xf, p_model_xf, p_kernel_sigma, true, *this);
         DEBUG_PRINTM(kf);
@@ -173,15 +173,15 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     // compute win size + fit to fhog cell size
     p_windows_size.width = round(p_init_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
     p_windows_size.height = round(p_init_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size;
-    p_roi.width = p_windows_size.width / p_cell_size;
-    p_roi.height = p_windows_size.height / p_cell_size;
+    feature_size.width = p_windows_size.width / p_cell_size;
+    feature_size.height = p_windows_size.height / p_cell_size;
 
     p_scales.clear();
     for (int i = -int(p_num_scales) / 2; i <= int(p_num_scales) / 2; ++i)
         p_scales.push_back(std::pow(p_scale_step, i));
 
 #ifdef CUFFT
-    if (p_roi.height * (p_roi.width / 2 + 1) > 1024) {
+    if (feature_size.height * (feature_size.width / 2 + 1) > 1024) {
         std::cerr << "Window after forward FFT is too big for CUDA kernels. Plese use -f to set "
                      "the window dimensions so its size is less or equal to "
                   << 1024 * p_cell_size * p_cell_size * 2 + 1
@@ -195,26 +195,26 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         std::exit(EXIT_FAILURE);
     }
 #else
-    p_xf.create(p_roi.height, p_roi.height / 2 + 1, p_num_of_feats);
+    p_xf.create(feature_size.height, feature_size.height / 2 + 1, p_num_of_feats);
 #endif
 
 #if defined(CUFFT) || defined(FFTW)
-    uint width = p_roi.width / 2 + 1;
+    uint width = feature_size.width / 2 + 1;
 #else
-    uint width = p_roi.width;
+    uint width = feature_size.width;
 #endif
-    p_model_xf.create(p_roi.height, width, p_num_of_feats);
-    p_yf.create(p_roi.height, width, 1);
-    p_xf.create(p_roi.height, width, p_num_of_feats);
+    p_model_xf.create(feature_size.height, width, p_num_of_feats);
+    p_yf.create(feature_size.height, width, 1);
+    p_xf.create(feature_size.height, width, p_num_of_feats);
 
 #ifndef BIG_BATCH
     for (auto scale: p_scales)
-        d.threadctxs.emplace_back(p_roi, p_num_of_feats, scale);
+        d.threadctxs.emplace_back(feature_size, p_num_of_feats, scale);
 #else
-    d.threadctxs.emplace_back(p_roi, p_num_of_feats, p_num_scales);
+    d.threadctxs.emplace_back(feature_size, p_num_of_feats, p_num_scales);
 #endif
 
-    gaussian_correlation.reset(new GaussianCorrelation(1, p_roi));
+    gaussian_correlation.reset(new GaussianCorrelation(1, feature_size));
 
     p_current_center = p_init_pose.center();
     p_current_scale = 1.;
@@ -228,17 +228,17 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 
     std::cout << "init: img size " << img.cols << "x" << img.rows << std::endl;
     std::cout << "init: win size " << p_windows_size.width << "x" << p_windows_size.height << std::endl;
-    std::cout << "init: FFT size " << p_roi.width << "x" << p_roi.height << std::endl;
+    std::cout << "init: FFT size " << feature_size.width << "x" << feature_size.height << std::endl;
     std::cout << "init: min max scales factors: " << p_min_max_scale[0] << " " << p_min_max_scale[1] << std::endl;
 
     p_output_sigma = std::sqrt(p_init_pose.w * p_init_pose.h) * p_output_sigma_factor / p_cell_size;
 
-    fft.init(p_roi.width, p_roi.height, p_num_of_feats, p_num_scales);
-    fft.set_window(MatDynMem(cosine_window_function(p_roi.width, p_roi.height)));
+    fft.init(feature_size.width, feature_size.height, p_num_of_feats, p_num_scales);
+    fft.set_window(MatDynMem(cosine_window_function(feature_size.width, feature_size.height)));
 
     // window weights, i.e. labels
-    MatScales gsl(1, p_roi);
-    gaussian_shaped_labels(p_output_sigma, p_roi.width, p_roi.height).copyTo(gsl.plane(0));
+    MatScales gsl(1, feature_size);
+    gaussian_shaped_labels(p_output_sigma, feature_size.width, feature_size.height).copyTo(gsl.plane(0));
     fft.forward(gsl, p_yf);
     DEBUG_PRINTM(p_yf);
 
@@ -506,7 +506,7 @@ cv::Mat KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int c
 
     hog_feat.insert(hog_feat.end(), color_feat.begin(), color_feat.end());
 
-    int size[] = {p_num_of_feats, p_roi.height, p_roi.width};
+    int size[] = {p_num_of_feats, feature_size.height, feature_size.width};
     cv::Mat result(3, size, CV_32F);
     for (uint i = 0; i < hog_feat.size(); ++i)
         hog_feat[i].copyTo(cv::Mat(size[1], size[2], CV_32FC1, result.ptr(i)));
@@ -695,7 +695,7 @@ void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat &result, const Comp
     // FIXME
     cuda_gaussian_correlation(ifft_res.deviceMem(), k.deviceMem(), xf_sqr_norm.deviceMem(),
                               auto_correlation ? xf_sqr_norm.deviceMem() : yf_sqr_norm.deviceMem(), sigma,
-                              xf.n_channels, xf.n_scales, kcf.p_roi.height, kcf.p_roi.width);
+                              xf.n_channels, xf.n_scales, kcf.feature_size.height, kcf.feature_size.width);
 #else
 
     float numel_xf_inv = 1.f / (xf.cols * xf.rows * (xf.channels() / xf.n_scales));
