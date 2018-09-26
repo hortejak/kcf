@@ -10,11 +10,11 @@
 double calcAccuracy(std::string line, cv::Rect bb_rect, cv::Rect &groundtruth_rect)
 {
     std::vector<float> numbers;
-    std::istringstream s( line );
+    std::istringstream s(line);
     float x;
     char ch;
 
-    while (s >> x){
+    while (s >> x) {
         numbers.push_back(x);
         s >> ch;
     }
@@ -23,11 +23,11 @@ double calcAccuracy(std::string line, cv::Rect bb_rect, cv::Rect &groundtruth_re
     double y1 = std::min(numbers[1], std::min(numbers[3], std::min(numbers[5], numbers[7])));
     double y2 = std::max(numbers[1], std::max(numbers[3], std::max(numbers[5], numbers[7])));
 
-    groundtruth_rect = cv::Rect(x1, y1, x2-x1, y2-y1);
+    groundtruth_rect = cv::Rect(x1, y1, x2 - x1, y2 - y1);
 
     double rects_intersection = (groundtruth_rect & bb_rect).area();
     double rects_union = (groundtruth_rect | bb_rect).area();
-    double accuracy = rects_intersection/rects_union;
+    double accuracy = rects_intersection / rects_union;
 
     return accuracy;
 }
@@ -50,8 +50,7 @@ int main(int argc, char *argv[])
             {0,           0,                 0,  0 }
         };
 
-        int c = getopt_long(argc, argv, "dhv::f::o:",
-                        long_options, &option_index);
+        int c = getopt_long(argc, argv, "dhv::f::o:", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -85,7 +84,7 @@ int main(int argc, char *argv[])
             sizes.erase(0, pos + delimiter.length());
 
             fit_size_x = stol(first_argument);
-	    fit_size_y = stol(sizes);
+            fit_size_y = stol(sizes);
             break;
         }
     }
