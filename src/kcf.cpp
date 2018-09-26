@@ -274,7 +274,8 @@ BBox_c KCF_Tracker::getBBox()
     tmp.w *= p_current_scale;
     tmp.h *= p_current_scale;
 
-    if (p_resize_image) tmp.scale(1 / p_downscale_factor);
+    if (p_resize_image)
+        tmp.scale(1 / p_downscale_factor);
     if (p_fit_to_pw2) {
         tmp.scale_x(1 / p_scale_factor_x);
         tmp.scale_y(1 / p_scale_factor_y);
@@ -316,7 +317,6 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2f &new_location) con
         }
     }
 #else
-    // FIXME: Iterate correctly in big batch mode - perhaps have only one element in the list
     for (uint j = 0; j < p_scales.size(); ++j) {
         if (d.threadctxs[0].max[j].response > max) {
             max = d.threadctxs[0].max[j].response;
@@ -370,7 +370,6 @@ void KCF_Tracker::track(cv::Mat &img)
         it.async_res.wait();
 
 #else  // !ASYNC
-    // FIXME: Iterate correctly in big batch mode - perhaps have only one element in the list
     NORMAL_OMP_PARALLEL_FOR
     for (uint i = 0; i < d.threadctxs.size(); ++i)
         d.threadctxs[i].track(*this, input_rgb, input_gray);
