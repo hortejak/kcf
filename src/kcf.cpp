@@ -151,20 +151,20 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
             std::cerr << "Error: Fit size is not multiple of HOG cell size (" << p_cell_size << ")" << std::endl;
             std::exit(EXIT_FAILURE);
         }
-        p_scale_factor_x = (double)fit_size_x / round(p_pose.w * (1. + p_padding));
-        p_scale_factor_y = (double)fit_size_y / round(p_pose.h * (1. + p_padding));
-        std::cout << "resizing image horizontaly by factor of " << p_scale_factor_x << " and verticaly by factor of "
-                  << p_scale_factor_y << std::endl;
+        p_fit_factor_x = (double)fit_size_x / round(p_pose.w * (1. + p_padding));
+        p_fit_factor_y = (double)fit_size_y / round(p_pose.h * (1. + p_padding));
+        std::cout << "resizing image horizontaly by factor of " << p_fit_factor_x << " and verticaly by factor of "
+                  << p_fit_factor_y << std::endl;
         p_fit_to_pw2 = true;
-        p_pose.scale_x(p_scale_factor_x);
-        p_pose.scale_y(p_scale_factor_y);
-        if (fabs(p_scale_factor_x - 1) > p_floating_error || fabs(p_scale_factor_y - 1) > p_floating_error) {
-            if (p_scale_factor_x < 1 && p_scale_factor_y < 1) {
-                cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
-                cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
+        p_pose.scale_x(p_fit_factor_x);
+        p_pose.scale_y(p_fit_factor_y);
+        if (fabs(p_fit_factor_x - 1) > p_floating_error || fabs(p_fit_factor_y - 1) > p_floating_error) {
+            if (p_fit_factor_x < 1 && p_fit_factor_y < 1) {
+                cv::resize(input_gray, input_gray, cv::Size(0, 0), p_fit_factor_x, p_fit_factor_y, cv::INTER_AREA);
+                cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_fit_factor_x, p_fit_factor_y, cv::INTER_AREA);
             } else {
-                cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
-                cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
+                cv::resize(input_gray, input_gray, cv::Size(0, 0), p_fit_factor_x, p_fit_factor_y, cv::INTER_LINEAR);
+                cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_fit_factor_x, p_fit_factor_y, cv::INTER_LINEAR);
             }
         }
     }
@@ -258,8 +258,8 @@ void KCF_Tracker::updateTrackerPosition(BBox_c &bbox)
         p_pose.cy = tmp.cy;
     } else if (p_fit_to_pw2) {
         BBox_c tmp = bbox;
-        tmp.scale_x(p_scale_factor_x);
-        tmp.scale_y(p_scale_factor_y);
+        tmp.scale_x(p_fit_factor_x);
+        tmp.scale_y(p_fit_factor_y);
         p_pose.cx = tmp.cx;
         p_pose.cy = tmp.cy;
     } else {
@@ -277,8 +277,8 @@ BBox_c KCF_Tracker::getBBox()
     if (p_resize_image)
         tmp.scale(1 / p_downscale_factor);
     if (p_fit_to_pw2) {
-        tmp.scale_x(1 / p_scale_factor_x);
-        tmp.scale_y(1 / p_scale_factor_y);
+        tmp.scale_x(1 / p_fit_factor_x);
+        tmp.scale_y(1 / p_fit_factor_y);
     }
 
     return tmp;
@@ -294,14 +294,14 @@ void KCF_Tracker::resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray)
     if (p_resize_image) {
         cv::resize(input_gray, input_gray, cv::Size(0, 0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
         cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
-    } else if (p_fit_to_pw2 && fabs(p_scale_factor_x - 1) > p_floating_error &&
-               fabs(p_scale_factor_y - 1) > p_floating_error) {
-        if (p_scale_factor_x < 1 && p_scale_factor_y < 1) {
-            cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
-            cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_AREA);
+    } else if (p_fit_to_pw2 && fabs(p_fit_factor_x - 1) > p_floating_error &&
+               fabs(p_fit_factor_y - 1) > p_floating_error) {
+        if (p_fit_factor_x < 1 && p_fit_factor_y < 1) {
+            cv::resize(input_gray, input_gray, cv::Size(0, 0), p_fit_factor_x, p_fit_factor_y, cv::INTER_AREA);
+            cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_fit_factor_x, p_fit_factor_y, cv::INTER_AREA);
         } else {
-            cv::resize(input_gray, input_gray, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
-            cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_scale_factor_x, p_scale_factor_y, cv::INTER_LINEAR);
+            cv::resize(input_gray, input_gray, cv::Size(0, 0), p_fit_factor_x, p_fit_factor_y, cv::INTER_LINEAR);
+            cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_fit_factor_x, p_fit_factor_y, cv::INTER_LINEAR);
         }
     }
 }
@@ -382,8 +382,8 @@ void KCF_Tracker::track(cv::Mat &img)
     p_pose.cx += p_current_scale * p_cell_size * double(new_location.x);
     p_pose.cy += p_current_scale * p_cell_size * double(new_location.y);
     if (p_fit_to_pw2) {
-        clamp2(p_pose.cx, 0.0, (img.cols * p_scale_factor_x) - 1);
-        clamp2(p_pose.cy, 0.0, (img.rows * p_scale_factor_y) - 1);
+        clamp2(p_pose.cx, 0.0, (img.cols * p_fit_factor_x) - 1);
+        clamp2(p_pose.cy, 0.0, (img.rows * p_fit_factor_y) - 1);
     } else {
         clamp2(p_pose.cx, 0.0, img.cols - 1.0);
         clamp2(p_pose.cy, 0.0, img.rows - 1.0);

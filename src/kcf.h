@@ -98,8 +98,8 @@ private:
     bool p_fit_to_pw2 = false;
 
     const double p_downscale_factor = 0.5;
-    double p_scale_factor_x = 1;
-    double p_scale_factor_y = 1;
+    double p_fit_factor_x = 1;
+    double p_fit_factor_y = 1;
     const double p_floating_error = 0.0001;
 
     const double p_padding = 1.5;
