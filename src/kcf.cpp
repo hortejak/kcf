@@ -63,7 +63,7 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
     MatScaleFeats patch_feats(1, p_num_of_feats, p_roi);
     DEBUG_PRINT(patch_feats);
     MatScaleFeats temp(1, p_num_of_feats, p_roi);
-    get_features(input_rgb, input_gray, p_pose.cx, p_pose.cy,
+    get_features(input_rgb, input_gray, p_current_center.x, p_current_center.y,
                  p_windows_size.width, p_windows_size.height,
                  p_current_scale).copyTo(patch_feats.scale(0));
     DEBUG_PRINT(patch_feats);
@@ -127,10 +127,10 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         }
     }
 
-    p_pose.w = x2 - x1;
-    p_pose.h = y2 - y1;
-    p_pose.cx = x1 + p_pose.w / 2.;
-    p_pose.cy = y1 + p_pose.h / 2.;
+    p_init_pose.w = x2 - x1;
+    p_init_pose.h = y2 - y1;
+    p_init_pose.cx = x1 + p_init_pose.w / 2.;
+    p_init_pose.cy = y1 + p_init_pose.h / 2.;
 
     cv::Mat input_gray, input_rgb = img.clone();
     if (img.channels() == 3) {
@@ -140,10 +140,10 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         img.convertTo(input_gray, CV_32FC1);
 
     // don't need too large image
-    if (p_pose.w * p_pose.h > 100. * 100. && (fit_size_x == -1 || fit_size_y == -1)) {
+    if (p_init_pose.w * p_init_pose.h > 100. * 100. && (fit_size_x == -1 || fit_size_y == -1)) {
         std::cout << "resizing image by factor of " << 1 / p_downscale_factor << std::endl;
         p_resize_image = true;
-        p_pose.scale(p_downscale_factor);
+        p_init_pose.scale(p_downscale_factor);
         cv::resize(input_gray, input_gray, cv::Size(0, 0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
         cv::resize(input_rgb, input_rgb, cv::Size(0, 0), p_downscale_factor, p_downscale_factor, cv::INTER_AREA);
     } else if (!(fit_size_x == -1 && fit_size_y == -1)) {
@@ -151,13 +151,13 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
             std::cerr << "Error: Fit size is not multiple of HOG cell size (" << p_cell_size << ")" << std::endl;
             std::exit(EXIT_FAILURE);
         }
-        p_fit_factor_x = (double)fit_size_x / round(p_pose.w * (1. + p_padding));
-        p_fit_factor_y = (double)fit_size_y / round(p_pose.h * (1. + p_padding));
+        p_fit_factor_x = (double)fit_size_x / round(p_init_pose.w * (1. + p_padding));
+        p_fit_factor_y = (double)fit_size_y / round(p_init_pose.h * (1. + p_padding));
         std::cout << "resizing image horizontaly by factor of " << p_fit_factor_x << " and verticaly by factor of "
                   << p_fit_factor_y << std::endl;
         p_fit_to_pw2 = true;
-        p_pose.scale_x(p_fit_factor_x);
-        p_pose.scale_y(p_fit_factor_y);
+        p_init_pose.scale_x(p_fit_factor_x);
+        p_init_pose.scale_y(p_fit_factor_y);
         if (fabs(p_fit_factor_x - 1) > p_floating_error || fabs(p_fit_factor_y - 1) > p_floating_error) {
             if (p_fit_factor_x < 1 && p_fit_factor_y < 1) {
                 cv::resize(input_gray, input_gray, cv::Size(0, 0), p_fit_factor_x, p_fit_factor_y, cv::INTER_AREA);
@@ -169,9 +169,10 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         }
     }
 
+
     // compute win size + fit to fhog cell size
-    p_windows_size.width = round(p_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
-    p_windows_size.height = round(p_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size;
+    p_windows_size.width = round(p_init_pose.w * (1. + p_padding) / p_cell_size) * p_cell_size;
+    p_windows_size.height = round(p_init_pose.h * (1. + p_padding) / p_cell_size) * p_cell_size;
     p_roi.width = p_windows_size.width / p_cell_size;
     p_roi.height = p_windows_size.height / p_cell_size;
 
@@ -215,6 +216,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 
     gaussian_correlation.reset(new GaussianCorrelation(1, p_roi));
 
+    p_current_center = p_init_pose.center();
     p_current_scale = 1.;
 
     double min_size_ratio = std::max(5. * p_cell_size / p_windows_size.width, 5. * p_cell_size / p_windows_size.height);
@@ -229,7 +231,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     std::cout << "init: FFT size " << p_roi.width << "x" << p_roi.height << std::endl;
     std::cout << "init: min max scales factors: " << p_min_max_scale[0] << " " << p_min_max_scale[1] << std::endl;
 
-    p_output_sigma = std::sqrt(p_pose.w * p_pose.h) * p_output_sigma_factor / p_cell_size;
+    p_output_sigma = std::sqrt(p_init_pose.w * p_init_pose.h) * p_output_sigma_factor / p_cell_size;
 
     fft.init(p_roi.width, p_roi.height, p_num_of_feats, p_num_scales);
     fft.set_window(MatDynMem(cosine_window_function(p_roi.width, p_roi.height)));
@@ -251,28 +253,23 @@ void KCF_Tracker::setTrackerPose(BBox_c &bbox, cv::Mat &img, int fit_size_x, int
 
 void KCF_Tracker::updateTrackerPosition(BBox_c &bbox)
 {
+    BBox_c tmp = bbox;
     if (p_resize_image) {
-        BBox_c tmp = bbox;
         tmp.scale(p_downscale_factor);
-        p_pose.cx = tmp.cx;
-        p_pose.cy = tmp.cy;
     } else if (p_fit_to_pw2) {
-        BBox_c tmp = bbox;
         tmp.scale_x(p_fit_factor_x);
         tmp.scale_y(p_fit_factor_y);
-        p_pose.cx = tmp.cx;
-        p_pose.cy = tmp.cy;
-    } else {
-        p_pose.cx = bbox.cx;
-        p_pose.cy = bbox.cy;
     }
+    p_current_center = tmp.center();
 }
 
 BBox_c KCF_Tracker::getBBox()
 {
-    BBox_c tmp = p_pose;
-    tmp.w *= p_current_scale;
-    tmp.h *= p_current_scale;
+    BBox_c tmp;
+    tmp.cx = p_current_center.x;
+    tmp.cy = p_current_center.y;
+    tmp.w = p_init_pose.w * p_current_scale;
+    tmp.h = p_init_pose.h * p_current_scale;
 
     if (p_resize_image)
         tmp.scale(1 / p_downscale_factor);
@@ -306,7 +303,7 @@ void KCF_Tracker::resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray)
     }
 }
 
-double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2f &new_location) const
+double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) const
 {
     double max = -1.;
 #ifndef BIG_BATCH
@@ -375,18 +372,18 @@ void KCF_Tracker::track(cv::Mat &img)
         d.threadctxs[i].track(*this, input_rgb, input_gray);
 #endif
 
-    cv::Point2f new_location;
+    cv::Point2d new_location;
     uint max_idx;
     max_response = findMaxReponse(max_idx, new_location);
 
-    p_pose.cx += p_current_scale * p_cell_size * double(new_location.x);
-    p_pose.cy += p_current_scale * p_cell_size * double(new_location.y);
+    p_current_center += p_current_scale * p_cell_size * new_location;
+
     if (p_fit_to_pw2) {
-        clamp2(p_pose.cx, 0.0, (img.cols * p_fit_factor_x) - 1);
-        clamp2(p_pose.cy, 0.0, (img.rows * p_fit_factor_y) - 1);
+        clamp2(p_current_center.x, 0.0, (img.cols * p_fit_factor_x) - 1);
+        clamp2(p_current_center.y, 0.0, (img.rows * p_fit_factor_y) - 1);
     } else {
-        clamp2(p_pose.cx, 0.0, img.cols - 1.0);
-        clamp2(p_pose.cy, 0.0, img.rows - 1.0);
+        clamp2(p_current_center.x, 0.0, img.cols - 1.0);
+        clamp2(p_current_center.y, 0.0, img.rows - 1.0);
     }
 
     // sub grid scale interpolation
@@ -409,7 +406,7 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
     BIG_BATCH_OMP_PARALLEL_FOR
     for (uint i = 0; i < IF_BIG_BATCH(kcf.p_num_scales, 1); ++i)
     {
-        kcf.get_features(input_rgb, input_gray, kcf.p_pose.cx, kcf.p_pose.cy,
+        kcf.get_features(input_rgb, input_gray, kcf.p_current_center.x, kcf.p_current_center.y,
                          kcf.p_windows_size.width, kcf.p_windows_size.height,
                          kcf.p_current_scale * IF_BIG_BATCH(kcf.p_scales[i], scale))
                 .copyTo(patch_feats.scale(i));

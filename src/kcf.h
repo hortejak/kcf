@@ -26,6 +26,8 @@ struct BBox_c
 {
     double cx, cy, w, h;
 
+    inline cv::Point2d center() const { return cv::Point2d(cx, cy); }
+
     inline void scale(double factor)
     {
         cx *= factor;
@@ -91,7 +93,14 @@ public:
 private:
     Fft &fft;
 
-    BBox_c p_pose;
+    // Initial pose of tracked object in internal image coordinates
+    // (scaled by p_downscale_factor if p_resize_image)
+    BBox_c p_init_pose;
+
+    // Information to calculate current pose of the tracked object
+    cv::Point2d p_current_center;
+    double p_current_scale = 1.;
+
     double max_response = -1.;
 
     bool p_resize_image = false;
@@ -112,7 +121,6 @@ private:
 
     const uint p_num_scales = m_use_scale ? 7 : 1;
     const double p_scale_step = 1.02;
-    double p_current_scale = 1.;
     double p_min_max_scale[2];
     std::vector<double> p_scales;
 
@@ -163,7 +171,7 @@ private:
     double sub_grid_scale(uint index);
     void resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray);
     void train(cv::Mat input_rgb, cv::Mat input_gray, double interp_factor);
-    double findMaxReponse(uint &max_idx, cv::Point2f &new_location) const;
+    double findMaxReponse(uint &max_idx, cv::Point2d &new_location) const;
 };
 
 #endif //KCF_HEADER_6565467831231
