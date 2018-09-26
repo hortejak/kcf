@@ -41,8 +41,8 @@ class Kcf_Tracker_Private {
 
 KCF_Tracker::KCF_Tracker(double padding, double kernel_sigma, double lambda, double interp_factor,
                          double output_sigma_factor, int cell_size)
-    : fft(*new FFT()), p_padding(padding), p_output_sigma_factor(output_sigma_factor), p_kernel_sigma(kernel_sigma),
-      p_lambda(lambda), p_interp_factor(interp_factor), p_cell_size(cell_size), d(*new Kcf_Tracker_Private)
+    : p_cell_size(cell_size), fft(*new FFT()), p_padding(padding), p_output_sigma_factor(output_sigma_factor), p_kernel_sigma(kernel_sigma),
+      p_lambda(lambda), p_interp_factor(interp_factor), d(*new Kcf_Tracker_Private)
 {
 }
 

@@ -64,6 +64,7 @@ public:
     const bool m_use_subgrid_scale {true};
     const bool m_use_cnfeat {true};
     const bool m_use_linearkernel {false};
+    const int p_cell_size = 4;            //4 for hog (= bin_size)
 
     /*
     padding             ... extra area surrounding the target           (1.5)
@@ -107,7 +108,6 @@ private:
     const double p_kernel_sigma = 0.5;    //def = 0.5
     const double p_lambda = 1e-4;         //regularization in learning step
     const double p_interp_factor = 0.02;  //def = 0.02, linear interpolation factor for adaptation
-    const int p_cell_size = 4;            //4 for hog (= bin_size)
     cv::Size p_windows_size;
 
     const uint p_num_scales = m_use_scale ? 7 : 1;

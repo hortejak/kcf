@@ -77,14 +77,23 @@ int main(int argc, char *argv[])
             visualize_delay = optarg ? atol(optarg) : 1;
             break;
         case 'f':
-            std::string sizes = optarg ? optarg : "128x128";
-            std::string delimiter = "x";
-            size_t pos = sizes.find(delimiter);
-            std::string first_argument = sizes.substr(0, pos);
-            sizes.erase(0, pos + delimiter.length());
-
-            fit_size_x = stol(first_argument);
-            fit_size_y = stol(sizes);
+            if (!optarg) {
+                fit_size_x = fit_size_y = 128;
+            } else {
+                char tail;
+                if (sscanf(optarg, "%d%c", &fit_size_x, &tail) == 1) {
+                    fit_size_y = fit_size_x;
+                } else if (sscanf(optarg, "%dx%d%c", &fit_size_x, &fit_size_y, &tail) != 2) {
+                    fprintf(stderr, "Cannot parse -f argument: %s\n", optarg);
+                    return 1;
+                }
+            }
+            int min_size = 2 * tracker.p_cell_size;
+            if (fit_size_x <  min_size || fit_size_x < min_size) {
+                fprintf(stderr, "Fit size %dx%d too small. Minimum is %dx%d.\n",
+                        fit_size_x, fit_size_y, min_size, min_size);
+                return 1;
+            }
             break;
         }
     }
