@@ -176,11 +176,8 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_roi.height = p_windows_size.height / p_cell_size;
 
     p_scales.clear();
-    if (m_use_scale)
-        for (int i = -int(p_num_scales) / 2; i <= int(p_num_scales) / 2; ++i)
-            p_scales.push_back(std::pow(p_scale_step, i));
-    else
-        p_scales.push_back(1.);
+    for (int i = -int(p_num_scales) / 2; i <= int(p_num_scales) / 2; ++i)
+        p_scales.push_back(std::pow(p_scale_step, i));
 
 #ifdef CUFFT
     if (p_roi.height * (p_roi.width / 2 + 1) > 1024) {
