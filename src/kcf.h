@@ -58,12 +58,12 @@ class KCF_Tracker
     friend ThreadCtx;
 public:
     bool m_debug     {false};
-    bool m_use_scale {true};
-    bool m_use_color {true};
-    bool m_use_subpixel_localization {true};
-    bool m_use_subgrid_scale {true};
-    bool m_use_cnfeat {true};
-    bool m_use_linearkernel {false};
+    const bool m_use_scale {true};
+    const bool m_use_color {true};
+    const bool m_use_subpixel_localization {true};
+    const bool m_use_subgrid_scale {true};
+    const bool m_use_cnfeat {true};
+    const bool m_use_linearkernel {false};
 
     /*
     padding             ... extra area surrounding the target           (1.5)
@@ -101,16 +101,16 @@ private:
     double p_scale_factor_y = 1;
     const double p_floating_error = 0.0001;
 
-    double p_padding = 1.5;
-    double p_output_sigma_factor = 0.1;
+    const double p_padding = 1.5;
+    const double p_output_sigma_factor = 0.1;
     double p_output_sigma;
-    double p_kernel_sigma = 0.5;    //def = 0.5
-    double p_lambda = 1e-4;         //regularization in learning step
-    double p_interp_factor = 0.02;  //def = 0.02, linear interpolation factor for adaptation
-    int p_cell_size = 4;            //4 for hog (= bin_size)
+    const double p_kernel_sigma = 0.5;    //def = 0.5
+    const double p_lambda = 1e-4;         //regularization in learning step
+    const double p_interp_factor = 0.02;  //def = 0.02, linear interpolation factor for adaptation
+    const int p_cell_size = 4;            //4 for hog (= bin_size)
     cv::Size p_windows_size;
-    uint p_num_scales {7};
-    double p_scale_step = 1.02;
+    const uint p_num_scales {7};
+    const double p_scale_step = 1.02;
     double p_current_scale = 1.;
     double p_min_max_scale[2];
     std::vector<double> p_scales;
