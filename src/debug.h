@@ -96,7 +96,7 @@ std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<T> &p)
     return os;
 }
 
-#if CV_VERSION_MAJOR < 3 || CV_VERSION_MINOR < 3
+#if CV_MAJOR_VERSION == 3 && CV_MINOR_VERSION < 3
 static inline std::ostream &operator<<(std::ostream &out, const cv::MatSize &msize)
 {
     int i, dims = msize.p[-1];

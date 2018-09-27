@@ -34,7 +34,7 @@ void clamp2(T& n, const T& lower, const T& upper)
     n = std::max(lower, std::min(n, upper));
 }
 
-#if CV_VERSION_EPOCH < 3
+#if CV_MAJOR_VERSION < 3
 template<typename _Tp> static inline
 cv::Size_<_Tp> operator / (const cv::Size_<_Tp>& a, _Tp b)
 {
