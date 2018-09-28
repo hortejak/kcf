@@ -314,35 +314,21 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
 #endif
 
     if (m_visual_debug) {
-        cv::Mat all_responses(cv::Size(p_num_angles * 100, p_num_scales * 100),
-                              d.threadctxs[max_idx].response.plane(0).type(), cv::Scalar::all(0));
+        int w = 100; //feature_size.width;
+        int h = 100; //feature_size.height;
+        cv::Mat all_responses(h * p_num_scales, w * p_num_angles,
+                              d.threadctxs[0].response.type(), cv::Scalar::all(0));
         for (size_t i = 0; i < p_num_scales; ++i) {
             for (size_t j = 0; j < p_num_angles; ++j) {
-                cv::Mat in_roi(all_responses, cv::Rect(j * 100, i * 100, 100, 100));
-                cv::Mat copy_response = d.threadctxs[p_num_angles * i + j].response.plane(0).clone();
-
-                copy_response = copy_response(cv::Rect(0, 0, copy_response.cols & -2, copy_response.rows & -2));
-
-                int cx = copy_response.cols / 2;
-                int cy = copy_response.rows / 2;
-                cv::Mat q0(copy_response, cv::Rect(0, 0, cx, cy));
-                cv::Mat q1(copy_response, cv::Rect(cx, 0, cx, cy));
-                cv::Mat q2(copy_response, cv::Rect(0, cy, cx, cy));
-                cv::Mat q3(copy_response, cv::Rect(cx, cy, cx, cy));
-                cv::Mat tmp;
-                q0.copyTo(tmp);
-                q3.copyTo(q0);
-                tmp.copyTo(q3);
-                q1.copyTo(tmp);
-                q2.copyTo(q1);
-                tmp.copyTo(q2);
-
-                copy_response.copyTo(in_roi);
+                cv::Mat tmp = d.threadctxs[IF_BIG_BATCH(0, p_num_angles * i + j)].response.plane(IF_BIG_BATCH(p_num_angles * i + j, 0));
+                tmp = circshift(tmp, -tmp.cols/2, -tmp.rows/2);
+                cv::resize(tmp, tmp, cv::Size(w, h));
+                cv::Mat resp_roi(all_responses, cv::Rect(j * w, i * h, w, h));
+                tmp.copyTo(resp_roi);
             }
         }
         cv::namedWindow("All responses", CV_WINDOW_AUTOSIZE);
         cv::imshow("All responses", all_responses);
-        cv::waitKey();
     }
 
     cv::Point2i &max_response_pt = IF_BIG_BATCH(d.threadctxs[0].max[max_idx].loc,        d.threadctxs[max_idx].max.loc);
@@ -560,7 +546,7 @@ cv::Mat KCF_Tracker::gaussian_shaped_labels(double sigma, int dim1, int dim2)
     return rot_labels;
 }
 
-cv::Mat KCF_Tracker::circshift(const cv::Mat &patch, int x_rot, int y_rot)
+cv::Mat KCF_Tracker::circshift(const cv::Mat &patch, int x_rot, int y_rot) const
 {
     cv::Mat rot_patch(patch.size(), CV_32FC1);
     cv::Mat tmp_x_rot(patch.size(), CV_32FC1);
