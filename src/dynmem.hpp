@@ -21,7 +21,7 @@ template <typename T> class DynMem_ {
 #endif
     size_t num_elem;
   public:
-    typedef T type;
+    typedef T value_type;
     DynMem_(size_t num_elem) : num_elem(num_elem)
     {
 #ifdef CUFFT
