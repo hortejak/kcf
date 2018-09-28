@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "threadctx.hpp"
 #include "debug.h"
+#include <limits>
 
 #ifdef FFTW
 #include "fft_fftw.h"
@@ -297,6 +298,8 @@ void KCF_Tracker::resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray)
 double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) const
 {
     double max = -1.;
+    max_idx = std::numeric_limits<uint>::max();
+
 #ifndef BIG_BATCH
     for (uint j = 0; j < d.threadctxs.size(); ++j) {
         if (d.threadctxs[j].max.response > max) {
@@ -312,6 +315,7 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
         }
     }
 #endif
+    assert(max_idx < IF_BIG_BATCH(p_scales.size(), d.threadctxs.size()));
 
     if (m_visual_debug) {
         int w = 100; //feature_size.width;
