@@ -202,14 +202,10 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     }
 #endif
 
-#if defined(CUFFT) || defined(FFTW)
-    uint width = feature_size.width / 2 + 1;
-#else
-    uint width = feature_size.width;
-#endif
-    p_model_xf.create(feature_size.height, width, p_num_of_feats);
-    p_yf.create(feature_size.height, width, 1);
-    p_xf.create(feature_size.height, width, p_num_of_feats);
+    cv::Size csz = Fft::freq_size(feature_size);
+    p_model_xf.create(csz.height, csz.width, p_num_of_feats);
+    p_yf.create(csz.height, csz.width, 1);
+    p_xf.create(csz.height, csz.width, p_num_of_feats);
 
 #ifndef BIG_BATCH
     for (auto scale: p_scales)
