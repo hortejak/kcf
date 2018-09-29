@@ -32,16 +32,7 @@ template <typename T> class ComplexMat_ {
         p_data = convert(mat);
     }
 
-    void create(uint _rows, uint _cols, uint _n_channels)
-    {
-        rows = _rows;
-        cols = _cols;
-        n_channels = _n_channels;
-        n_scales = 1;
-        p_data.resize(n_channels * cols * rows);
-    }
-
-    void create(uint _rows, uint _cols, uint _n_channels, uint _n_scales)
+    void create(uint _rows, uint _cols, uint _n_channels, uint _n_scales = 1)
     {
         rows = _rows;
         cols = _cols;
