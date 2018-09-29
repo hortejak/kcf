@@ -41,8 +41,8 @@ void Fft::forward(const MatScales &real_input, ComplexMat &complex_result)
     assert(real_input.size[1] == int(m_height));
     assert(real_input.size[2] == int(m_width));
 
-    assert(complex_result.cols = freq_size(cv::Size(m_width, m_height)).width);
-    assert(complex_result.rows = freq_size(cv::Size(m_width, m_height)).height);
+    assert(int(complex_result.cols) == freq_size(cv::Size(m_width, m_height)).width);
+    assert(int(complex_result.rows) == freq_size(cv::Size(m_width, m_height)).height);
     assert(complex_result.channels() == uint(real_input.size[0]));
 
     (void)real_input;
