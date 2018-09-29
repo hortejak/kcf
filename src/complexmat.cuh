@@ -15,7 +15,6 @@ class ComplexMat {
     uint rows;
     uint n_channels;
     uint n_scales = 1;
-    bool foreign_data = false;
 
     ComplexMat() : cols(0), rows(0), n_channels(0) {}
 
@@ -44,7 +43,7 @@ class ComplexMat {
 
     ~ComplexMat()
     {
-        if (p_data != nullptr && !foreign_data) {
+        if (p_data != nullptr) {
             CudaSafeCall(cudaFree(p_data));
             p_data = nullptr;
         }
