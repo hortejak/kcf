@@ -70,7 +70,6 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
     // obtain a sub-window for training
     // TODO: Move Mats outside from here
     MatScaleFeats patch_feats(1, p_num_of_feats, feature_size);
-    DEBUG_PRINT(patch_feats);
     MatScaleFeats temp(1, p_num_of_feats, feature_size);
     get_features(input_rgb, input_gray, p_current_center.x, p_current_center.y,
                  p_windows_size.width, p_windows_size.height,
