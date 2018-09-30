@@ -81,12 +81,10 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
     p_model_xf = p_model_xf * (1. - interp_factor) + p_xf * interp_factor;
     DEBUG_PRINTM(p_model_xf);
 
-    ComplexMat alphaf_num, alphaf_den;
-
     if (m_use_linearkernel) {
         ComplexMat xfconj = p_xf.conj();
-        alphaf_num = xfconj.mul(p_yf);
-        alphaf_den = (p_xf * xfconj);
+        p_model_alphaf_num = xfconj.mul(p_yf);
+        p_model_alphaf_den = (p_xf * xfconj);
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
         cv::Size sz(Fft::freq_size(feature_size));
