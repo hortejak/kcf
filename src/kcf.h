@@ -124,9 +124,9 @@ private:
         uint height, width, n_feats;
     public:
         ComplexMat yf {height, width, 1};
-        ComplexMat model_alphaf {height, width, n_feats};
-        ComplexMat model_alphaf_num {height, width, n_feats};
-        ComplexMat model_alphaf_den {height, width, n_feats};
+        ComplexMat model_alphaf {height, width, 1};
+        ComplexMat model_alphaf_num {height, width, 1};
+        ComplexMat model_alphaf_den {height, width, 1};
         ComplexMat model_xf {height, width, n_feats};
         ComplexMat xf {height, width, n_feats};
 
@@ -137,9 +137,9 @@ private:
 
     class GaussianCorrelation {
       public:
-        GaussianCorrelation(uint num_scales, cv::Size size)
+        GaussianCorrelation(uint num_scales, uint num_feats, cv::Size size)
             : xf_sqr_norm(num_scales)
-            , xyf(Fft::freq_size(size), 1, num_scales)
+            , xyf(Fft::freq_size(size), num_feats, num_scales)
             , ifft_res(num_scales, size)
             , k(num_scales, size)
         {}

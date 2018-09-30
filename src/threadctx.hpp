@@ -42,7 +42,7 @@ private:
     MatScaleFeats patch_feats{num_scales, num_features, roi};
     MatScaleFeats temp{num_scales, num_features, roi};
 
-    KCF_Tracker::GaussianCorrelation gaussian_correlation{num_scales, roi};
+    KCF_Tracker::GaussianCorrelation gaussian_correlation{num_scales, num_features, roi};
 
     MatScales ifft2_res{num_scales, roi};
 

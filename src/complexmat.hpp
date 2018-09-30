@@ -15,35 +15,24 @@ template <typename T> class ComplexMat_ {
     uint n_scales;
 
     ComplexMat_(uint _rows, uint _cols, uint _n_channels, uint _n_scales = 1)
-        : cols(_cols), rows(_rows), n_channels(_n_channels * _n_scales), n_scales(_n_scales)
-    {
-        p_data.resize(n_channels * cols * rows);
-    }
+        : cols(_cols), rows(_rows), n_channels(_n_channels * _n_scales), n_scales(_n_scales),
+          p_data(n_channels * cols * rows) {}
     ComplexMat_(cv::Size size, uint _n_channels, uint _n_scales = 1)
         : cols(size.width), rows(size.height), n_channels(_n_channels * _n_scales), n_scales(_n_scales)
-    {
-        p_data.resize(n_channels * cols * rows);
-    }
+        , p_data(n_channels * cols * rows) {}
 
     // assuming that mat has 2 channels (real, img)
     ComplexMat_(const cv::Mat &mat) : cols(uint(mat.cols)), rows(uint(mat.rows)), n_channels(1), n_scales(1)
+                                    , p_data(n_channels * cols * rows)
     {
-        p_data = convert(mat);
+        memcpy(p_data.hostMem(), mat.ptr<std::complex<T>>(), mat.total() * mat.elemSize());
     }
 
     static ComplexMat_ same_size(const ComplexMat_ &o)
     {
-        return ComplexMat_(o.cols, o.rows, o.n_channels / o.n_scales, o.n_scales);
+        return ComplexMat_(o.rows, o.cols, o.n_channels / o.n_scales, o.n_scales);
     }
 
-    void create(uint _rows, uint _cols, uint _n_channels, uint _n_scales = 1)
-    {
-        rows = _rows;
-        cols = _cols;
-        n_channels = _n_channels * _n_scales;
-        n_scales = _n_scales;
-        p_data.resize(n_channels * cols * rows);
-    }
     // cv::Mat API compatibility
     cv::Size size() const { return cv::Size(cols, rows); }
     uint channels() const { return n_channels; }
@@ -55,7 +44,7 @@ template <typename T> class ComplexMat_ {
         for (uint i = 0; i < rows; ++i) {
             const std::complex<T> *row = mat.ptr<std::complex<T>>(i);
             for (uint j = 0; j < cols; ++j)
-                p_data[idx * rows * cols + i * cols + j] = row[j];
+                p_data.hostMem()[idx * rows * cols + i * cols + j] = row[j];
         }
     }
 
@@ -80,8 +69,8 @@ template <typename T> class ComplexMat_ {
         for (uint scale = 0; scale < n_scales; ++scale) {
             T sum_sqr_norm = 0;
             for (int i = 0; i < n_channels_per_scale; ++i)
-                for (auto lhs = p_data.begin() + i * rows * cols + scale * scale_offset;
-                     lhs != p_data.begin() + (i + 1) * rows * cols + scale * scale_offset; ++lhs)
+                for (auto lhs = p_data.hostMem() + i * rows * cols + scale * scale_offset;
+                     lhs != p_data.hostMem() + (i + 1) * rows * cols + scale * scale_offset; ++lhs)
                     sum_sqr_norm += lhs->real() * lhs->real() + lhs->imag() * lhs->imag();
             result.hostMem()[scale] = sum_sqr_norm / static_cast<T>(cols * rows);
         }
@@ -100,7 +89,7 @@ template <typename T> class ComplexMat_ {
 
     ComplexMat_<T> sum_over_channels() const
     {
-        assert(p_data.size() == n_channels * rows * cols);
+        assert(p_data.num_elem == n_channels * rows * cols);
 
         uint n_channels_per_scale = n_channels / n_scales;
         uint scale_offset = n_channels_per_scale * rows * cols;
@@ -111,7 +100,7 @@ template <typename T> class ComplexMat_ {
                 std::complex<T> acc = 0;
                 for (uint ch = 0; ch < n_channels_per_scale; ++ch)
                     acc +=  p_data[scale * scale_offset + i + ch * rows * cols];
-                result.p_data[scale * rows * cols + i] = acc;
+                result.p_data.hostMem()[scale * rows * cols + i] = acc;
             }
         }
         return result;
@@ -135,8 +124,8 @@ template <typename T> class ComplexMat_ {
         return result;
     }
 
-    std::complex<T> *get_p_data() { return p_data.data(); }
-    const std::complex<T> *get_p_data() const { return p_data.data(); }
+    std::complex<T> *get_p_data() { return p_data.hostMem(); }
+    const std::complex<T> *get_p_data() const { return p_data.hostMem(); }
 
     // element-wise per channel multiplication, division and addition
     ComplexMat_<T> operator*(const ComplexMat_<T> &rhs) const
@@ -190,7 +179,7 @@ template <typename T> class ComplexMat_ {
     }
 
   private:
-    std::vector<std::complex<T>> p_data;
+    DynMem_<std::complex<T>> p_data;
 
     // convert 2 channel mat (real, imag) to vector row-by-row
     std::vector<std::complex<T>> convert(const cv::Mat &mat)
@@ -213,8 +202,8 @@ template <typename T> class ComplexMat_ {
 
         ComplexMat_<T> result = *this;
         for (uint s = 0; s < n_scales; ++s) {
-            auto lhs = result.p_data.begin() + (s * n_channels/n_scales * rows * cols);
-            auto rhs = mat_rhs.p_data.begin();
+            auto lhs = result.p_data.hostMem() + (s * n_channels/n_scales * rows * cols);
+            auto rhs = mat_rhs.p_data.hostMem();
             for (uint i = 0; i < n_channels/n_scales * rows * cols; ++i)
                 op(*(lhs + i), *(rhs + i));
         }
@@ -228,9 +217,9 @@ template <typename T> class ComplexMat_ {
 
         ComplexMat_<T> result = *this;
         for (uint i = 0; i < n_channels; ++i) {
-            auto lhs = result.p_data.begin() + i * rows * cols;
-            auto rhs = mat_rhs.p_data.begin();
-            for (; lhs != result.p_data.begin() + (i + 1) * rows * cols; ++lhs, ++rhs)
+            auto lhs = result.p_data.hostMem() + i * rows * cols;
+            auto rhs = mat_rhs.p_data.hostMem();
+            for (; lhs != result.p_data.hostMem() + (i + 1) * rows * cols; ++lhs, ++rhs)
                 op(*lhs, *rhs);
         }
 
@@ -259,8 +248,8 @@ template <typename T> class ComplexMat_ {
     {
         ComplexMat_<T> result = *this;
         for (uint i = 0; i < n_channels; ++i)
-            for (auto lhs = result.p_data.begin() + i * rows * cols;
-                 lhs != result.p_data.begin() + (i + 1) * rows * cols; ++lhs)
+            for (auto lhs = result.p_data.hostMem() + i * rows * cols;
+                 lhs != result.p_data.hostMem() + (i + 1) * rows * cols; ++lhs)
                 op(*lhs);
         return result;
     }

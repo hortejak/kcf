@@ -208,7 +208,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     d.threadctxs.emplace_back(feature_size, p_num_of_feats, p_num_scales);
 #endif
 
-    gaussian_correlation.reset(new GaussianCorrelation(1, feature_size));
+    gaussian_correlation.reset(new GaussianCorrelation(1, p_num_of_feats, feature_size));
 
     p_current_center = p_init_pose.center();
     p_current_scale = 1.;

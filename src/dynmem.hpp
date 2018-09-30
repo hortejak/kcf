@@ -32,6 +32,10 @@ template <typename T> class DynMem_ {
         ptr_h = new T[num_elem];
 #endif
     }
+    DynMem_(const DynMem_ &other) : DynMem_(other.num_elem)
+    {
+        memcpy(ptr_h, other.ptr_h, num_elem * sizeof(T));
+    }
     DynMem_(DynMem_ &&other) : num_elem(other.num_elem)
     {
         ptr_h = other.ptr_h;
@@ -50,6 +54,7 @@ template <typename T> class DynMem_ {
 #endif
     }
     T *hostMem() { return ptr_h; }
+    const T *hostMem() const { return ptr_h; }
 #ifdef CUFFT
     T *deviceMem() { return ptr_d; }
 #endif
