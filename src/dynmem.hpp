@@ -19,9 +19,10 @@ template <typename T> class DynMem_ {
 #ifdef CUFFT
     T *ptr_d = nullptr;
 #endif
-    size_t num_elem;
   public:
     typedef T value_type;
+    const size_t num_elem;
+
     DynMem_(size_t num_elem) : num_elem(num_elem)
     {
 #ifdef CUFFT
@@ -31,7 +32,8 @@ template <typename T> class DynMem_ {
         ptr_h = new T[num_elem];
 #endif
     }
-    DynMem_(DynMem_&& other) {
+    DynMem_(DynMem_ &&other) : num_elem(other.num_elem)
+    {
         ptr_h = other.ptr_h;
         other.ptr_h = nullptr;
 #ifdef CUFFT
@@ -52,10 +54,12 @@ template <typename T> class DynMem_ {
     T *deviceMem() { return ptr_d; }
 #endif
     void operator=(DynMem_ &rhs) {
+        assert(num_elem == rhs.num_elem);
         memcpy(ptr_h, rhs.ptr_h, num_elem * sizeof(T));
     }
     void operator=(DynMem_ &&rhs)
     {
+        assert(num_elem == rhs.num_elem);
         ptr_h = rhs.ptr_h;
         rhs.ptr_h = nullptr;
 #ifdef CUFFT
