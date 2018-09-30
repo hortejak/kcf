@@ -14,6 +14,7 @@ for i in "$@"; do
 
     result=$(grep 'Average accuracy:' $i || :)
     if [[ "$result" =~ Average\ accuracy:\ ([0-9.]+) ]]; then
+	result+=" >= ${expected_accuracy[$seq]}"
 	if [[ $(echo "${BASH_REMATCH[1]} >= ${expected_accuracy[$seq]:-0}"|bc) -eq 1 ]]; then
 	    status=ok
 	else
@@ -22,5 +23,5 @@ for i in "$@"; do
     else
 	status=FAILED
     fi
-    echo ! "$seq;$flags;$build;$result >= ${expected_accuracy[$seq]};$status"
+    echo ! "$seq;$flags;$build;$result;$status"
 done | sort | column -t -s";"
