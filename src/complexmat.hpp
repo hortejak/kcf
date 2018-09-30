@@ -14,7 +14,6 @@ template <typename T> class ComplexMat_ {
     uint n_channels;
     uint n_scales;
 
-    ComplexMat_() : cols(0), rows(0), n_channels(0), n_scales(0) {}
     ComplexMat_(uint _rows, uint _cols, uint _n_channels, uint _n_scales = 1)
         : cols(_cols), rows(_rows), n_channels(_n_channels * _n_scales), n_scales(_n_scales)
     {
@@ -30,6 +29,11 @@ template <typename T> class ComplexMat_ {
     ComplexMat_(const cv::Mat &mat) : cols(uint(mat.cols)), rows(uint(mat.rows)), n_channels(1), n_scales(1)
     {
         p_data = convert(mat);
+    }
+
+    static ComplexMat_ same_size(const ComplexMat_ &o)
+    {
+        return ComplexMat_(o.cols, o.rows, o.n_channels / o.n_scales, o.n_scales);
     }
 
     void create(uint _rows, uint _cols, uint _n_channels, uint _n_scales = 1)

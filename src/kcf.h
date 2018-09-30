@@ -120,13 +120,20 @@ private:
 
     Kcf_Tracker_Private &d;
 
-    //model
-    ComplexMat p_yf;
-    ComplexMat p_model_alphaf;
-    ComplexMat p_model_alphaf_num;
-    ComplexMat p_model_alphaf_den;
-    ComplexMat p_model_xf;
-    ComplexMat p_xf;
+    class Model {
+        uint height, width, n_feats;
+    public:
+        ComplexMat yf {height, width, 1};
+        ComplexMat model_alphaf {height, width, n_feats};
+        ComplexMat model_alphaf_num {height, width, n_feats};
+        ComplexMat model_alphaf_den {height, width, n_feats};
+        ComplexMat model_xf {height, width, n_feats};
+        ComplexMat xf {height, width, n_feats};
+
+        Model(cv::Size freq_size, uint _n_feats) : height(freq_size.height), width(freq_size.width), n_feats(_n_feats) {}
+    };
+
+    std::unique_ptr<Model> model;
 
     class GaussianCorrelation {
       public:
@@ -145,6 +152,7 @@ private:
         MatScales ifft_res;
         MatScales k;
     };
+
 
     //helping functions
     void scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray);

@@ -76,26 +76,26 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
                  p_windows_size.width, p_windows_size.height,
                  p_current_scale).copyTo(patch_feats.scale(0));
     DEBUG_PRINT(patch_feats);
-    fft.forward_window(patch_feats, p_xf, temp);
-    DEBUG_PRINTM(p_xf);
-    p_model_xf = p_model_xf * (1. - interp_factor) + p_xf * interp_factor;
-    DEBUG_PRINTM(p_model_xf);
+    fft.forward_window(patch_feats, model->xf, temp);
+    DEBUG_PRINTM(model->xf);
+    model->model_xf = model->model_xf * (1. - interp_factor) + model->xf * interp_factor;
+    DEBUG_PRINTM(model->model_xf);
 
     if (m_use_linearkernel) {
-        ComplexMat xfconj = p_xf.conj();
-        p_model_alphaf_num = xfconj.mul(p_yf);
-        p_model_alphaf_den = (p_xf * xfconj);
+        ComplexMat xfconj = model->xf.conj();
+        model->model_alphaf_num = xfconj.mul(model->yf);
+        model->model_alphaf_den = (model->xf * xfconj);
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
         cv::Size sz(Fft::freq_size(feature_size));
         ComplexMat kf(sz.height, sz.width, 1);
-        (*gaussian_correlation)(kf, p_model_xf, p_model_xf, p_kernel_sigma, true, *this);
+        (*gaussian_correlation)(kf, model->model_xf, model->model_xf, p_kernel_sigma, true, *this);
         DEBUG_PRINTM(kf);
-        p_model_alphaf_num = p_yf * kf;
-        p_model_alphaf_den = kf * (kf + p_lambda);
+        model->model_alphaf_num = model->yf * kf;
+        model->model_alphaf_den = kf * (kf + p_lambda);
     }
-    p_model_alphaf = p_model_alphaf_num / p_model_alphaf_den;
-    DEBUG_PRINTM(p_model_alphaf);
+    model->model_alphaf = model->model_alphaf_num / model->model_alphaf_den;
+    DEBUG_PRINTM(model->model_alphaf);
     //        p_model_alphaf = p_yf / (kf + p_lambda);   //equation for fast training
 }
 
@@ -200,10 +200,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     }
 #endif
 
-    cv::Size csz = Fft::freq_size(feature_size);
-    p_model_xf.create(csz.height, csz.width, p_num_of_feats);
-    p_yf.create(csz.height, csz.width, 1);
-    p_xf.create(csz.height, csz.width, p_num_of_feats);
+    model.reset(new Model(Fft::freq_size(feature_size), p_num_of_feats));
 
 #ifndef BIG_BATCH
     for (auto scale: p_scales)
@@ -241,8 +238,8 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     // window weights, i.e. labels
     MatScales gsl(1, feature_size);
     gaussian_shaped_labels(p_output_sigma, feature_size.width, feature_size.height).copyTo(gsl.plane(0));
-    fft.forward(gsl, p_yf);
-    DEBUG_PRINTM(p_yf);
+    fft.forward(gsl, model->yf);
+    DEBUG_PRINTM(model->yf);
 
     // train initial model
     train(input_rgb, input_gray, 1.0);
@@ -423,11 +420,11 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
     DEBUG_PRINTM(zf);
 
     if (kcf.m_use_linearkernel) {
-        kzf = zf.mul(kcf.p_model_alphaf).sum_over_channels();
+        kzf = zf.mul(kcf.model->model_alphaf).sum_over_channels();
     } else {
-        gaussian_correlation(kzf, zf, kcf.p_model_xf, kcf.p_kernel_sigma, false, kcf);
+        gaussian_correlation(kzf, zf, kcf.model->model_xf, kcf.p_kernel_sigma, false, kcf);
         DEBUG_PRINTM(kzf);
-        kzf = kzf.mul(kcf.p_model_alphaf);
+        kzf = kzf.mul(kcf.model->model_alphaf);
     }
     kcf.fft.inverse(kzf, response);
 
