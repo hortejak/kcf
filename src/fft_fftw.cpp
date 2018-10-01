@@ -134,13 +134,13 @@ void Fftw::inverse(ComplexMat &complex_input, MatScales &real_result)
 
 Fftw::~Fftw()
 {
-    fftwf_destroy_plan(plan_f);
-    fftwf_destroy_plan(plan_fw);
-    fftwf_destroy_plan(plan_i_1ch);
+    if (plan_f) fftwf_destroy_plan(plan_f);
+    if (plan_fw) fftwf_destroy_plan(plan_fw);
+    if (plan_i_1ch) fftwf_destroy_plan(plan_i_1ch);
 
 #ifdef BIG_BATCH
-    fftwf_destroy_plan(plan_f_all_scales);
-    fftwf_destroy_plan(plan_fw_all_scales);
-    fftwf_destroy_plan(plan_i_all_scales);
+    if (plan_f_all_scales) fftwf_destroy_plan(plan_f_all_scales);
+    if (plan_fw_all_scales) fftwf_destroy_plan(plan_fw_all_scales);
+    if (plan_i_all_scales) fftwf_destroy_plan(plan_i_all_scales);
 #endif
 }
