@@ -47,11 +47,7 @@ template <typename T> class DynMem_ {
     }
     ~DynMem_()
     {
-#ifdef CUFFT
-        CudaSafeCall(cudaFreeHost(ptr_h));
-#else
-        delete[] ptr_h;
-#endif
+        release();
     }
     T *hostMem() { return ptr_h; }
     const T *hostMem() const { return ptr_h; }
@@ -65,6 +61,7 @@ template <typename T> class DynMem_ {
     void operator=(DynMem_ &&rhs)
     {
         assert(num_elem == rhs.num_elem);
+        release();
         ptr_h = rhs.ptr_h;
         rhs.ptr_h = nullptr;
 #ifdef CUFFT
@@ -73,6 +70,15 @@ template <typename T> class DynMem_ {
 #endif
     }
     T operator[](uint i) const { return ptr_h[i]; }
+private:
+    void release()
+    {
+#ifdef CUFFT
+        CudaSafeCall(cudaFreeHost(ptr_h));
+#else
+        delete[] ptr_h;
+#endif
+    }
 };
 
 typedef DynMem_<float> DynMem;
