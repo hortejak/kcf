@@ -7,8 +7,10 @@
 #include <functional>
 #include "dynmem.hpp"
 
-template <typename T> class ComplexMat_ {
+class ComplexMat_ {
   public:
+    typedef float T;
+
     uint cols;
     uint rows;
     uint n_channels;
@@ -40,7 +42,7 @@ template <typename T> class ComplexMat_ {
     // assuming that mat has 2 channels (real, imag)
     void set_channel(uint idx, const cv::Mat &mat)
     {
-        assert(idx >= 0 && idx < n_channels);
+        assert(idx < n_channels);
         for (uint i = 0; i < rows; ++i) {
             const std::complex<T> *row = mat.ptr<std::complex<T>>(i);
             for (uint j = 0; j < cols; ++j)
@@ -77,24 +79,24 @@ template <typename T> class ComplexMat_ {
         return;
     }
 
-    ComplexMat_<T> sqr_mag() const
+    ComplexMat_ sqr_mag() const
     {
         return mat_const_operator([](std::complex<T> &c) { c = c.real() * c.real() + c.imag() * c.imag(); });
     }
 
-    ComplexMat_<T> conj() const
+    ComplexMat_ conj() const
     {
         return mat_const_operator([](std::complex<T> &c) { c = std::complex<T>(c.real(), -c.imag()); });
     }
 
-    ComplexMat_<T> sum_over_channels() const
+    ComplexMat_ sum_over_channels() const
     {
         assert(p_data.num_elem == n_channels * rows * cols);
 
         uint n_channels_per_scale = n_channels / n_scales;
         uint scale_offset = n_channels_per_scale * rows * cols;
 
-        ComplexMat_<T> result(this->rows, this->cols, 1, n_scales);
+        ComplexMat_ result(this->rows, this->cols, 1, n_scales);
         for (uint scale = 0; scale < n_scales; ++scale) {
             for (uint i = 0; i < rows * cols; ++i) {
                 std::complex<T> acc = 0;
@@ -109,7 +111,7 @@ template <typename T> class ComplexMat_ {
     // return 2 channels (real, imag) for first complex channel
     cv::Mat to_cv_mat() const
     {
-        assert(p_data.size() >= 1);
+        assert(p_data.num_elem >= 1);
         return channel_to_cv_mat(0);
     }
     // return a vector of 2 channels (real, imag) per one complex channel
@@ -128,43 +130,43 @@ template <typename T> class ComplexMat_ {
     const std::complex<T> *get_p_data() const { return p_data.hostMem(); }
 
     // element-wise per channel multiplication, division and addition
-    ComplexMat_<T> operator*(const ComplexMat_<T> &rhs) const
+    ComplexMat_ operator*(const ComplexMat_ &rhs) const
     {
         return mat_mat_operator([](std::complex<T> &c_lhs, const std::complex<T> &c_rhs) { c_lhs *= c_rhs; }, rhs);
     }
-    ComplexMat_<T> operator/(const ComplexMat_<T> &rhs) const
+    ComplexMat_ operator/(const ComplexMat_ &rhs) const
     {
         return mat_mat_operator([](std::complex<T> &c_lhs, const std::complex<T> &c_rhs) { c_lhs /= c_rhs; }, rhs);
     }
-    ComplexMat_<T> operator+(const ComplexMat_<T> &rhs) const
+    ComplexMat_ operator+(const ComplexMat_ &rhs) const
     {
         return mat_mat_operator([](std::complex<T> &c_lhs, const std::complex<T> &c_rhs) { c_lhs += c_rhs; }, rhs);
     }
 
     // multiplying or adding constant
-    ComplexMat_<T> operator*(const T &rhs) const
+    ComplexMat_ operator*(const T &rhs) const
     {
         return mat_const_operator([&rhs](std::complex<T> &c) { c *= rhs; });
     }
-    ComplexMat_<T> operator+(const T &rhs) const
+    ComplexMat_ operator+(const T &rhs) const
     {
         return mat_const_operator([&rhs](std::complex<T> &c) { c += rhs; });
     }
 
     // multiplying element-wise multichannel by one channel mats (rhs mat is with one channel)
-    ComplexMat_<T> mul(const ComplexMat_<T> &rhs) const
+    ComplexMat_ mul(const ComplexMat_ &rhs) const
     {
         return matn_mat1_operator([](std::complex<T> &c_lhs, const std::complex<T> &c_rhs) { c_lhs *= c_rhs; }, rhs);
     }
 
     // multiplying element-wise multichannel mats - same as operator*(ComplexMat), but without allocating memory for the result
-    ComplexMat_<T> muln(const ComplexMat_<T> &rhs) const
+    ComplexMat_ muln(const ComplexMat_ &rhs) const
     {
         return mat_mat_operator([](std::complex<T> &c_lhs, const std::complex<T> &c_rhs) { c_lhs *= c_rhs; }, rhs);
     }
 
     // text output
-    friend std::ostream &operator<<(std::ostream &os, const ComplexMat_<T> &mat)
+    friend std::ostream &operator<<(std::ostream &os, const ComplexMat_ &mat)
     {
         // for (int i = 0; i < mat.n_channels; ++i){
         for (int i = 0; i < 1; ++i) {
@@ -195,12 +197,12 @@ template <typename T> class ComplexMat_ {
         return result;
     }
 
-    ComplexMat_<T> mat_mat_operator(void (*op)(std::complex<T> &c_lhs, const std::complex<T> &c_rhs),
-                                    const ComplexMat_<T> &mat_rhs) const
+    ComplexMat_ mat_mat_operator(void (*op)(std::complex<T> &c_lhs, const std::complex<T> &c_rhs),
+                                    const ComplexMat_ &mat_rhs) const
     {
         assert(mat_rhs.n_channels == n_channels/n_scales && mat_rhs.cols == cols && mat_rhs.rows == rows);
 
-        ComplexMat_<T> result = *this;
+        ComplexMat_ result = *this;
         for (uint s = 0; s < n_scales; ++s) {
             auto lhs = result.p_data.hostMem() + (s * n_channels/n_scales * rows * cols);
             auto rhs = mat_rhs.p_data.hostMem();
@@ -210,12 +212,12 @@ template <typename T> class ComplexMat_ {
 
         return result;
     }
-    ComplexMat_<T> matn_mat1_operator(void (*op)(std::complex<T> &c_lhs, const std::complex<T> &c_rhs),
-                                      const ComplexMat_<T> &mat_rhs) const
+    ComplexMat_ matn_mat1_operator(void (*op)(std::complex<T> &c_lhs, const std::complex<T> &c_rhs),
+                                      const ComplexMat_ &mat_rhs) const
     {
         assert(mat_rhs.n_channels == 1 && mat_rhs.cols == cols && mat_rhs.rows == rows);
 
-        ComplexMat_<T> result = *this;
+        ComplexMat_ result = *this;
         for (uint i = 0; i < n_channels; ++i) {
             auto lhs = result.p_data.hostMem() + i * rows * cols;
             auto rhs = mat_rhs.p_data.hostMem();
@@ -225,14 +227,14 @@ template <typename T> class ComplexMat_ {
 
         return result;
     }
-    ComplexMat_<T> matn_mat2_operator(void (*op)(std::complex<T> &c_lhs, const std::complex<T> &c_rhs),
-                                      const ComplexMat_<T> &mat_rhs) const
+    ComplexMat_ matn_mat2_operator(void (*op)(std::complex<T> &c_lhs, const std::complex<T> &c_rhs),
+                                      const ComplexMat_ &mat_rhs) const
     {
         assert(mat_rhs.n_channels == n_channels / n_scales && mat_rhs.cols == cols && mat_rhs.rows == rows);
 
         int n_channels_per_scale = n_channels / n_scales;
         int scale_offset = n_channels_per_scale * rows * cols;
-        ComplexMat_<T> result = *this;
+        ComplexMat_ result = *this;
         for (uint i = 0; i < n_scales; ++i) {
             for (int j = 0; j < n_channels_per_scale; ++j) {
                 auto lhs = result.p_data.hostMem() + (j * rows * cols) + (i * scale_offset);
@@ -244,9 +246,9 @@ template <typename T> class ComplexMat_ {
 
         return result;
     }
-    ComplexMat_<T> mat_const_operator(const std::function<void(std::complex<T> &c_rhs)> &op) const
+    ComplexMat_ mat_const_operator(const std::function<void(std::complex<T> &c_rhs)> &op) const
     {
-        ComplexMat_<T> result = *this;
+        ComplexMat_ result = *this;
         for (uint i = 0; i < n_channels; ++i)
             for (auto lhs = result.p_data.hostMem() + i * rows * cols;
                  lhs != result.p_data.hostMem() + (i + 1) * rows * cols; ++lhs)
@@ -267,6 +269,6 @@ template <typename T> class ComplexMat_ {
     }
 };
 
-typedef ComplexMat_<float> ComplexMat;
+typedef ComplexMat_ ComplexMat;
 
 #endif // COMPLEX_MAT_HPP_213123048309482094
