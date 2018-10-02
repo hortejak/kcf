@@ -12,8 +12,8 @@ for i in "$@"; do
     flags=${BASH_REMATCH[3]}
     seq=${BASH_REMATCH[2]}
 
-    result=$(grep 'Average accuracy:' $i || :)
-    if [[ "$result" =~ Average\ accuracy:\ ([0-9.]+) ]]; then
+    result=$(grep 'Average accuracy:' $i | sed -e 's/Average/Avg./g' -e 's/processing //' || :)
+    if [[ "$result" =~ accuracy:\ ([0-9.]+) ]]; then
 	result+=" >= ${expected_accuracy[$seq]}"
 	if [[ $(echo "${BASH_REMATCH[1]} >= ${expected_accuracy[$seq]:-0}"|bc) -eq 1 ]]; then
 	    status=ok
@@ -24,4 +24,4 @@ for i in "$@"; do
 	status=FAILED
     fi
     echo ! "$seq;$flags;$build;$result;$status"
-done | sort | column -t -s";"
+done | sort -t";" $SORT_FLAGS | column -t -s";"

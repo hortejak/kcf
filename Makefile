@@ -117,7 +117,7 @@ rule TEST_SEQ
   command = build-$$build/kcf_vot $$flags $$seq $(if $(TRAVIS),2>&1) >$$out $(if $(TRAVIS),| grep -v libdc1394); true
 rule PRINT_RESULTS
   description = Print results
-  command = ./wvtool -w131 -v run ./print-test-results $$in
+  command = ./wvtool -w120 -v run ./print-test-results $$in
 rule PLOT_RESULTS
   description = Plot results
   command = ./graphGen.sh -f -s $$in
