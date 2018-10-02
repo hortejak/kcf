@@ -693,7 +693,7 @@ void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat &result, const Comp
     DEBUG_PRINTM(xyf_sum);
     kcf.fft.inverse(xyf_sum, ifft_res);
     DEBUG_PRINTM(ifft_res);
-#ifdef CUFFT
+#if 0 && defined(CUFFT)
     // FIXME
     cuda_gaussian_correlation(ifft_res.deviceMem(), k.deviceMem(), xf_sqr_norm.deviceMem(),
                               auto_correlation ? xf_sqr_norm.deviceMem() : yf_sqr_norm.deviceMem(), sigma,
