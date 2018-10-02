@@ -83,10 +83,38 @@ ComplexMat ComplexMat::conj() const
     return result;
 }
 
+__global__ static void sum_channels(float *dest, const float *src, uint channels, uint num_channel_elem)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (idx >= num_channel_elem)
+        return;
+
+    float acc = 0;
+    for (uint i = 0; i < channels; ++i)
+        acc += src[idx + i * num_channel_elem];
+    dest[idx] = acc;
+}
+
 ComplexMat ComplexMat::sum_over_channels() const
 {
-    //     assert(p_data.size() > 1);
-    ComplexMat result(this->rows, this->cols, 1);
+    assert(p_data.num_elem == n_channels * rows * cols);
+
+    uint n_channels_per_scale = n_channels / n_scales;
+    uint scale_offset = n_channels_per_scale * rows * cols;
+
+    ComplexMat_ result(this->rows, this->cols, 1, n_scales);
+
+    const uint total = rows * cols * 2;
+    const dim3 threads(256);
+    const dim3 blocks((total + threads.x - 1) / threads.x);
+
+    for (uint scale = 0; scale < n_scales; ++scale) {
+        sum_channels<<<blocks, threads>>>(reinterpret_cast<float*>(result.p_data.deviceMem() + scale * scale_offset),
+                                          reinterpret_cast<const float*>(p_data.deviceMem() + scale * scale_offset),
+                                          n_channels_per_scale, total);
+    }
+    CudaSafeCall(cudaStreamSynchronize(cudaStreamPerThread));
     return result;
 }
 
