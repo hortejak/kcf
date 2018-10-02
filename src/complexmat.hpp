@@ -55,7 +55,7 @@ template <typename T> class ComplexMat_ {
         int n_channels_per_scale = n_channels / n_scales;
         T sum_sqr_norm = 0;
         for (int i = 0; i < n_channels_per_scale; ++i) {
-            for (auto lhs = p_data.begin() + i * rows * cols; lhs != p_data.begin() + (i + 1) * rows * cols; ++lhs)
+            for (auto lhs = p_data.hostMem() + i * rows * cols; lhs != p_data.hostMem() + (i + 1) * rows * cols; ++lhs)
                 sum_sqr_norm += lhs->real() * lhs->real() + lhs->imag() * lhs->imag();
         }
         sum_sqr_norm = sum_sqr_norm / static_cast<T>(cols * rows);
@@ -235,9 +235,9 @@ template <typename T> class ComplexMat_ {
         ComplexMat_<T> result = *this;
         for (uint i = 0; i < n_scales; ++i) {
             for (int j = 0; j < n_channels_per_scale; ++j) {
-                auto lhs = result.p_data.begin() + (j * rows * cols) + (i * scale_offset);
-                auto rhs = mat_rhs.p_data.begin() + (j * rows * cols);
-                for (; lhs != result.p_data.begin() + ((j + 1) * rows * cols) + (i * scale_offset); ++lhs, ++rhs)
+                auto lhs = result.p_data.hostMem() + (j * rows * cols) + (i * scale_offset);
+                auto rhs = mat_rhs.p_data.hostMem() + (j * rows * cols);
+                for (; lhs != result.p_data.hostMem() + ((j + 1) * rows * cols) + (i * scale_offset); ++lhs, ++rhs)
                     op(*lhs, *rhs);
             }
         }
