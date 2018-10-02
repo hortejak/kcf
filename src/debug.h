@@ -7,10 +7,10 @@
 #include <stdio.h>
 #include <opencv2/opencv.hpp>
 #include "dynmem.hpp"
-#ifdef CUFFT
-#include "complexmat.cuh"
-#else
 #include "complexmat.hpp"
+
+#ifdef CUFFT
+#include <cufft.h>
 #endif
 
 

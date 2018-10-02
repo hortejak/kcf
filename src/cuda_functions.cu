@@ -1,4 +1,4 @@
-#include "cuda_functions.cuh"
+#include "cuda_functions.h"
 
 __global__ void gaussian_correlation_kernel(float *data_in, float *data_out, float *xf_sqr_norm, float *yf_sqr_norm,
                                             int rows, int cols, int channels_per_scale, double sigma)

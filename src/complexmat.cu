@@ -1,6 +1,6 @@
-#include "complexmat.cuh"
+#include "complexmat.hpp"
 
-__global__ void sqr_norm_kernel(int n, float *out, float *data, float rows, float cols)
+__global__ void sqr_norm_kernel(int n, float *out, const float *data, float rows, float cols)
 {
     extern __shared__ float sdata[];
     int i = blockDim.x * threadIdx.y + threadIdx.x;
@@ -35,13 +35,13 @@ void ComplexMat::sqr_norm(DynMem &result) const
     dim3 numBlocks(n_channels / n_scales, n_scales);
 
     sqr_norm_kernel<<<numBlocks, threadsPerBlock, rows * cols * sizeof(float)>>>(
-        n_channels / n_scales, result.deviceMem(), this->p_data, rows, cols);
+        n_channels / n_scales, result.deviceMem(), (float*)this->p_data.deviceMem(), rows, cols);
     CudaCheckError();
 
     return;
 }
 
-__global__ void sqr_mag_kernel(float *data, float *result)
+__global__ void sqr_mag_kernel(const float *data, float *result)
 {
     int blockId = blockIdx.x + blockIdx.y * gridDim.x;
     int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
@@ -56,13 +56,13 @@ ComplexMat ComplexMat::sqr_mag() const
 
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels / n_scales, n_scales);
-    sqr_mag_kernel<<<numBlocks, threadsPerBlock, 0>>>(this->p_data, result.p_data);
+    sqr_mag_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(), (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
 }
 
-__global__ void conj_kernel(float *data, float *result)
+__global__ void conj_kernel(const float *data, float *result)
 {
     int blockId = blockIdx.x + blockIdx.y * gridDim.x;
     int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
@@ -77,7 +77,7 @@ ComplexMat ComplexMat::conj() const
 
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels / n_scales, n_scales);
-    conj_kernel<<<numBlocks, threadsPerBlock, 0>>>(this->p_data, result.p_data);
+    conj_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(), (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
@@ -90,12 +90,7 @@ ComplexMat ComplexMat::sum_over_channels() const
     return result;
 }
 
-cufftComplex *ComplexMat::get_p_data() const
-{
-    return (cufftComplex *)p_data;
-}
-
-__global__ void same_num_channels_mul_kernel(float *data_l, float *data_r, float *result)
+__global__ void same_num_channels_mul_kernel(const float *data_l, const float *data_r, float *result)
 {
     int blockId = blockIdx.x + blockIdx.y * gridDim.x;
     int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
@@ -113,14 +108,15 @@ ComplexMat ComplexMat::operator*(const ComplexMat &rhs) const
 
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels / n_scales, n_scales);
-    same_num_channels_mul_kernel<<<numBlocks, threadsPerBlock, 0>>>(this->p_data, rhs.p_data,
-                                                                                  result.p_data);
+    same_num_channels_mul_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(),
+                                                                    (float*)rhs.p_data.deviceMem(),
+                                                                    (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
 }
 
-__global__ void same_num_channels_div_kernel(float *data_l, float *data_r, float *result)
+__global__ void same_num_channels_div_kernel(const float *data_l, const float *data_r, float *result)
 {
     int blockId = blockIdx.x + blockIdx.y * gridDim.x;
     int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
@@ -139,14 +135,15 @@ ComplexMat ComplexMat::operator/(const ComplexMat &rhs) const
 
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels / n_scales, n_scales);
-    same_num_channels_div_kernel<<<numBlocks, threadsPerBlock, 0>>>(this->p_data, rhs.p_data,
-                                                                                  result.p_data);
+    same_num_channels_div_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(),
+                                                                    (float*)rhs.p_data.deviceMem(),
+                                                                    (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
 }
 
-__global__ void same_num_channels_add_kernel(float *data_l, float *data_r, float *result)
+__global__ void same_num_channels_add_kernel(const float *data_l, const float *data_r, float *result)
 {
     int blockId = blockIdx.x + blockIdx.y * gridDim.x;
     int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
@@ -163,14 +160,15 @@ ComplexMat ComplexMat::operator+(const ComplexMat &rhs) const
 
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels / n_scales, n_scales);
-    same_num_channels_add_kernel<<<numBlocks, threadsPerBlock, 0>>>(this->p_data, rhs.p_data,
-                                                                                  result.p_data);
+    same_num_channels_add_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(),
+                                                                    (float*)rhs.p_data.deviceMem(),
+                                                                    (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
 }
 
-__global__ void constant_mul_kernel(float *data_l, float constant, float *result)
+__global__ void constant_mul_kernel(const float *data_l, float constant, float *result)
 {
     int blockId = blockIdx.x + blockIdx.y * gridDim.x;
     int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
@@ -185,13 +183,15 @@ ComplexMat ComplexMat::operator*(const float &rhs) const
 
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels / n_scales, n_scales);
-    constant_mul_kernel<<<numBlocks, threadsPerBlock, 0>>>(this->p_data, rhs, result.p_data);
+    constant_mul_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(),
+                                                           rhs,
+                                                           (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
 }
 
-__global__ void constant_add_kernel(float *data_l, float constant, float *result)
+__global__ void constant_add_kernel(const float *data_l, float constant, float *result)
 {
     int blockId = blockIdx.x + blockIdx.y * gridDim.x;
     int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
@@ -206,13 +206,15 @@ ComplexMat ComplexMat::operator+(const float &rhs) const
 
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels / n_scales, n_scales);
-    constant_add_kernel<<<numBlocks, threadsPerBlock, 0>>>(this->p_data, rhs, result.p_data);
+    constant_add_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(),
+                                                           rhs,
+                                                           (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
 }
 
-__global__ void one_channel_mul_kernel(float *data_l, float *data_r, float *result)
+__global__ void one_channel_mul_kernel(const float *data_l, const float *data_r, float *result)
 {
     int blockId = blockIdx.x + blockIdx.y * gridDim.x;
     int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
@@ -231,7 +233,9 @@ ComplexMat ComplexMat::mul(const ComplexMat &rhs) const
 
     dim3 threadsPerBlock(rows, cols);
     dim3 numBlocks(n_channels / n_scales, n_scales);
-    one_channel_mul_kernel<<<numBlocks, threadsPerBlock, 0>>>(this->p_data, rhs.p_data, result.p_data);
+    one_channel_mul_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(),
+                                                              (float*)rhs.p_data.deviceMem(),
+                                                              (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
@@ -248,38 +252,28 @@ __global__ void scales_channel_mul_kernel(float *data_l, float *data_r, float *r
 }
 
 // multiplying element-wise multichannel by one channel mats (rhs mat is with multiple channel)
-ComplexMat ComplexMat::mul2(const ComplexMat &rhs) const
-{
-    assert(rhs.n_channels == n_channels / n_scales && rhs.cols == cols && rhs.rows == rows);
+// ComplexMat ComplexMat::mul2(const ComplexMat &rhs) const
+// {
+//     assert(rhs.n_channels == n_channels / n_scales && rhs.cols == cols && rhs.rows == rows);
 
-    ComplexMat result(this->rows, this->cols, this->channels(), this->n_scales);
+//     ComplexMat result(this->rows, this->cols, this->channels(), this->n_scales);
 
-    dim3 threadsPerBlock(rows, cols);
-    dim3 numBlocks(n_channels / n_scales, n_scales);
-    scales_channel_mul_kernel<<<numBlocks, threadsPerBlock, 0>>>(this->p_data, rhs.p_data, result.p_data);
-    CudaCheckError();
+//     dim3 threadsPerBlock(rows, cols);
+//     dim3 numBlocks(n_channels / n_scales, n_scales);
+//     scales_channel_mul_kernel<<<numBlocks, threadsPerBlock, 0>>>(this->p_data, rhs.p_data, result.p_data);
+//     CudaCheckError();
 
-    return result;
-}
+//     return result;
+// }
 
-void ComplexMat::operator=(ComplexMat &rhs)
-{
-    cols = rhs.cols;
-    rows = rhs.rows;
-    n_channels = rhs.n_channels;
-    n_scales = rhs.n_scales;
+// void ComplexMat::operator=(ComplexMat &&rhs)
+// {
+//     cols = rhs.cols;
+//     rows = rhs.rows;
+//     n_channels = rhs.n_channels;
+//     n_scales = rhs.n_scales;
 
-    p_data = rhs.p_data;
-}
+//     p_data = rhs.p_data;
 
-void ComplexMat::operator=(ComplexMat &&rhs)
-{
-    cols = rhs.cols;
-    rows = rhs.rows;
-    n_channels = rhs.n_channels;
-    n_scales = rhs.n_scales;
-
-    p_data = rhs.p_data;
-
-    rhs.p_data = nullptr;
-}
+//     rhs.p_data = nullptr;
+// }

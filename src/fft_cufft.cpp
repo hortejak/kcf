@@ -64,10 +64,10 @@ void cuFFT::forward(const MatScales &real_input, ComplexMat &complex_result)
     auto in = static_cast<cufftReal *>(const_cast<MatScales&>(real_input).deviceMem());
 
     if (real_input.size[0] == 1)
-        cudaErrorCheck(cufftExecR2C(plan_f, in, complex_result.get_p_data()));
+        cudaErrorCheck(cufftExecR2C(plan_f, in, complex_result.get_dev_data()));
 #ifdef BIG_BATCH
     else
-        cudaErrorCheck(cufftExecR2C(plan_f_all_scales, in, complex_result.get_p_data()));
+        cudaErrorCheck(cufftExecR2C(plan_f_all_scales, in, complex_result.get_dev_data()));
 #endif
 }
 
@@ -87,10 +87,10 @@ void cuFFT::forward_window(MatScaleFeats &feat, ComplexMat &complex_result, MatS
     }
 
     if (n_scales == 1)
-        cudaErrorCheck(cufftExecR2C(plan_fw, temp_data, complex_result.get_p_data()));
+        cudaErrorCheck(cufftExecR2C(plan_fw, temp_data, complex_result.get_dev_data()));
 #ifdef BIG_BATCH
     else
-        cudaErrorCheck(cufftExecR2C(plan_fw_all_scales, temp_data, complex_result.get_p_data()));
+        cudaErrorCheck(cufftExecR2C(plan_fw_all_scales, temp_data, complex_result.get_dev_data()));
 #endif
 }
 

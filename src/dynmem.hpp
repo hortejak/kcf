@@ -53,6 +53,7 @@ template <typename T> class DynMem_ {
     const T *hostMem() const { return ptr_h; }
 #ifdef CUFFT
     T *deviceMem() { return ptr_d; }
+    const T *deviceMem() const { return ptr_d; }
 #endif
     void operator=(DynMem_ &rhs) {
         assert(num_elem == rhs.num_elem);

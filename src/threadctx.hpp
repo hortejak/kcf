@@ -4,12 +4,7 @@
 #include <future>
 #include "dynmem.hpp"
 #include "kcf.h"
-
-#ifdef CUFFT
-#include "complexmat.cuh"
-#else
 #include "complexmat.hpp"
-#endif
 
 class KCF_Tracker;
 
