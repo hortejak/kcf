@@ -74,8 +74,12 @@ class DbgTracer {
     void traceVal(const char *name, const T& obj, int line, bool always = false)
     {
         (void)line;
-        if (debug || always)
+        if (debug || always) {
+#ifdef CUFFT
+            CudaSafeCall(cudaStreamSynchronize(cudaStreamPerThread));
+#endif
             std::cerr << indent() << name /*<< " @" << line */ << " " << print(obj) << std::endl;
+        }
     }
 
     template <typename T> struct Printer {
