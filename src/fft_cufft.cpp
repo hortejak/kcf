@@ -92,6 +92,7 @@ void cuFFT::forward_window(MatScaleFeats &feat, ComplexMat &complex_result, MatS
     else
         cudaErrorCheck(cufftExecR2C(plan_fw_all_scales, temp_data, complex_result.get_dev_data()));
 #endif
+    CudaSafeCall(cudaStreamSynchronize(cudaStreamPerThread));
 }
 
 void cuFFT::inverse(ComplexMat &complex_input, MatScales &real_result)
@@ -110,6 +111,7 @@ void cuFFT::inverse(ComplexMat &complex_input, MatScales &real_result)
 #endif
     // TODO: Investigate whether this scalling is needed or not
     cudaErrorCheck(cublasSscal(cublas, real_result.total(), &alpha, out, 1));
+    CudaSafeCall(cudaStreamSynchronize(cudaStreamPerThread));
 }
 
 cuFFT::~cuFFT()
