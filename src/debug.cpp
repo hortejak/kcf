@@ -7,7 +7,7 @@ std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<cv::Mat> &p)
     os << std::setprecision(DbgTracer::precision);
     os << p.obj.size << " " << p.obj.channels() << "ch ";// << static_cast<const void *>(p.obj.data);
     os << " = [ ";
-    constexpr size_t num = 10;
+    const size_t num = 10; //p.obj.total();
     for (size_t i = 0; i < std::min(num, p.obj.total()); ++i)
         os << p.obj.ptr<float>()[i] << ", ";
     os << (num < p.obj.total() ? "... ]" : "]");
@@ -19,7 +19,7 @@ std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat> 
     IOSave s(os);
     os << std::setprecision(DbgTracer::precision);
     os << "<cplx> " << p.obj.size() << " " << p.obj.channels() << "ch "; // << p.obj.get_p_data();
-    constexpr int num = 10;
+    const int num = 10; //p.obj.rows * p.obj.cols * p.obj.n_channels / p.obj.n_scales;
     for (uint s = 0; s < p.obj.n_scales; ++s) {
         uint ofs = s * p.obj.rows * p.obj.cols * p.obj.n_channels / p.obj.n_scales;
         os << " = [ ";
