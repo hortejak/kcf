@@ -184,15 +184,6 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
         p_scales.push_back(std::pow(p_scale_step, i));
 
 #ifdef CUFFT
-    if (Fft::freq_size(feature_size).area() > 1024) {
-        std::cerr << "Window after forward FFT is too big for CUDA kernels. Plese use -f to set "
-                     "the window dimensions so its size is less or equal to "
-                  << 1024 * p_cell_size * p_cell_size * 2 + 1
-                  << " pixels. Currently the size of the window is: " << fit_size
-                  << " which is  " << fit_size.area() << " pixels. " << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-
     if (m_use_linearkernel) {
         std::cerr << "cuFFT supports only Gaussian kernel." << std::endl;
         std::exit(EXIT_FAILURE);

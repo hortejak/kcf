@@ -45,20 +45,21 @@ void ComplexMat_::sqr_norm(DynMem &result) const
 
 __global__ void sqr_mag_kernel(const float *data, float *result)
 {
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
-    int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
+    int idx = 2 * (blockIdx.x * blockDim.x + threadIdx.x);
 
-    result[threadId] = data[threadId] * data[threadId] + data[threadId + 1] * data[threadId + 1];
-    result[threadId + 1] = 0;
+    result[idx] = data[idx] * data[idx] + data[idx + 1] * data[idx + 1];
+    result[idx + 1] = 0;
 }
 
-ComplexMat ComplexMat::sqr_mag() const
+ComplexMat_ ComplexMat_::sqr_mag() const
 {
-    ComplexMat result(this->rows, this->cols, this->channels(), this->n_scales);
+    ComplexMat_ result = ComplexMat_::same_size(*this);
 
-    dim3 threadsPerBlock(rows, cols);
-    dim3 numBlocks(n_channels / n_scales, n_scales);
-    sqr_mag_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(), (float*)result.p_data.deviceMem());
+    const uint total = n_channels * rows * cols;
+    const dim3 threads(256);
+    const dim3 blocks((total + threads.x - 1) / threads.x);
+
+    sqr_mag_kernel<<<threads, blocks, 0>>>((float*)this->p_data.deviceMem(), (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
@@ -66,20 +67,21 @@ ComplexMat ComplexMat::sqr_mag() const
 
 __global__ void conj_kernel(const float *data, float *result)
 {
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
-    int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
+    int idx = 2 * (blockIdx.x * blockDim.x + threadIdx.x);
 
-    result[threadId] = data[threadId];
-    result[threadId + 1] = -data[threadId + 1];
+    result[idx] = data[idx];
+    result[idx + 1] = -data[idx + 1];
 }
 
-ComplexMat ComplexMat::conj() const
+ComplexMat_ ComplexMat_::conj() const
 {
-    ComplexMat result(this->rows, this->cols, this->channels(), this->n_scales);
+    ComplexMat_ result = ComplexMat_::same_size(*this);
 
-    dim3 threadsPerBlock(rows, cols);
-    dim3 numBlocks(n_channels / n_scales, n_scales);
-    conj_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(), (float*)result.p_data.deviceMem());
+    const uint total = n_channels * rows * cols;
+    const dim3 threads(256);
+    const dim3 blocks((total + threads.x - 1) / threads.x);
+
+    conj_kernel<<<threads, blocks, 0>>>((float*)this->p_data.deviceMem(), (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
@@ -98,7 +100,7 @@ __global__ static void sum_channels(float *dest, const float *src, uint channels
     dest[idx] = acc;
 }
 
-ComplexMat ComplexMat::sum_over_channels() const
+ComplexMat_ ComplexMat_::sum_over_channels() const
 {
     assert(p_data.num_elem == n_channels * rows * cols);
 
@@ -122,25 +124,26 @@ ComplexMat ComplexMat::sum_over_channels() const
 
 __global__ void same_num_channels_mul_kernel(const float *data_l, const float *data_r, float *result)
 {
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
-    int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
+    int idx = 2 * (blockIdx.x * blockDim.x + threadIdx.x);
 
-    result[threadId] = data_l[threadId] * data_r[threadId] - data_l[threadId + 1] * data_r[threadId + 1];
-    result[threadId + 1] = data_l[threadId] * data_r[threadId + 1] + data_l[threadId + 1] * data_r[threadId];
+    result[idx] = data_l[idx] * data_r[idx] - data_l[idx + 1] * data_r[idx + 1];
+    result[idx + 1] = data_l[idx] * data_r[idx + 1] + data_l[idx + 1] * data_r[idx];
 }
 
 // element-wise per channel multiplication, division and addition
-ComplexMat ComplexMat::operator*(const ComplexMat &rhs) const
+ComplexMat_ ComplexMat_::operator*(const ComplexMat_ &rhs) const
 {
     assert(rhs.n_channels == n_channels && rhs.cols == cols && rhs.rows == rows);
 
-    ComplexMat result(this->rows, this->cols, this->channels(), this->n_scales);
+    ComplexMat_ result = ComplexMat_::same_size(*this);
 
-    dim3 threadsPerBlock(rows, cols);
-    dim3 numBlocks(n_channels / n_scales, n_scales);
-    same_num_channels_mul_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(),
-                                                                    (float*)rhs.p_data.deviceMem(),
-                                                                    (float*)result.p_data.deviceMem());
+    const uint total = n_channels * rows * cols;
+    const dim3 threads(256);
+    const dim3 blocks((total + threads.x - 1) / threads.x);
+
+    same_num_channels_mul_kernel<<<blocks, threads, 0>>>((float*)this->p_data.deviceMem(),
+                                                         (float*)rhs.p_data.deviceMem(),
+                                                         (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
@@ -148,26 +151,27 @@ ComplexMat ComplexMat::operator*(const ComplexMat &rhs) const
 
 __global__ void same_num_channels_div_kernel(const float *data_l, const float *data_r, float *result)
 {
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
-    int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
+    int idx = 2 * (blockIdx.x * blockDim.x + threadIdx.x);
 
-    result[threadId] = (data_l[threadId] * data_r[threadId] + data_l[threadId + 1] * data_r[threadId + 1]) /
-                       (data_r[threadId] * data_r[threadId] + data_r[threadId + 1] * data_r[threadId + 1]);
-    result[threadId + 1] = (data_l[threadId + 1] * data_r[threadId] - data_l[threadId] * data_r[threadId + 1]) /
-                           (data_r[threadId] * data_r[threadId] + data_r[threadId + 1] * data_r[threadId + 1]);
+    result[idx] = (data_l[idx] * data_r[idx] + data_l[idx + 1] * data_r[idx + 1]) /
+                  (data_r[idx] * data_r[idx] + data_r[idx + 1] * data_r[idx + 1]);
+    result[idx + 1] = (data_l[idx + 1] * data_r[idx] - data_l[idx] * data_r[idx + 1]) /
+                      (data_r[idx] * data_r[idx] + data_r[idx + 1] * data_r[idx + 1]);
 }
 
-ComplexMat ComplexMat::operator/(const ComplexMat &rhs) const
+ComplexMat_ ComplexMat_::operator/(const ComplexMat_ &rhs) const
 {
     assert(rhs.n_channels == n_channels && rhs.cols == cols && rhs.rows == rows);
 
-    ComplexMat result(this->rows, this->cols, this->channels(), this->n_scales);
+    ComplexMat_ result = ComplexMat_::same_size(*this);
 
-    dim3 threadsPerBlock(rows, cols);
-    dim3 numBlocks(n_channels / n_scales, n_scales);
-    same_num_channels_div_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(),
-                                                                    (float*)rhs.p_data.deviceMem(),
-                                                                    (float*)result.p_data.deviceMem());
+    const uint total = n_channels * rows * cols;
+    const dim3 threads(256);
+    const dim3 blocks((total + threads.x - 1) / threads.x);
+
+    same_num_channels_div_kernel<<<threads, blocks, 0>>>((float*)this->p_data.deviceMem(),
+                                                         (float*)rhs.p_data.deviceMem(),
+                                                         (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
@@ -175,24 +179,25 @@ ComplexMat ComplexMat::operator/(const ComplexMat &rhs) const
 
 __global__ void same_num_channels_add_kernel(const float *data_l, const float *data_r, float *result)
 {
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
-    int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
+    int idx = 2 * (blockIdx.x * blockDim.x + threadIdx.x);
 
-    result[threadId] = data_l[threadId] + data_r[threadId];
-    result[threadId + 1] = data_l[threadId + 1] + data_r[threadId + 1];
+    result[idx] = data_l[idx] + data_r[idx];
+    result[idx + 1] = data_l[idx + 1] + data_r[idx + 1];
 }
 
-ComplexMat ComplexMat::operator+(const ComplexMat &rhs) const
+ComplexMat_ ComplexMat_::operator+(const ComplexMat_ &rhs) const
 {
     assert(rhs.n_channels == n_channels && rhs.cols == cols && rhs.rows == rows);
 
-    ComplexMat result(this->rows, this->cols, this->channels(), this->n_scales);
+    ComplexMat_ result = ComplexMat_::same_size(*this);
 
-    dim3 threadsPerBlock(rows, cols);
-    dim3 numBlocks(n_channels / n_scales, n_scales);
-    same_num_channels_add_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(),
-                                                                    (float*)rhs.p_data.deviceMem(),
-                                                                    (float*)result.p_data.deviceMem());
+    const uint total = n_channels * rows * cols;
+    const dim3 threads(256);
+    const dim3 blocks((total + threads.x - 1) / threads.x);
+
+    same_num_channels_add_kernel<<<threads, blocks, 0>>>((float*)this->p_data.deviceMem(),
+                                                         (float*)rhs.p_data.deviceMem(),
+                                                         (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
@@ -200,22 +205,23 @@ ComplexMat ComplexMat::operator+(const ComplexMat &rhs) const
 
 __global__ void constant_mul_kernel(const float *data_l, float constant, float *result)
 {
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
-    int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
+    int idx = 2 * (blockIdx.x * blockDim.x + threadIdx.x);
 
-    result[threadId] = data_l[threadId] * constant;
-    result[threadId + 1] = data_l[threadId + 1] * constant;
+    result[idx] = data_l[idx] * constant;
+    result[idx + 1] = data_l[idx + 1] * constant;
 }
 
-ComplexMat ComplexMat::operator*(const float &rhs) const
+ComplexMat_ ComplexMat_::operator*(const float &rhs) const
 {
-    ComplexMat result(this->rows, this->cols, this->channels(), this->n_scales);
+    ComplexMat_ result = ComplexMat_::same_size(*this);
 
-    dim3 threadsPerBlock(rows, cols);
-    dim3 numBlocks(n_channels / n_scales, n_scales);
-    constant_mul_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(),
-                                                           rhs,
-                                                           (float*)result.p_data.deviceMem());
+    const uint total = n_channels * rows * cols;
+    const dim3 threads(256);
+    const dim3 blocks((total + threads.x - 1) / threads.x);
+
+    constant_mul_kernel<<<threads, blocks, 0>>>((float*)this->p_data.deviceMem(),
+                                                rhs,
+                                                (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
@@ -223,80 +229,83 @@ ComplexMat ComplexMat::operator*(const float &rhs) const
 
 __global__ void constant_add_kernel(const float *data_l, float constant, float *result)
 {
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
-    int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
+    int idx = 2 * (blockIdx.x * blockDim.x + threadIdx.x);
 
-    result[threadId] = data_l[threadId] + constant;
-    result[threadId + 1] = data_l[threadId + 1];
+    result[idx] = data_l[idx] + constant;
+    result[idx + 1] = data_l[idx + 1];
 }
 
-ComplexMat ComplexMat::operator+(const float &rhs) const
+ComplexMat_ ComplexMat_::operator+(const float &rhs) const
 {
-    ComplexMat result(this->rows, this->cols, this->channels(), this->n_scales);
+    ComplexMat_ result = ComplexMat_::same_size(*this);
 
-    dim3 threadsPerBlock(rows, cols);
-    dim3 numBlocks(n_channels / n_scales, n_scales);
-    constant_add_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(),
-                                                           rhs,
-                                                           (float*)result.p_data.deviceMem());
+    const uint total = n_channels * rows * cols;
+    const dim3 threads(256);
+    const dim3 blocks((total + threads.x - 1) / threads.x);
+
+    constant_add_kernel<<<threads, blocks, 0>>>((float*)this->p_data.deviceMem(),
+                                                rhs,
+                                                (float*)result.p_data.deviceMem());
     CudaCheckError();
 
     return result;
 }
 
-__global__ void one_channel_mul_kernel(const float *data_l, const float *data_r, float *result)
+__global__ void one_channel_mul_kernel(const float *data_l, const float *data_r, float *result, int channel_total)
 {
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
-    int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
-    int one_ch_index = 2 * ((threadIdx.y * blockDim.x) + threadIdx.x);
+    int idx = 2 * (blockIdx.x * blockDim.x + threadIdx.x);
+    int one_ch_idx = idx  % (2 * channel_total);
 
-    result[threadId] = data_l[threadId] * data_r[one_ch_index] - data_l[threadId + 1] * data_r[one_ch_index + 1];
-    result[threadId + 1] = data_l[threadId] * data_r[one_ch_index + 1] + data_l[threadId + 1] * data_r[one_ch_index];
+    result[idx] = data_l[idx] * data_r[one_ch_idx] - data_l[idx + 1] * data_r[one_ch_idx + 1];
+    result[idx + 1] = data_l[idx] * data_r[one_ch_idx + 1] + data_l[idx + 1] * data_r[one_ch_idx];
 }
 
 // multiplying element-wise multichannel by one channel mats (rhs mat is with one channel)
-ComplexMat ComplexMat::mul(const ComplexMat &rhs) const
+ComplexMat_ ComplexMat_::mul(const ComplexMat_ &rhs) const
 {
     assert(rhs.n_channels == 1 && rhs.cols == cols && rhs.rows == rows);
 
-    ComplexMat result(this->rows, this->cols, this->channels(), this->n_scales);
+    ComplexMat_ result = ComplexMat_::same_size(*this);
 
-    dim3 threadsPerBlock(rows, cols);
-    dim3 numBlocks(n_channels / n_scales, n_scales);
-    one_channel_mul_kernel<<<numBlocks, threadsPerBlock, 0>>>((float*)this->p_data.deviceMem(),
-                                                              (float*)rhs.p_data.deviceMem(),
-                                                              (float*)result.p_data.deviceMem());
+    const uint total = n_channels * rows * cols;
+    const dim3 threads(256);
+    const dim3 blocks((total + threads.x - 1) / threads.x);
+
+    one_channel_mul_kernel<<<threads, blocks, 0>>>((float*)this->p_data.deviceMem(),
+                                                   (float*)rhs.p_data.deviceMem(),
+                                                   (float*)result.p_data.deviceMem(),
+                                                   rows * cols);
     CudaCheckError();
 
     return result;
 }
 
-__global__ void scales_channel_mul_kernel(float *data_l, float *data_r, float *result)
-{
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
-    int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
-    int one_ch_index = 2 * ((threadIdx.y * blockDim.x) + threadIdx.x + blockIdx.x * blockDim.x * blockDim.y);
+// __global__ void scales_channel_mul_kernel(float *data_l, float *data_r, float *result)
+// {
+//     int blockId = blockIdx.x + blockIdx.y * gridDim.x;
+//     int idx = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
+//     int one_ch_index = 2 * ((threadIdx.y * blockDim.x) + threadIdx.x + blockIdx.x * blockDim.x * blockDim.y);
 
-    result[threadId] = data_l[threadId] * data_r[one_ch_index] - data_l[threadId + 1] * data_r[one_ch_index + 1];
-    result[threadId + 1] = data_l[threadId] * data_r[one_ch_index + 1] + data_l[threadId + 1] * data_r[one_ch_index];
-}
+//     result[idx] = data_l[idx] * data_r[one_ch_index] - data_l[idx + 1] * data_r[one_ch_index + 1];
+//     result[idx + 1] = data_l[idx] * data_r[one_ch_index + 1] + data_l[idx + 1] * data_r[one_ch_index];
+// }
 
 // multiplying element-wise multichannel by one channel mats (rhs mat is with multiple channel)
-// ComplexMat ComplexMat::mul2(const ComplexMat &rhs) const
+// ComplexMat_ ComplexMat_::mul2(const ComplexMat_ &rhs) const
 // {
 //     assert(rhs.n_channels == n_channels / n_scales && rhs.cols == cols && rhs.rows == rows);
 
-//     ComplexMat result(this->rows, this->cols, this->channels(), this->n_scales);
+//     ComplexMat_ result(this->rows, this->cols, this->channels(), this->n_scales);
 
 //     dim3 threadsPerBlock(rows, cols);
 //     dim3 numBlocks(n_channels / n_scales, n_scales);
-//     scales_channel_mul_kernel<<<numBlocks, threadsPerBlock, 0>>>(this->p_data, rhs.p_data, result.p_data);
+//     scales_channel_mul_kernel<<<threads, blocks, 0>>>(this->p_data, rhs.p_data, result.p_data);
 //     CudaCheckError();
 
 //     return result;
 // }
 
-// void ComplexMat::operator=(ComplexMat &&rhs)
+// void ComplexMat_::operator=(ComplexMat_ &&rhs)
 // {
 //     cols = rhs.cols;
 //     rows = rhs.rows;
