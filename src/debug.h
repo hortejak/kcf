@@ -41,6 +41,7 @@ class DbgTracer {
 
   public:
     bool debug = false;
+    static constexpr int precision = 2;
 
     std::string indent() { return std::string(indentLvl * 4, ' '); }
 
@@ -78,6 +79,8 @@ class DbgTracer {
 #ifdef CUFFT
             CudaSafeCall(cudaStreamSynchronize(cudaStreamPerThread));
 #endif
+            IOSave s(std::cerr);
+            std::cerr << std::setprecision(precision);
             std::cerr << indent() << name /*<< " @" << line */ << " " << print(obj) << std::endl;
         }
     }

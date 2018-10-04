@@ -4,7 +4,7 @@
 std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<cv::Mat> &p)
 {
     IOSave s(os);
-    os << std::setprecision(3);
+    os << std::setprecision(DbgTracer::precision);
     os << p.obj.size << " " << p.obj.channels() << "ch ";// << static_cast<const void *>(p.obj.data);
     os << " = [ ";
     constexpr size_t num = 10;
@@ -17,7 +17,7 @@ std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<cv::Mat> &p)
 std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat> &p)
 {
     IOSave s(os);
-    os << std::setprecision(3);
+    os << std::setprecision(DbgTracer::precision);
     os << "<cplx> " << p.obj.size() << " " << p.obj.channels() << "ch "; // << p.obj.get_p_data();
     constexpr int num = 10;
     for (uint s = 0; s < p.obj.n_scales; ++s) {
