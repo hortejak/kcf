@@ -149,8 +149,15 @@ class ComplexMat_ {
         for (uint s = 0; s < n_scales; ++s) {
             auto lhs = result.p_data.hostMem() + (s * n_channels/n_scales * rows * cols);
             auto rhs = mat_rhs.p_data.hostMem();
-            for (uint i = 0; i < n_channels/n_scales * rows * cols; ++i)
-                op(*(lhs + i), *(rhs + i));
+            const size_t sz = n_channels/n_scales * rows * cols;
+
+            // TODO: For zero-copy, the data is already avaiable from e.g. mat_rhs.p_data.deviceMem()
+            #pragma omp target data map(fromto: lhs[0:sz]) map(to: rhs[0:sz])
+            {
+                #pragma omp target teams distribute parallel for schedule(static,1) num_teams(1) num_threads(1)
+                for (uint i = 0; i < sz; ++i)
+                    op(*(lhs + i), *(rhs + i));
+            }
         }
 
         return result;
