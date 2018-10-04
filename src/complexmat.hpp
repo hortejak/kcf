@@ -32,6 +32,7 @@ class ComplexMat_ {
     ComplexMat_(const cv::Mat &mat) : cols(uint(mat.cols)), rows(uint(mat.rows)), n_channels(1), n_scales(1)
                                     , p_data(n_channels * cols * rows)
     {
+        cudaSync();
         memcpy(p_data.hostMem(), mat.ptr<std::complex<T>>(), mat.total() * mat.elemSize());
     }
 
@@ -48,6 +49,7 @@ class ComplexMat_ {
     void set_channel(uint idx, const cv::Mat &mat)
     {
         assert(idx < n_channels);
+        cudaSync();
         for (uint i = 0; i < rows; ++i) {
             const std::complex<T> *row = mat.ptr<std::complex<T>>(i);
             for (uint j = 0; j < cols; ++j)
@@ -83,8 +85,14 @@ class ComplexMat_ {
         return result;
     }
 
-    std::complex<T> *get_p_data() { return p_data.hostMem(); }
-    const std::complex<T> *get_p_data() const { return p_data.hostMem(); }
+    std::complex<T> *get_p_data() {
+        cudaSync();
+        return p_data.hostMem();
+    }
+    const std::complex<T> *get_p_data() const {
+        cudaSync();
+        return p_data.hostMem();
+    }
 
 #ifdef CUFFT
     cufftComplex *get_dev_data() { return (cufftComplex*)p_data.deviceMem(); }
@@ -160,6 +168,12 @@ class ComplexMat_ {
         }
         return result;
     }
+
+#ifdef CUFFT
+    void cudaSync() const;
+#else
+    void cudaSync() const {}
+#endif
 };
 
 typedef ComplexMat_ ComplexMat;

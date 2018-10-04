@@ -35,7 +35,7 @@ void ComplexMat_::sqr_norm(DynMem &result) const
     sqr_norm_kernel<<<blocks, threads, threads.x * sizeof(float)>>>((const float*)p_data.deviceMem(),
                                                                     block_res.deviceMem(), total);
     CudaCheckError();
-    CudaSafeCall(cudaStreamSynchronize(cudaStreamPerThread));
+    cudaSync();
 
     T res = 0;
     for (int i = 0; i < blocks.x; i++)
@@ -339,3 +339,8 @@ ComplexMat_ ComplexMat_::mul(const ComplexMat_ &rhs) const
 
 //     rhs.p_data = nullptr;
 // }
+
+void ComplexMat_::cudaSync() const
+{
+    CudaSafeCall(cudaStreamSynchronize(cudaStreamPerThread));
+}
