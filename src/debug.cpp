@@ -32,7 +32,6 @@ std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat> 
             os << c << ", ";
         }
         os << (num < p.obj.size().area() ? "... ]" : "]");
-        os << std::endl << std::string(20, ' ');
     }
     return os;
 }
