@@ -680,11 +680,13 @@ void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat &result, const Comp
 {
     TRACE("");
     xf.sqr_norm(xf_sqr_norm);
+    DEBUG_PRINTM(xf_sqr_norm[0]);
     if (auto_correlation) {
         yf_sqr_norm = xf_sqr_norm;
     } else {
         yf.sqr_norm(yf_sqr_norm);
     }
+    DEBUG_PRINTM(yf_sqr_norm[0]);
     xyf = auto_correlation ? xf.sqr_mag() : xf * yf.conj(); // xf.muln(yf.conj());
     DEBUG_PRINTM(xyf);
 

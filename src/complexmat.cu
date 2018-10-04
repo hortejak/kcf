@@ -1,44 +1,46 @@
 #include "complexmat.hpp"
 
-__global__ void sqr_norm_kernel(int n, float *out, const float *data, float rows, float cols)
+
+__global__ void sqr_norm_kernel(const float *in, float *block_res, int total)
 {
     extern __shared__ float sdata[];
-    int i = blockDim.x * threadIdx.y + threadIdx.x;
-    int blockId = blockIdx.x + blockIdx.y * gridDim.x;
-    int threadId = 2 * (blockId * (blockDim.x * blockDim.y) + (threadIdx.y * blockDim.x) + threadIdx.x);
+    int in_idx = 2 * (blockIdx.x * blockDim.x + threadIdx.x);
+    int i = threadIdx.x;
 
-    sdata[i] = 0;
-    sdata[i] = data[threadId] * data[threadId] + data[threadId + 1] * data[threadId + 1];
-    __syncthreads();
+    if (in_idx >= total * 2)
+        sdata[i] = 0;
+    else
+        sdata[i] = in[in_idx] * in[in_idx] + in[in_idx + 1] * in[in_idx + 1];
 
-    for (unsigned int s = (blockDim.x * blockDim.y + 1) / 2, old_s = blockDim.x * blockDim.y; s > 0; s >>= 1) {
-
-        if (old_s & 1) s += 1;
-
-        if (i < s && i + s < old_s) {
-            sdata[i] += sdata[i + s];
-        }
-        old_s = s;
+    for (unsigned s = (blockDim.x + 1) / 2; s > 0; s >>= 1) {
         __syncthreads();
+        if (i < s)
+            sdata[i] += sdata[i + s];
     }
 
-    if (i == 0) {
-        atomicAdd(&out[blockId / n], sdata[0] / (rows * cols));
-    }
+    if (i == 0)
+        block_res[blockIdx.x] = sdata[0];
 }
 
-void ComplexMat::sqr_norm(DynMem &result) const
+void ComplexMat_::sqr_norm(DynMem &result) const
 {
-    CudaSafeCall(cudaMemsetAsync(result.deviceMem(), 0, n_scales * sizeof(float)));
+    assert(n_scales == 1);
 
-    dim3 threadsPerBlock(rows, cols);
-    dim3 numBlocks(n_channels / n_scales, n_scales);
+    const uint total = n_channels * rows * cols;
+    const dim3 threads(1024);
+    const dim3 blocks((total + threads.x - 1) / threads.x);
 
-    sqr_norm_kernel<<<numBlocks, threadsPerBlock, rows * cols * sizeof(float)>>>(
-        n_channels / n_scales, result.deviceMem(), (float*)this->p_data.deviceMem(), rows, cols);
+    DynMem block_res(blocks.x);
+
+    sqr_norm_kernel<<<blocks, threads, threads.x * sizeof(float)>>>((const float*)p_data.deviceMem(),
+                                                                    block_res.deviceMem(), total);
     CudaCheckError();
+    CudaSafeCall(cudaStreamSynchronize(cudaStreamPerThread));
 
-    return;
+    T res = 0;
+    for (int i = 0; i < blocks.x; i++)
+        res += block_res[i];
+    result.hostMem()[0] = res / static_cast<T>(cols * rows);
 }
 
 __global__ void sqr_mag_kernel(const float *data, float *result)
