@@ -23,14 +23,8 @@ std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat> 
     for (uint s = 0; s < p.obj.n_scales; ++s) {
         uint ofs = s * p.obj.rows * p.obj.cols * p.obj.n_channels / p.obj.n_scales;
         os << " = [ ";
-        for (int i = 0; i < std::min(num, p.obj.size().area()); ++i) {
-            std::complex<float> c = p.obj.get_p_data()[ofs + i];
-            if (fabs(c.real()) < 5e-7)
-                c = std::complex<float>(0, c.imag());
-            if (fabs(c.imag()) < 5e-7)
-                c = std::complex<float>(c.real(), 0);
-            os << c << ", ";
-        }
+        for (int i = 0; i < std::min(num, p.obj.size().area()); ++i)
+            os << p.obj.get_p_data()[ofs + i] << ", ";
         os << (num < p.obj.size().area() ? "... ]" : "]");
     }
     return os;
