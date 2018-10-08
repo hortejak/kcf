@@ -256,6 +256,7 @@ BBox_c KCF_Tracker::getBBox()
     tmp.cy = p_current_center.y;
     tmp.w = p_init_pose.w * p_current_scale;
     tmp.h = p_init_pose.h * p_current_scale;
+    tmp.a = 0;
 
     if (p_resize_image)
         tmp.scale(1 / p_downscale_factor);
