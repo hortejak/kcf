@@ -115,7 +115,6 @@ ComplexMat_ ComplexMat_::sum_over_channels() const
     assert(p_data.num_elem == n_channels * rows * cols);
 
     uint n_channels_per_scale = n_channels / n_scales;
-    uint scale_offset = n_channels_per_scale * rows * cols;
 
     ComplexMat_ result(this->rows, this->cols, 1, n_scales);
 
@@ -124,8 +123,8 @@ ComplexMat_ ComplexMat_::sum_over_channels() const
     const dim3 blocks((total + threads.x - 1) / threads.x);
 
     for (uint scale = 0; scale < n_scales; ++scale) {
-        sum_channels<<<blocks, threads>>>(reinterpret_cast<float*>(result.p_data.deviceMem() + scale * scale_offset),
-                                          reinterpret_cast<const float*>(p_data.deviceMem() + scale * scale_offset),
+        sum_channels<<<blocks, threads>>>(reinterpret_cast<float*>(result.p_data.deviceMem() + scale * rows * cols),
+                                          reinterpret_cast<const float*>(p_data.deviceMem() + scale * n_channels_per_scale * rows * cols),
                                           n_channels_per_scale, total);
     }
     CudaSafeCall(cudaStreamSynchronize(cudaStreamPerThread));

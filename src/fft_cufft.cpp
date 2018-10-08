@@ -100,13 +100,14 @@ void cuFFT::inverse(ComplexMat &complex_input, MatScales &real_result)
     Fft::inverse(complex_input, real_result);
 
     uint n_channels = complex_input.n_channels;
-    cufftComplex *in = reinterpret_cast<cufftComplex *>(complex_input.get_p_data());
+    cufftComplex *in = reinterpret_cast<cufftComplex *>(complex_input.get_dev_data());
     cufftReal *out = real_result.deviceMem();
     float alpha = 1.0 / (m_width * m_height);
 
     if (n_channels == 1)
         cudaErrorCheck(cufftExecC2R(plan_i_1ch, in, out));
 #ifdef BIG_BATCH
+    else
         cudaErrorCheck(cufftExecC2R(plan_i_all_scales, in, out));
 #endif
     // TODO: Investigate whether this scalling is needed or not
