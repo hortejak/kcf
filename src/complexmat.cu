@@ -24,23 +24,27 @@ __global__ void sqr_norm_kernel(const float *in, float *block_res, int total)
 
 void ComplexMat_::sqr_norm(DynMem &result) const
 {
-    assert(n_scales == 1);
+    assert(result.num_elem == n_scales);
 
-    const uint total = n_channels * rows * cols;
+    const uint total = n_channels / n_scales * rows * cols;
     const dim3 threads(1024);
     const dim3 blocks((total + threads.x - 1) / threads.x);
 
-    DynMem block_res(blocks.x);
+    DynMem block_res(blocks.x * n_scales);
 
-    sqr_norm_kernel<<<blocks, threads, threads.x * sizeof(float)>>>((const float*)p_data.deviceMem(),
-                                                                    block_res.deviceMem(), total);
-    CudaCheckError();
+    for (uint s = 0; s < n_scales; ++s) {
+        sqr_norm_kernel<<<blocks, threads, threads.x * sizeof(float)>>>((const float*)(p_data.deviceMem() + s * total),
+                                                                        block_res.deviceMem() + s * blocks.x, total);
+        CudaCheckError();
+    }
     cudaSync();
 
-    T res = 0;
-    for (int i = 0; i < blocks.x; i++)
-        res += block_res[i];
-    result.hostMem()[0] = res / static_cast<T>(cols * rows);
+    for (uint s = 0; s < n_scales; ++s) {
+        T res = 0;
+        for (int i = 0; i < blocks.x; i++)
+            res += block_res[s * blocks.x + i];
+        result.hostMem()[s] = res / static_cast<T>(cols * rows);
+    }
 }
 
 __global__ void sqr_mag_kernel(const float *data, float *result, int total)
@@ -141,19 +145,21 @@ __global__ void same_num_channels_mul_kernel(const float *data_l, const float *d
 // element-wise per channel multiplication, division and addition
 ComplexMat_ ComplexMat_::operator*(const ComplexMat_ &rhs) const
 {
-    assert(rhs.n_channels == n_channels && rhs.cols == cols && rhs.rows == rows);
+    assert(n_channels == n_scales * rhs.n_channels && rhs.cols == cols && rhs.rows == rows);
 
     ComplexMat_ result = ComplexMat_::same_size(*this);
 
-    const uint total = n_channels * rows * cols;
+    const uint total = n_channels / n_scales * rows * cols;
     const dim3 threads(256);
     const dim3 blocks((total + threads.x - 1) / threads.x);
 
-    same_num_channels_mul_kernel<<<blocks, threads, 0>>>((float*)this->p_data.deviceMem(),
-                                                         (float*)rhs.p_data.deviceMem(),
-                                                         (float*)result.p_data.deviceMem(),
-                                                         total);
-    CudaCheckError();
+    for (uint s = 0; s < n_scales; ++s) {
+        same_num_channels_mul_kernel<<<blocks, threads, 0>>>((float*)(this->p_data.deviceMem() + s * total),
+                                                             (float*)rhs.p_data.deviceMem(),
+                                                             (float*)(result.p_data.deviceMem() + s * total),
+                                                             total);
+        CudaCheckError();
+    }
 
     return result;
 }
