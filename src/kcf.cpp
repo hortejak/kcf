@@ -68,14 +68,11 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
     TRACE("");
 
     // obtain a sub-window for training
-    // TODO: Move Mats outside from here
-    MatScaleFeats patch_feats(1, p_num_of_feats, feature_size);
-    MatScaleFeats temp(1, p_num_of_feats, feature_size);
     get_features(input_rgb, input_gray, p_current_center.x, p_current_center.y,
                  p_windows_size.width, p_windows_size.height,
-                 p_current_scale).copyTo(patch_feats.scale(0));
-    DEBUG_PRINT(patch_feats);
-    fft.forward_window(patch_feats, model->xf, temp);
+                 p_current_scale).copyTo(model->patch_feats.scale(0));
+    DEBUG_PRINT(model->patch_feats);
+    fft.forward_window(model->patch_feats, model->xf, model->temp);
     DEBUG_PRINTM(model->xf);
     model->model_xf = model->model_xf * (1. - interp_factor) + model->xf * interp_factor;
     DEBUG_PRINTM(model->model_xf);
@@ -190,7 +187,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     }
 #endif
 
-    model.reset(new Model(Fft::freq_size(feature_size), p_num_of_feats));
+    model.reset(new Model(feature_size, p_num_of_feats));
 
 #ifndef BIG_BATCH
     for (auto scale: p_scales)

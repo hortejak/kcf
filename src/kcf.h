@@ -119,6 +119,7 @@ private:
     Kcf_Tracker_Private &d;
 
     class Model {
+        cv::Size feature_size;
         uint height, width, n_feats;
     public:
         ComplexMat yf {height, width, 1};
@@ -128,7 +129,17 @@ private:
         ComplexMat model_xf {height, width, n_feats};
         ComplexMat xf {height, width, n_feats};
 
-        Model(cv::Size freq_size, uint _n_feats) : height(freq_size.height), width(freq_size.width), n_feats(_n_feats) {}
+        // Temporary variables for trainig
+        MatScaleFeats patch_feats{1, n_feats, feature_size};
+        MatScaleFeats temp{1, n_feats, feature_size};
+
+
+
+        Model(cv::Size feature_size, uint _n_feats)
+            : feature_size(feature_size)
+            , height(Fft::freq_size(feature_size).height)
+            , width(Fft::freq_size(feature_size).width)
+            , n_feats(_n_feats) {}
     };
 
     std::unique_ptr<Model> model;
@@ -150,7 +161,6 @@ private:
         MatScales ifft_res;
         MatScales k;
     };
-
 
     //helping functions
     void scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray);
