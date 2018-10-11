@@ -91,6 +91,7 @@ IF(use_cuda)
   CUDA_SELECT_NVCC_ARCH_FLAGS(ARCH_FLAGS ${CUDA_ARCH_LIST})
   list( APPEND CUDA_NVCC_FLAGS -O3 -std=c++11 ${ARCH_FLAGS} --default-stream per-thread) # --gpu-architecture sm_62 )
   find_cuda_helper_libs(cufftw)
+  find_cuda_helper_libs(nvToolsExt)
 ENDIF()
 
 add_subdirectory(piotr_fhog)
@@ -124,7 +125,7 @@ IF(FFT STREQUAL "cuFFTW")
 ENDIF() #cuFFTW
 
 IF(FFT STREQUAL "cuFFT")
-    target_link_libraries(kcf ${CUDA_cufft_LIBRARY} ${CUDA_cublas_LIBRARY} ${CUDA_LIBRARIES})
+  target_link_libraries(kcf ${CUDA_cufft_LIBRARY} ${CUDA_cublas_LIBRARY} ${CUDA_LIBRARIES} ${CUDA_nvToolsExt_LIBRARY})
 ENDIF()
 
 IF(PROFILING)

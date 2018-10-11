@@ -11,6 +11,7 @@
 
 #ifdef CUFFT
 #include <cufft.h>
+#include "nvToolsExt.h"
 #endif
 
 
@@ -52,6 +53,9 @@ class DbgTracer {
       public:
         FTrace(DbgTracer &dt, const char *fn, const char *format, ...) : t(dt), funcName(fn)
         {
+#ifdef CUFFT
+            nvtxRangePushA(fn);
+#endif
             if (!t.debug) return;
             char *arg;
             va_list vl;
@@ -65,6 +69,9 @@ class DbgTracer {
         }
         ~FTrace()
         {
+#ifdef CUFFT
+            nvtxRangePop();
+#endif
             if (!t.debug) return;
             t.indentLvl--;
             std::cerr << t.indent() << "}" << std::endl;
