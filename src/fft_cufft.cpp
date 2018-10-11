@@ -4,6 +4,7 @@ cuFFT::cuFFT()
 {
     CudaSafeCall(cudaSetDeviceFlags(cudaDeviceMapHost));
     cudaErrorCheck(cublasCreate(&cublas));
+    cudaErrorCheck(cublasSetStream(cublas, cudaStreamPerThread));
 }
 
 cufftHandle cuFFT::create_plan_fwd(uint howmany) const
