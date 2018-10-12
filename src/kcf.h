@@ -168,7 +168,7 @@ private:
     std::unique_ptr<GaussianCorrelation> gaussian_correlation;
     cv::Mat circshift(const cv::Mat &patch, int x_rot, int y_rot) const;
     cv::Mat cosine_window_function(int dim1, int dim2);
-    cv::Mat get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, int cy, int size_x, int size_y, double scale) const;
+    cv::Mat get_features(cv::Mat &input_rgb, cv::Mat &input_gray, cv::Mat *dbg_patch, int cx, int cy, int size_x, int size_y, double scale) const;
     cv::Point2f sub_pixel_peak(cv::Point &max_loc, cv::Mat &response) const;
     double sub_grid_scale(uint index);
     void resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray);

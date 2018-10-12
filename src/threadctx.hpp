@@ -49,6 +49,8 @@ public:
     std::future<void> async_res;
 #endif
 
+    std::vector<cv::Mat> dbg_patch{num_scales}; // images for visual debugging
+
     MatScales response{num_scales, roi};
 
     struct Max {
