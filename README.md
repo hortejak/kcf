@@ -7,19 +7,37 @@ of the algorithm including execution on the GPU. The aim is also to
 modify the code according to the PRedictable Execution Model (PREM).
 
 Stable version of the tracker is available from a [CTU server][2],
-development happens at GitHub [here][wsh] and [here][3].
+development happens at [GitHub][iig].
 
 [1]: http://hercules2020.eu/
 [2]: http://rtime.felk.cvut.cz/gitweb/hercules2020/kcf.git
-[wsh]: https://github.com/wentasah/kcf
+[iig]: https://github.com/CTU-IIG/kcf
 [3]: https://github.com/Shanigen/kcf
+
+<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
+**Table of Contents**
+
+    - [Prerequisites](#prerequisites)
+    - [Compilation](#compilation)
+        - [Compile all supported versions](#compile-all-supported-versions)
+        - [Using cmake gui](#using-cmake-gui)
+        - [Command line](#command-line)
+    - [Running](#running)
+        - [Options](#options)
+    - [Automated testing](#automated-testing)
+    - [Authors](#authors)
+    - [References](#references)
+    - [License](#license)
+
+<!-- markdown-toc end -->
+
 
 ## Prerequisites
 
-The code depends on OpenCV 2.4 library
-and [CMake][13] (optionally with [Ninja][8]) is used for building.
-Depending on the version to be compiled you need to have development
-packages for [FFTW][4], [CUDA][5] or [OpenMP][6] installed.
+The code depends on OpenCV (version 2.4 or 3.x) library. [CMake][13]
+(optionally with [Ninja][8]) is used for building. Depending on the
+version to be compiled you need to have development packages for
+[FFTW][4], [CUDA][5] or [OpenMP][6] installed.
 
 On TX2, the following command should install what's needed:
 ``` shellsession
@@ -101,27 +119,19 @@ With all of these FFT version additional options can be added:
 
 |Option| Description |
 | --- | --- |
-| `-DASYNC=ON` | Use C++ `std::async` to run computations for different scales in parallel. This doesn't work with `BIG_BATCH` mode.|
-| `-DBIG_BATCH=ON` | Concatenate matrices of different scales to one big matrix and perform all computations on this matrix. This mode doesn't work with `OpenCV` FFT.|
-| `-DOPENMP=ON` | Parallelize certain operation with OpenMP. This can only be used with `OpenCV` or `fftw` FFT implementations. By default it runs computations for differenct scales in parallel. With `-DBIG_BATCH=ON` it parallelizes the feature extraction and the search for maximal response for differenct scales. With `fftw`, Ffftw's plans will execute in parallel.|
+| `-DBIG_BATCH=ON` | Concatenate matrices of different scales to one big matrix and perform all computations on this matrix. This improves performance of GPU FFT offloading. |
+| `-DOPENMP=ON` | Parallelize certain operation with OpenMP. With `-DBIG_BATCH=OFF` it runs computations for differenct scales in parallel, with `-DBIG_BATCH=ON` it parallelizes the feature extraction, which runs on the CPU. With `fftw`, Ffftw's plans will execute in parallel.|
 | `-DCUDA_DEBUG=ON` | Adds calls cudaDeviceSynchronize after every CUDA function and kernel call.|
 | `-DOpenCV_DIR=/opt/opencv-3.3/share/OpenCV` | Compile against a custom OpenCV version. |
+| `-DASYNC=ON` | Use C++ `std::async` to run computations for different scales in parallel. This mode of parallelization was present in the original implementation. Here, it is superseeded with -DOPENMP. This doesn't work with `BIG_BATCH` mode.|
 
-
-### Compilation for non-TX2 CUDA
-
-The CuFFT version is set up to run on NVIDIA Jetson TX2. If you want
-to run it on different architecture, change the `--gpu-architecture
-sm_62` NVCC flag in **/src/CMakeLists.txt** to your architecture of
-NVIDIA GPU. To find what SM variation you architecture has look
-[here][9].
-
-[9]: http://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/
+See also the top-level `Makefile` for other useful cmake parameters
+such as extra compiler flags etc.
 
 ## Running
 
-No matter which method is used to compile the code, the results will
-be `kcf_vot` binary.
+No matter which method is used to compile the code, the result will be
+a `kcf_vot` binary.
 
 It operates on an image sequence created according to [VOT 2014
 methodology][10]. You can find some image sequences in [vot2016
@@ -162,17 +172,40 @@ top_left_y, width, height".
 
 | Options | Description |
 | ------- | ----------- |
+| --fit, -f[W[xH]] | Specifies the dimension to which the extracted patches should be scaled. Best performance is achieved for powers of two; the smaller number the higher performance but worse accuracy. No dimension or zero rounds the dimensions to the nearest smaller power of 2, a single dimension `W` will result in patch size of `W`×`W`. The numbers should be divisible by 4. |
 | --visualize, -v[delay_ms] | Visualize the output, optionally with specified delay. If the delay is 0 the program will wait for a key press. |
 | --output, -o <output.txt>	 | Specify name of output file. |
 | --debug, -d				 | Generate debug output. |
-| --fit, -f[W[xH]] | Specifies the dimension to which the extracted patch should be scaled. It should be divisible by 4. No dimension or zero rounds the dimensions to the nearest smaller power of 2, a single dimension `W` will result in patch size of `W`×`W`. |
+
+## Automated testing
+
+The tracker comes with a test suite based on [vot2016 datatset][11].
+You can run the test suite as follows:
+
+    make vot2016  # This download the datased (about 1GB of data)
+	make test
+
+The above command run all tests in parallel and displays the results
+in a table. If you want to measure performance, do not run multiple
+tests together. This can be achieved by:
+
+	make build.ninja
+	ninja -j1 test
+
+You can test only a subset of builds or image sequences by setting
+BUILDS, TESTSEQ or TESTFLAGS make variables. For instance:
+
+	make build.ninja BUILDS="cufft cufft-big fftw" TESTSEQ="bmx ball1"
+	ninja test
+
+
 
 
 ## Authors
 * Vít Karafiát, Michal Sojka
 
-Original C++ implementation of KCF tracker was written by Tomas Vojir
-[here][12] and is reimplementation of algorithm presented in
+[Original C++ implementation of the KCF tracker][12] was written by
+Tomas Vojir and is reimplementation of the algorithm presented in
 "High-Speed Tracking with Kernelized Correlation Filters" paper \[1].
 
 [12]: https://github.com/vojirt/kcf/blob/master/README.md
@@ -200,3 +233,7 @@ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+<!-- Local Variables: -->
+<!-- markdown-toc-user-toc-structure-manipulation-fn: cdr -->
+<!-- End: -->
