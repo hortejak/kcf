@@ -689,12 +689,6 @@ void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat &result, const Comp
     DEBUG_PRINTM(xyf_sum);
     kcf.fft.inverse(xyf_sum, ifft_res);
     DEBUG_PRINTM(ifft_res);
-#if 0 && defined(CUFFT)
-    // FIXME
-    cuda_gaussian_correlation(ifft_res.deviceMem(), k.deviceMem(), xf_sqr_norm.deviceMem(),
-                              auto_correlation ? xf_sqr_norm.deviceMem() : yf_sqr_norm.deviceMem(), sigma,
-                              xf.n_channels, xf.n_scales, kcf.feature_size.height, kcf.feature_size.width);
-#else
 
     float numel_xf_inv = 1.f / (xf.cols * xf.rows * (xf.channels() / xf.n_scales));
     for (uint i = 0; i < xf.n_scales; ++i) {
@@ -704,7 +698,7 @@ void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat &result, const Comp
                 * numel_xf_inv, 0), plane);
         DEBUG_PRINTM(plane);
     }
-#endif
+
     kcf.fft.forward(ifft_res, result);
 }
 

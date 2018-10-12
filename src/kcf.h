@@ -8,7 +8,6 @@
 
 #include "complexmat.hpp"
 #ifdef CUFFT
-#include "cuda_functions.h"
 #include "cuda_error_check.hpp"
 #include <cuda_runtime.h>
 #endif
