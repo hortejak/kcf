@@ -17,17 +17,17 @@ development happens at [GitHub][iig].
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
 
-    - [Prerequisites](#prerequisites)
-    - [Compilation](#compilation)
-        - [Compile all supported versions](#compile-all-supported-versions)
-        - [Using cmake gui](#using-cmake-gui)
-        - [Command line](#command-line)
-    - [Running](#running)
-        - [Options](#options)
-    - [Automated testing](#automated-testing)
-    - [Authors](#authors)
-    - [References](#references)
-    - [License](#license)
+- [Prerequisites](#prerequisites)
+- [Compilation](#compilation)
+    - [Compile all supported versions](#compile-all-supported-versions)
+    - [Using cmake gui](#using-cmake-gui)
+    - [Command line](#command-line)
+- [Running](#running)
+    - [Options](#options)
+- [Automated testing](#automated-testing)
+- [Authors](#authors)
+- [References](#references)
+- [License](#license)
 
 <!-- markdown-toc end -->
 
