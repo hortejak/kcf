@@ -83,9 +83,6 @@ class DbgTracer {
     {
         (void)line;
         if (debug || always) {
-#ifdef CUFFT
-            CudaSafeCall(cudaStreamSynchronize(cudaStreamPerThread));
-#endif
             IOSave s(std::cerr);
             std::cerr << std::setprecision(precision);
             std::cerr << indent() << name /*<< " @" << line */ << " " << print(obj) << std::endl;

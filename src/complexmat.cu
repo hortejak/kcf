@@ -24,6 +24,7 @@ __global__ void sqr_norm_kernel(const float *in, float *block_res, int total)
 
 void ComplexMat_::sqr_norm(DynMem &result) const
 {
+
     assert(result.num_elem == n_scales);
 
     const uint total = n_channels / n_scales * rows * cols;
@@ -127,7 +128,6 @@ ComplexMat_ ComplexMat_::sum_over_channels() const
                                           reinterpret_cast<const float*>(p_data.deviceMem() + scale * n_channels_per_scale * rows * cols),
                                           n_channels_per_scale, total);
     }
-    CudaSafeCall(cudaStreamSynchronize(cudaStreamPerThread));
     return result;
 }
 
