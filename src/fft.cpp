@@ -67,6 +67,10 @@ void Fft::forward_window(MatScaleFeats &patch_feats, ComplexMat &complex_result,
         assert(tmp.size[2] == patch_feats.size[2]);
         assert(tmp.size[3] == patch_feats.size[3]);
 
+        assert(int(complex_result.cols) == freq_size(cv::Size(m_width, m_height)).width);
+        assert(int(complex_result.rows) == freq_size(cv::Size(m_width, m_height)).height);
+        assert(complex_result.channels() == uint(patch_feats.size[0] * patch_feats.size[1]));
+
         (void)patch_feats;
         (void)complex_result;
         (void)tmp;
@@ -84,6 +88,10 @@ void Fft::inverse(ComplexMat &complex_input, MatScales &real_result)
 #endif
     assert(real_result.size[1] == int(m_height));
     assert(real_result.size[2] == int(m_width));
+
+    assert(int(complex_input.cols) == freq_size(cv::Size(m_width, m_height)).width);
+    assert(int(complex_input.rows) == freq_size(cv::Size(m_width, m_height)).height);
+    assert(complex_input.channels() == uint(real_result.size[0]));
 
     (void)complex_input;
     (void)real_result;
