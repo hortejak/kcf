@@ -273,7 +273,7 @@ BBox_c KCF_Tracker::getBBox()
     tmp.cy = p_current_center.y;
     tmp.w = p_init_pose.w * p_current_scale;
     tmp.h = p_init_pose.h * p_current_scale;
-    tmp.a = 0;
+    tmp.a = p_current_angle;
 
     if (p_resize_image)
         tmp.scale(1 / p_downscale_factor);
@@ -646,12 +646,15 @@ cv::Mat KCF_Tracker::cosine_window_function(int dim1, int dim2)
 cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int width, int height, double angle) const
 {
     cv::Mat patch;
-    (void)angle;
 
-    int x1 = cx - width / 2;
-    int y1 = cy - height / 2;
-    int x2 = cx + width / 2;
-    int y2 = cy + height / 2;
+    cv::Size sz(width, height);
+    cv::RotatedRect rr(cv::Point2f(cx, cy), sz, angle);
+    cv::Rect bb = rr.boundingRect();
+
+    int x1 = bb.tl().x;
+    int y1 = bb.tl().y;
+    int x2 = bb.br().x;
+    int y2 = bb.br().y;
 
     // out of image
     if (x1 >= input.cols || y1 >= input.rows || x2 < 0 || y2 < 0) {
@@ -691,6 +694,12 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
         //      imshow( "copyMakeBorder", patch);
         //      cv::waitKey();
     }
+
+    cv::Point2f src_pts[4];
+    cv::RotatedRect(cv::Point2f(patch.size()) / 2.0, sz, angle).points(src_pts);
+    cv::Point2f dst_pts[3] = { cv::Point2f(0, height), cv::Point2f(0, 0),  cv::Point2f(width, 0)};
+    auto rot = cv::getAffineTransform(src_pts, dst_pts);
+    cv::warpAffine(patch, patch, rot, sz);
 
     // sanity check
     assert(patch.cols == width && patch.rows == height);

@@ -110,7 +110,7 @@ private:
     double p_min_max_scale[2];
     std::vector<double> p_scales;
 
-    const uint p_num_angles = 1;
+    const uint p_num_angles = 3;
     const int p_angle_step = 10;
     std::vector<double> p_angles;
 
