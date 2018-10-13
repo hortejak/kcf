@@ -177,11 +177,11 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     feature_size = fit_size / p_cell_size;
 
     p_scales.clear();
-    for (int i = -int(p_num_scales) / 2; i <= int(p_num_scales) / 2; ++i)
+    for (int i = -int(p_num_scales - 1) / 2; i <= int(p_num_scales) / 2; ++i)
         p_scales.push_back(std::pow(p_scale_step, i));
 
     p_angles.clear();
-    for (int i = -int(p_num_angles) / 2; i <= int(p_num_angles) / 2; ++i)
+    for (int i = -int(p_num_angles - 1) / 2; i <= int(p_num_angles) / 2; ++i)
         p_angles.push_back(i * p_angle_step);
 
 #ifdef CUFFT
