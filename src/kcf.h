@@ -43,6 +43,7 @@ struct BBox_c
 class KCF_Tracker
 {
     friend ThreadCtx;
+    friend Kcf_Tracker_Private;
 public:
     bool m_debug {false};
     bool m_visual_debug {false};
@@ -86,6 +87,7 @@ private:
     // Information to calculate current pose of the tracked object
     cv::Point2d p_current_center;
     double p_current_scale = 1.;
+    double p_current_angle = 0.;
 
     double max_response = -1.;
 
@@ -115,7 +117,7 @@ private:
     const int p_num_of_feats = 31 + (m_use_color ? 3 : 0) + (m_use_cnfeat ? 10 : 0);
     cv::Size feature_size;
 
-    Kcf_Tracker_Private &d;
+    std::unique_ptr<Kcf_Tracker_Private> d;
 
     class Model {
         cv::Size feature_size;
@@ -163,12 +165,12 @@ private:
 
     //helping functions
     void scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray);
-    cv::Mat get_subwindow(const cv::Mat &input, int cx, int cy, int size_x, int size_y) const;
+    cv::Mat get_subwindow(const cv::Mat &input, int cx, int cy, int size_x, int size_y, double angle) const;
     cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);
     std::unique_ptr<GaussianCorrelation> gaussian_correlation;
     cv::Mat circshift(const cv::Mat &patch, int x_rot, int y_rot) const;
     cv::Mat cosine_window_function(int dim1, int dim2);
-    cv::Mat get_features(cv::Mat &input_rgb, cv::Mat &input_gray, cv::Mat *dbg_patch, int cx, int cy, int size_x, int size_y, double scale) const;
+    cv::Mat get_features(cv::Mat &input_rgb, cv::Mat &input_gray, cv::Mat *dbg_patch, int cx, int cy, int size_x, int size_y, double scale, double angle) const;
     cv::Point2f sub_pixel_peak(cv::Point &max_loc, cv::Mat &response) const;
     double sub_grid_scale(uint index);
     void resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray);
