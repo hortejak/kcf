@@ -110,7 +110,7 @@ private:
 
     const uint p_num_angles = 1;
     const int p_angle_step = 10;
-    std::vector<double> p_angles = {0};
+    std::vector<double> p_angles;
 
     const int p_num_of_feats = 31 + (m_use_color ? 3 : 0) + (m_use_cnfeat ? 10 : 0);
     cv::Size feature_size;
