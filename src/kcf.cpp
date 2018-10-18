@@ -494,7 +494,7 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
     for (size_t i = 0; i < max.size(); ++i) {
         cv::minMaxLoc(response.plane(i), &min_val, &max_val, &min_loc, &max_loc);
         DEBUG_PRINT(max_loc);
-        double weight = kcf.p_scales[i] < 1. ? kcf.p_scales[i] : 1. / kcf.p_scales[i];
+        double weight = max.scale(i) < 1. ? max.scale(i) : 1. / max.scale(i);
         max[i].response = max_val * weight;
         max[i].loc = max_loc;
     }
