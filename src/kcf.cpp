@@ -844,7 +844,7 @@ double KCF_Tracker::sub_grid_scale(uint max_index)
     cv::Mat A, fval;
     const auto &vec = d->IF_BIG_BATCH(threadctxs[0].max, threadctxs);
     uint index = vec.getScaleIdx(max_index);
-    uint angle_idx = vec.getAngleIdx(index);
+    uint angle_idx = vec.getAngleIdx(max_index);
 
     if (index >= vec.size()) {
         // interpolate from all values
