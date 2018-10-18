@@ -61,7 +61,6 @@ int main(int argc, char *argv[])
             break;
         case 'p':
             tracker.m_visual_debug = true;
-            visualize_delay = 500;
             break;
         case 'h':
             std::cerr << "Usage: \n"
