@@ -41,7 +41,7 @@ matrix:
       name: clang & test
       script:
         - make BUILDS="$(make print_BUILDS|grep -v cufft|paste -s)"
-        - LD_LIBRARY_PATH=/usr/local/clang-5.0.0/lib/ ninja test
+        - LD_LIBRARY_PATH=/usr/local/clang-5.0.0/lib/ LD_PRELOAD=libSegFault.so SEGFAULT_SIGNALS=all ninja test
       addons:
         apt: { sources: *common_sources, packages: [*common_packages, unzip] }
 
