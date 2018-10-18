@@ -369,6 +369,7 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
                     tmp /= max; // Normalize to 1
                     cross += cv::Point2d(tmp.size())/2;
                     tmp = circshift(tmp, -tmp.cols/2, -tmp.rows/2);
+                    //drawCross(tmp, cross, false);
                 }
                 bool green = false;
                 if (&*max_it == &IF_BIG_BATCH(threadctx.max(i, j), threadctx)) {
@@ -376,9 +377,10 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
                     cross = new_location + cv::Point2d(tmp.size())/2;
                     green = true;
                 }
-                cross.x *= double(w)/tmp.cols;
-                cross.y *= double(h)/tmp.rows;
-                cv::resize(tmp, tmp, cv::Size(w, h));
+                // Move to the center of pixes (if scaling up) and scale
+                cross.x = (cross.x + 0.5) * double(w)/tmp.cols;
+                cross.y = (cross.y + 0.5) * double(h)/tmp.rows;
+                cv::resize(tmp, tmp, cv::Size(w, h)); //, 0, 0, cv::INTER_NEAREST);
                 drawCross(tmp, cross, green);
                 cv::Mat resp_roi(all_responses, cv::Rect(j * (w+1), i * (h+1), w, h));
                 tmp.copyTo(resp_roi);
