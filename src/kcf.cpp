@@ -320,8 +320,8 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
                 tmp.copyTo(resp_roi);
             }
         }
-        cv::namedWindow("All responses", CV_WINDOW_AUTOSIZE);
-        cv::imshow("All responses", all_responses);
+        cv::namedWindow("KCF visual debug", CV_WINDOW_AUTOSIZE);
+        cv::imshow("KCF visual debug", all_responses);
     }
 
     cv::Point2i &max_response_pt = IF_BIG_BATCH(d.threadctxs[0].max[max_idx].loc,        d.threadctxs[max_idx].max.loc);
