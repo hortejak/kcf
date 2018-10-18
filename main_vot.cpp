@@ -191,8 +191,10 @@ int main(int argc, char *argv[])
                 cv::line(image, vertices[i], vertices[(i + 1) % 4], cv::Scalar(0, 255, 0), 2);
             cv::imshow("KCF output", image);
             int ret = cv::waitKey(visualize_delay);
-            if (visualize_delay > 0 && ret != -1 && ret < 128)
+            if ((visualize_delay > 0 && ret != -1 && ret < 128) ||
+                (visualize_delay == 0 && (ret == 27 /*esc*/ || ret == 'q')))
                 break;
+
         }
 
 //        std::stringstream s;
