@@ -294,7 +294,14 @@ void KCF_Tracker::resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray)
     }
 }
 
-static cv::Point wrapAroundFreq(cv::Point pt, cv::Mat &resp_map)
+static void drawCross(cv::Mat &img, cv::Point center, bool green)
+{
+    cv::Scalar col = green ? cv::Scalar(0, 1, 0) : cv::Scalar(0, 0, 1);
+    cv::line(img, cv::Point(center.x, 0), cv::Point(center.x, img.size().height), col);
+    cv::line(img, cv::Point(0, center.y), cv::Point(img.size().height, center.y), col);
+}
+
+static cv::Point2d wrapAroundFreq(cv::Point2d pt, cv::Mat &resp_map)
 {
     if (pt.y > resp_map.rows / 2) // wrap around to negative half-space of vertical axis
         pt.y = pt.y - resp_map.rows;
@@ -341,22 +348,39 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
 
     if (m_visual_debug) {
         const bool rgb = true;
-        int type = rgb ? d->threadctxs[0].IF_BIG_BATCH(dbg_patch[0], dbg_patch).type()
-                       : d->threadctxs[0].response.type();
-        int w = true ? 100 : (rgb ? fit_size.width  : feature_size.width);
-        int h = true ? 100 : (rgb ? fit_size.height : feature_size.height);
+        const bool fit = 1;
+        int w = fit ? 100 : (rgb ? fit_size.width  : feature_size.width);
+        int h = fit ? 100 : (rgb ? fit_size.height : feature_size.height);
         cv::Mat all_responses((h + 1) * p_num_scales - 1,
-                              (w + 1) * p_num_angles - 1, type, cv::Scalar::all(0));
+                              (w + 1) * p_num_angles - 1, CV_32FC3, cv::Scalar::all(0));
         for (size_t i = 0; i < p_num_scales; ++i) {
             for (size_t j = 0; j < p_num_angles; ++j) {
+                auto &threadctx = d->IF_BIG_BATCH(threadctxs[0], threadctxs(i, j));
                 cv::Mat tmp;
+                cv::Point2d cross = threadctx.IF_BIG_BATCH(max(i, j), max).loc;
+                cross = wrapAroundFreq(cross, max_response_map);
                 if (rgb) {
-                    tmp = d->IF_BIG_BATCH(threadctxs[0], threadctxs(i, j)).dbg_patch IF_BIG_BATCH((i, j),);
+                    threadctx.dbg_patch IF_BIG_BATCH((i, j),)
+                            .convertTo(tmp, all_responses.type(), 1.0 / 255);
+                    cross.x = cross.x / fit_size.width  * tmp.cols + tmp.cols / 2;
+                    cross.y = cross.y / fit_size.height * tmp.rows + tmp.rows / 2;
                 } else {
-                    tmp = d->IF_BIG_BATCH(threadctxs[0], threadctxs(i, j)).response.plane(IF_BIG_BATCH(d->threadctxs[0].max.getIdx(i, j), 0));
+                    cv::cvtColor(threadctx.response.plane(IF_BIG_BATCH(threadctx.max.getIdx(i, j), 0)),
+                            tmp, cv::COLOR_GRAY2BGR);
+                    tmp /= max; // Normalize to 1
+                    cross += cv::Point2d(tmp.size())/2;
                     tmp = circshift(tmp, -tmp.cols/2, -tmp.rows/2);
                 }
+                bool green = false;
+                if (&*max_it == &IF_BIG_BATCH(threadctx.max(i, j), threadctx)) {
+                    // Show the green cross at position of sub-pixel interpolation (if enabled)
+                    cross = new_location + cv::Point2d(tmp.size())/2;
+                    green = true;
+                }
+                cross.x *= double(w)/tmp.cols;
+                cross.y *= double(h)/tmp.rows;
                 cv::resize(tmp, tmp, cv::Size(w, h));
+                drawCross(tmp, cross, green);
                 cv::Mat resp_roi(all_responses, cv::Rect(j * (w+1), i * (h+1), w, h));
                 tmp.copyTo(resp_roi);
             }
@@ -570,8 +594,8 @@ cv::Mat KCF_Tracker::gaussian_shaped_labels(double sigma, int dim1, int dim2)
 
 cv::Mat KCF_Tracker::circshift(const cv::Mat &patch, int x_rot, int y_rot) const
 {
-    cv::Mat rot_patch(patch.size(), CV_32FC1);
-    cv::Mat tmp_x_rot(patch.size(), CV_32FC1);
+    cv::Mat rot_patch(patch.size(), patch.type());
+    cv::Mat tmp_x_rot(patch.size(), patch.type());
 
     // circular rotate x-axis
     if (x_rot < 0) {
