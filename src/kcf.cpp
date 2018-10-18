@@ -425,6 +425,12 @@ void KCF_Tracker::track(cv::Mat &img)
     uint max_idx;
     max_response = findMaxReponse(max_idx, new_location);
 
+    double angle_change = d->IF_BIG_BATCH(threadctxs[0].max, threadctxs).angle(max_idx);
+    p_current_angle += angle_change;
+
+    new_location.x = new_location.x * cos(-p_current_angle/180*M_PI) + new_location.y * sin(-p_current_angle/180*M_PI);
+    new_location.y = new_location.y * cos(-p_current_angle/180*M_PI) - new_location.x * sin(-p_current_angle/180*M_PI);
+
     new_location.x *= double(p_windows_size.width) / fit_size.width;
     new_location.y *= double(p_windows_size.height) / fit_size.height;
 
@@ -442,7 +448,6 @@ void KCF_Tracker::track(cv::Mat &img)
 
     clamp2(p_current_scale, p_min_max_scale[0], p_min_max_scale[1]);
 
-    p_current_angle += d->IF_BIG_BATCH(threadctxs[0].max, threadctxs).angle(max_idx);
 
     // train at newly estimated target position
     train(input_rgb, input_gray, p_interp_factor);
