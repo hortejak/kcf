@@ -46,7 +46,7 @@ class KCF_Tracker
     friend Kcf_Tracker_Private;
 public:
     bool m_debug {false};
-    bool m_visual_debug {false};
+    enum class vd {NONE, PATCH, RESPONSE} m_visual_debug {vd::NONE};
     const bool m_use_scale {true};
     const bool m_use_color {true};
     const bool m_use_subpixel_localization {true};

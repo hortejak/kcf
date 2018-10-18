@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
         int option_index = 0;
         static struct option long_options[] = {
             {"debug",     no_argument,       0,  'd' },
-            {"visualDebug", no_argument, 0, 'p'},
+            {"visual_debug", optional_argument,    0, 'p'},
             {"help",      no_argument,       0,  'h' },
             {"output",    required_argument, 0,  'o' },
             {"visualize", optional_argument, 0,  'v' },
@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
             {0,           0,                 0,  0 }
         };
 
-        int c = getopt_long(argc, argv, "dphv::f::o:", long_options, &option_index);
+        int c = getopt_long(argc, argv, "dp::hv::f::o:", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -60,7 +60,14 @@ int main(int argc, char *argv[])
             tracker.m_debug = true;
             break;
         case 'p':
-            tracker.m_visual_debug = true;
+            if (!optarg || *optarg == 'p')
+                tracker.m_visual_debug = KCF_Tracker::vd::PATCH;
+            else if (optarg && *optarg == 'r')
+                tracker.m_visual_debug = KCF_Tracker::vd::RESPONSE;
+            else {
+                fprintf(stderr, "Unknown visual debug mode: %c", *optarg);
+                return 1;
+            }
             break;
         case 'h':
             std::cerr << "Usage: \n"
@@ -68,10 +75,11 @@ int main(int argc, char *argv[])
                       << argv[0] << " [options] <directory>\n"
                       << argv[0] << " [options] <path/to/region.txt or groundtruth.txt> <path/to/images.txt> [path/to/output.txt]\n"
                       << "Options:\n"
-                      << " --visualize | -v[delay_ms]\n"
-                      << " --output    | -o <output.txt>\n"
-                      << " --debug     | -d\n"
-                      << " --fit       | -f[W[xH]]\n";
+                      << " --visualize    | -v[delay_ms]\n"
+                      << " --output       | -o <output.txt>\n"
+                      << " --fit          | -f[W[xH]]\n"
+                      << " --debug        | -d\n"
+                      << " --visual_debug | -p [p|r]\n";
             exit(0);
             break;
         case 'o':

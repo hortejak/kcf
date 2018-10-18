@@ -176,6 +176,7 @@ top_left_y, width, height".
 | --visualize, -v[delay_ms] | Visualize the output, optionally with specified delay. If the delay is 0 the program will wait for a key press. |
 | --output, -o <output.txt>	 | Specify name of output file. |
 | --debug, -d				 | Generate debug output. |
+| --visual_debug, -p[p|r] | Show graphical window with debugging information (either **p**atch or filter **r**esponse). |
 
 ## Automated testing
 

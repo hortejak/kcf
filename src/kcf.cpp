@@ -346,11 +346,10 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
     }
     DEBUG_PRINT(new_location);
 
-    if (m_visual_debug) {
-        const bool rgb = true;
+    if (m_visual_debug != vd::NONE) {
         const bool fit = 1;
-        int w = fit ? 100 : (rgb ? fit_size.width  : feature_size.width);
-        int h = fit ? 100 : (rgb ? fit_size.height : feature_size.height);
+        int w = fit ? 100 : (m_visual_debug == vd::PATCH ? fit_size.width  : feature_size.width);
+        int h = fit ? 100 : (m_visual_debug == vd::PATCH ? fit_size.height : feature_size.height);
         cv::Mat all_responses((h + 1) * p_num_scales - 1,
                               (w + 1) * p_num_angles - 1, CV_32FC3, cv::Scalar::all(0));
         for (size_t i = 0; i < p_num_scales; ++i) {
@@ -359,7 +358,7 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
                 cv::Mat tmp;
                 cv::Point2d cross = threadctx.IF_BIG_BATCH(max(i, j), max).loc;
                 cross = wrapAroundFreq(cross, max_response_map);
-                if (rgb) {
+                if (m_visual_debug == vd::PATCH ) {
                     threadctx.dbg_patch IF_BIG_BATCH((i, j),)
                             .convertTo(tmp, all_responses.type(), 1.0 / 255);
                     cross.x = cross.x / fit_size.width  * tmp.cols + tmp.cols / 2;
