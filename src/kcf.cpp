@@ -311,6 +311,29 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
     assert(max_it != vec.end());
     max = max_it->IF_BIG_BATCH(response, max.response);
 
+    max_idx = std::distance(vec.begin(), max_it);
+
+    cv::Point2i max_response_pt = IF_BIG_BATCH(max_it->loc, max_it->max.loc);
+    cv::Mat max_response_map    = IF_BIG_BATCH(d->threadctxs[0].response.plane(max_idx),
+                                               max_it->response.plane(0));
+
+    DEBUG_PRINTM(max_response_map);
+    DEBUG_PRINT(max_response_pt);
+
+    // sub pixel quadratic interpolation from neighbours
+    if (max_response_pt.y > max_response_map.rows / 2) // wrap around to negative half-space of vertical axis
+        max_response_pt.y = max_response_pt.y - max_response_map.rows;
+    if (max_response_pt.x > max_response_map.cols / 2) // same for horizontal axis
+        max_response_pt.x = max_response_pt.x - max_response_map.cols;
+
+
+    if (m_use_subpixel_localization) {
+        new_location = sub_pixel_peak(max_response_pt, max_response_map);
+    } else {
+        new_location = max_response_pt;
+    }
+    DEBUG_PRINT(new_location);
+
     if (m_visual_debug) {
         const bool rgb = true;
         int type = rgb ? d->threadctxs[0].IF_BIG_BATCH(dbg_patch[0], dbg_patch).type()
@@ -337,28 +360,6 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
         cv::imshow("KCF visual debug", all_responses);
     }
 
-    max_idx = std::distance(vec.begin(), max_it);
-
-    cv::Point2i max_response_pt = IF_BIG_BATCH(max_it->loc, max_it->max.loc);
-    cv::Mat max_response_map    = IF_BIG_BATCH(d->threadctxs[0].response.plane(max_idx),
-                                               max_it->response.plane(0));
-
-    DEBUG_PRINTM(max_response_map);
-    DEBUG_PRINT(max_response_pt);
-
-    // sub pixel quadratic interpolation from neighbours
-    if (max_response_pt.y > max_response_map.rows / 2) // wrap around to negative half-space of vertical axis
-        max_response_pt.y = max_response_pt.y - max_response_map.rows;
-    if (max_response_pt.x > max_response_map.cols / 2) // same for horizontal axis
-        max_response_pt.x = max_response_pt.x - max_response_map.cols;
-
-
-    if (m_use_subpixel_localization) {
-        new_location = sub_pixel_peak(max_response_pt, max_response_map);
-    } else {
-        new_location = max_response_pt;
-    }
-    DEBUG_PRINT(new_location);
     return max;
 }
 
