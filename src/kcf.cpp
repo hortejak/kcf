@@ -305,7 +305,8 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
         int type = rgb ? d.threadctxs[0].dbg_patch[0].type() : d.threadctxs[0].response.type();
         int w = true ? 100 : (rgb ? fit_size.width  : feature_size.width);
         int h = true ? 100 : (rgb ? fit_size.height : feature_size.height);
-        cv::Mat all_responses(h * p_num_scales, w * p_num_angles, type, cv::Scalar::all(0));
+        cv::Mat all_responses((h + 1) * p_num_scales - 1,
+                              (w + 1) * p_num_angles - 1, type, cv::Scalar::all(0));
         for (size_t i = 0; i < p_num_scales; ++i) {
             for (size_t j = 0; j < p_num_angles; ++j) {
                 cv::Mat tmp;
@@ -316,7 +317,7 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
                     tmp = circshift(tmp, -tmp.cols/2, -tmp.rows/2);
                 }
                 cv::resize(tmp, tmp, cv::Size(w, h));
-                cv::Mat resp_roi(all_responses, cv::Rect(j * w, i * h, w, h));
+                cv::Mat resp_roi(all_responses, cv::Rect(j * (w+1), i * (h+1), w, h));
                 tmp.copyTo(resp_roi);
             }
         }
