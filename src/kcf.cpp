@@ -294,6 +294,15 @@ void KCF_Tracker::resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray)
     }
 }
 
+static cv::Point wrapAroundFreq(cv::Point pt, cv::Mat &resp_map)
+{
+    if (pt.y > resp_map.rows / 2) // wrap around to negative half-space of vertical axis
+        pt.y = pt.y - resp_map.rows;
+    if (pt.x > resp_map.cols / 2) // same for horizontal axis
+        pt.x = pt.x - resp_map.cols;
+    return pt;
+}
+
 double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) const
 {
     double max;
@@ -320,13 +329,9 @@ double KCF_Tracker::findMaxReponse(uint &max_idx, cv::Point2d &new_location) con
     DEBUG_PRINTM(max_response_map);
     DEBUG_PRINT(max_response_pt);
 
+    max_response_pt = wrapAroundFreq(max_response_pt, max_response_map);
+
     // sub pixel quadratic interpolation from neighbours
-    if (max_response_pt.y > max_response_map.rows / 2) // wrap around to negative half-space of vertical axis
-        max_response_pt.y = max_response_pt.y - max_response_map.rows;
-    if (max_response_pt.x > max_response_map.cols / 2) // same for horizontal axis
-        max_response_pt.x = max_response_pt.x - max_response_map.cols;
-
-
     if (m_use_subpixel_localization) {
         new_location = sub_pixel_peak(max_response_pt, max_response_map);
     } else {
