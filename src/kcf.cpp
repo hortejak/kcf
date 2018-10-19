@@ -426,7 +426,8 @@ void KCF_Tracker::track(cv::Mat &img)
     uint max_idx;
     max_response = findMaxReponse(max_idx, new_location);
 
-    double angle_change = d->IF_BIG_BATCH(threadctxs[0].max, threadctxs).angle(max_idx);
+    double angle_change = m_use_subgrid_angle ? sub_grid_angle(max_idx)
+                                              : d->IF_BIG_BATCH(threadctxs[0].max, threadctxs).angle(max_idx);
     p_current_angle += angle_change;
 
     new_location.x = new_location.x * cos(-p_current_angle/180*M_PI) + new_location.y * sin(-p_current_angle/180*M_PI);
@@ -891,4 +892,53 @@ double KCF_Tracker::sub_grid_scale(uint max_index)
     if (a > 0 || a < 0)
         scale = -b / (2 * a);
     return scale;
+}
+
+double KCF_Tracker::sub_grid_angle(uint max_index)
+{
+    cv::Mat A, fval;
+    const auto &vec = d->IF_BIG_BATCH(threadctxs[0].max, threadctxs);
+    uint scale_idx = vec.getScaleIdx(max_index);
+    uint index = vec.getAngleIdx(max_index);
+
+    if (index >= vec.size()) {
+        // interpolate from all values
+        // fit 1d quadratic function f(x) = a*x^2 + b*x + c
+        A.create(p_angles.size(), 3, CV_32FC1);
+        fval.create(p_angles.size(), 1, CV_32FC1);
+        for (size_t i = 0; i < p_angles.size(); ++i) {
+            A.at<float>(i, 0) = float(p_angles[i] * p_angles[i]);
+            A.at<float>(i, 1) = float(p_angles[i]);
+            A.at<float>(i, 2) = 1;
+            fval.at<float>(i) = d->IF_BIG_BATCH(threadctxs[0].max[i].response, threadctxs(scale_idx, i).max.response);
+        }
+    } else {
+        // only from neighbours
+        if (index == 0 || index == p_angles.size() - 1)
+           return p_angles[index];
+
+        A = (cv::Mat_<float>(3, 3) <<
+             p_angles[index - 1] * p_angles[index - 1], p_angles[index - 1], 1,
+             p_angles[index + 0] * p_angles[index + 0], p_angles[index + 0], 1,
+             p_angles[index + 1] * p_angles[index + 1], p_angles[index + 1], 1);
+#ifdef BIG_BATCH
+        fval = (cv::Mat_<float>(3, 1) <<
+                d->threadctxs[0].max(scale_idx, index - 1).response,
+                d->threadctxs[0].max(scale_idx, index + 0).response,
+                d->threadctxs[0].max(scale_idx, index + 1).response);
+#else
+        fval = (cv::Mat_<float>(3, 1) <<
+                d->threadctxs(scale_idx, index - 1).max.response,
+                d->threadctxs(scale_idx, index + 0).max.response,
+                d->threadctxs(scale_idx, index + 1).max.response);
+#endif
+    }
+
+    cv::Mat x;
+    cv::solve(A, fval, x, cv::DECOMP_SVD);
+    float a = x.at<float>(0), b = x.at<float>(1);
+    double angle = p_angles[index];
+    if (a > 0 || a < 0)
+        angle = -b / (2 * a);
+    return angle;
 }

@@ -51,6 +51,7 @@ public:
     const bool m_use_color {true};
     const bool m_use_subpixel_localization {true};
     const bool m_use_subgrid_scale {true};
+    const bool m_use_subgrid_angle {true};
     const bool m_use_cnfeat {true};
     const bool m_use_linearkernel {false};
     const int p_cell_size = 4;            //4 for hog (= bin_size)
@@ -176,6 +177,7 @@ private:
     void resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray);
     void train(cv::Mat input_rgb, cv::Mat input_gray, double interp_factor);
     double findMaxReponse(uint &max_idx, cv::Point2d &new_location) const;
+    double sub_grid_angle(uint max_index);
 };
 
 #endif //KCF_HEADER_6565467831231
