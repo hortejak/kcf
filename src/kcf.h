@@ -105,8 +105,8 @@ private:
     cv::Size p_windows_size;              // size of the patch to find the tracked object in
     cv::Size fit_size;                    // size to which rescale the patch for better FFT performance
 
-    const uint p_num_scales = m_use_scale ? 7 : 1;
-    const double p_scale_step = 1.02;
+    const uint p_num_scales = m_use_scale ? 5 : 1;
+    const double p_scale_step = 1.03;
     double p_min_max_scale[2];
     std::vector<double> p_scales;
 
