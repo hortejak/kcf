@@ -35,9 +35,10 @@ double calcAccuracy(std::string line, cv::Rect bb_rect, cv::Rect &groundtruth_re
 int main(int argc, char *argv[])
 {
     //load region, images and prepare for output
-    std::string region, images, output;
+    std::string region, images, output, video_out;
     int visualize_delay = -1, fit_size_x = -1, fit_size_y = -1;
     KCF_Tracker tracker;
+    cv::VideoWriter videoWriter;
 
     while (1) {
         int option_index = 0;
@@ -46,12 +47,13 @@ int main(int argc, char *argv[])
             {"visual_debug", optional_argument,    0, 'p'},
             {"help",      no_argument,       0,  'h' },
             {"output",    required_argument, 0,  'o' },
+            {"video_out", optional_argument, 0,  'O' },
             {"visualize", optional_argument, 0,  'v' },
             {"fit",       optional_argument, 0,  'f' },
             {0,           0,                 0,  0 }
         };
 
-        int c = getopt_long(argc, argv, "dp::hv::f::o:", long_options, &option_index);
+        int c = getopt_long(argc, argv, "dp::hv::f::o:O::", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -84,6 +86,9 @@ int main(int argc, char *argv[])
             break;
         case 'o':
             output = optarg;
+            break;
+        case 'O':
+            video_out = optarg ? optarg : "./output.avi";
             break;
         case 'v':
             visualize_delay = optarg ? atol(optarg) : 1;
@@ -150,7 +155,14 @@ int main(int argc, char *argv[])
     vot_io.outputBoundingBox(init_rect);
     vot_io.getNextImage(image);
 
+    if (!video_out.empty()) {
+        int codec = CV_FOURCC('M', 'J', 'P', 'G');  // select desired codec (must be available at runtime)
+        double fps = 25.0;                          // framerate of the created video stream
+        videoWriter.open(video_out, codec, fps, image.size(), true);
+    }
+
     tracker.init(image, init_rect, fit_size_x, fit_size_y);
+
 
     BBox_c bb;
     cv::Rect bb_rect;
@@ -186,7 +198,7 @@ int main(int argc, char *argv[])
 
         std::cout << std::endl;
 
-        if (visualize_delay >= 0) {
+        if (visualize_delay >= 0 || !video_out.empty()) {
             cv::Point pt(bb.cx, bb.cy);
             cv::Size size(bb.w, bb.h);
             cv::RotatedRect rotatedRectangle(pt, size, bb.a);
@@ -196,12 +208,15 @@ int main(int argc, char *argv[])
 
             for (int i = 0; i < 4; i++)
                 cv::line(image, vertices[i], vertices[(i + 1) % 4], cv::Scalar(0, 255, 0), 2);
-            cv::imshow("KCF output", image);
-            int ret = cv::waitKey(visualize_delay);
-            if ((visualize_delay > 0 && ret != -1 && ret < 128) ||
-                (visualize_delay == 0 && (ret == 27 /*esc*/ || ret == 'q')))
-                break;
-
+            if (visualize_delay >= 0) {
+                cv::imshow("KCF output", image);
+                int ret = cv::waitKey(visualize_delay);
+                if ((visualize_delay > 0 && ret != -1 && ret < 128) ||
+                        (visualize_delay == 0 && (ret == 27 /*esc*/ || ret == 'q')))
+                    break;
+            }
+            if (!video_out.empty())
+                videoWriter << image;
         }
 
 //        std::stringstream s;
@@ -230,6 +245,8 @@ int main(int argc, char *argv[])
         std::cout << "; Average accuracy: " << sum_accuracy/frames << std::endl;
         groundtruth_stream.close();
     }
+    if (!video_out.empty())
+       videoWriter.release();
     std::cout << std::endl;
 
     return EXIT_SUCCESS;
