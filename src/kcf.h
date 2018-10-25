@@ -161,6 +161,7 @@ private:
     cv::Mat cosine_window_function(int dim1, int dim2);
     cv::Mat get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int cx, int cy, int size_x, int size_y, double scale) const;
     cv::Point2f sub_pixel_peak(cv::Point &max_loc, cv::Mat &response) const;
+    std::vector<cv::Mat> hog(const cv::Mat & img, int bin_size = 4, int n_orients = 9, float clip = 0.2) const;
     double sub_grid_scale(uint index);
     void resizeImgs(cv::Mat &input_rgb, cv::Mat &input_gray);
     void train(cv::Mat input_rgb, cv::Mat input_gray, double interp_factor);

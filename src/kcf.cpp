@@ -466,7 +466,7 @@ cv::Mat KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int c
     }
 
     // get hog(Histogram of Oriented Gradients) features
-    std::vector<cv::Mat> hog_feat = FHoG::extract(patch_gray, 2, p_cell_size, 9);
+    std::vector<cv::Mat> hog_feat = hog(patch_gray, p_cell_size, 9);
 
     // get color rgb features (simple r,g,b channels)
     std::vector<cv::Mat> color_feat;
@@ -505,6 +505,45 @@ cv::Mat KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, int c
         hog_feat[i].copyTo(cv::Mat(size[1], size[2], CV_32FC1, result.ptr(i)));
 
     return result;
+}
+
+std::vector<cv::Mat> KCF_Tracker::hog(const cv::Mat & img, int bin_size, int n_orients, float clip) const
+{
+    int n_res_channels = n_orients * 3 + 4;
+    int hb = img.rows / bin_size;
+    int wb = img.cols / bin_size;
+
+    std::vector<cv::Mat> hog_feat;
+    hog_feat.reserve(n_res_channels);
+
+    std::vector<float> descs;
+    cv::Mat input_hog;
+    img.convertTo(input_hog, CV_8U, 1 / 255.f);
+
+    cv::Size cell_size = cv::Size(bin_size, bin_size);
+    cv::Size block_stride = cell_size;
+    cv::Size block_size = cv::Size(2 * bin_size, 2 * bin_size);
+    cv::Size win_size = cv::Size(img.size[1] / bin_size * bin_size, img.size[0] / bin_size * bin_size);
+
+    cv::HOGDescriptor hog(win_size, block_size, block_stride, cell_size, 9, 1, -1, cv::HOGDescriptor::L2Hys, clip);
+    hog.compute(input_hog, descs);
+
+    for (int i = 0; i < n_res_channels; ++i) {
+        // output rows-by-rows
+        //            cv::Mat desc(hb, wb, CV_32F, (H+hb*wb*i));
+
+        // output cols-by-cols
+        cv::Mat desc(hb, wb, CV_32F);
+        for (int x = 0; x < wb; ++x) {
+            for (int y = 0; y < hb; ++y) {
+                //                std::cout << i*hb*wb + x*hb + y << std::endl;
+                desc.at<float>(y, x) = descs[i * hb * wb + x * hb + y];
+            }
+        }
+
+        hog_feat.push_back(desc.clone());
+    }
+    return hog_feat;
 }
 
 cv::Mat KCF_Tracker::gaussian_shaped_labels(double sigma, int dim1, int dim2)
