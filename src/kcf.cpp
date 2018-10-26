@@ -521,9 +521,6 @@ cv::Mat KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, cv::M
     cv::Mat patch_gray = get_subwindow(input_gray, cx, cy, scaled.width, scaled.height, angle);
     cv::Mat patch_rgb = get_subwindow(input_rgb, cx, cy, scaled.width, scaled.height, angle);
 
-    if (dbg_patch)
-        patch_rgb.copyTo(*dbg_patch);
-
     // resize to default size
     if (scaled.area() > fit_size.area()) {
         // if we downsample use  INTER_AREA interpolation
@@ -547,6 +544,9 @@ cv::Mat KCF_Tracker::get_features(cv::Mat &input_rgb, cv::Mat &input_gray, cv::M
             cv::resize(patch_rgb, patch_rgb, fit_size / p_cell_size, 0., 0., cv::INTER_LINEAR);
         }
     }
+
+    if (dbg_patch)
+        patch_rgb.copyTo(*dbg_patch);
 
     if (m_use_color && input_rgb.channels() == 3) {
         // use rgb color space
