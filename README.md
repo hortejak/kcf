@@ -183,7 +183,7 @@ top_left_y, width, height".
 The tracker comes with a test suite based on [vot2016 datatset][11].
 You can run the test suite as follows:
 
-    make vot2016  # This download the datased (about 1GB of data)
+    make vot2016  # This downloads the dataset (about 1GB of data)
 	make test
 
 The above command run all tests in parallel and displays the results
