@@ -14,7 +14,7 @@ ninja: build.ninja
 
 $(BUILDS): build.ninja
 	ninja build-$@/build.ninja
-	ninja -C build-$@
+	ninja -C $(CURDIR)/build-$@
 
 clean: build.ninja
 	ninja $@
