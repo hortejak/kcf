@@ -211,9 +211,9 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 #ifndef BIG_BATCH
     for (auto scale: p_scales)
         for (auto angle : p_angles)
-            d->threadctxs.emplace_back(feature_size, p_num_of_feats, scale, angle);
+            d->threadctxs.emplace_back(feature_size, (int)p_num_of_feats, scale, angle);
 #else
-    d->threadctxs.emplace_back(feature_size, p_num_of_feats, p_scales, p_angles);
+    d->threadctxs.emplace_back(feature_size, (int)p_num_of_feats, p_scales, p_angles);
 #endif
 
     gaussian_correlation.reset(new GaussianCorrelation(1, p_num_of_feats, feature_size));

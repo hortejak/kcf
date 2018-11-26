@@ -47,13 +47,13 @@ class KCF_Tracker
 public:
     bool m_debug {false};
     enum class vd {NONE, PATCH, RESPONSE} m_visual_debug {vd::NONE};
-    const bool m_use_scale {true};
-    const bool m_use_color {true};
-    const bool m_use_subpixel_localization {true};
-    const bool m_use_subgrid_scale {true};
-    const bool m_use_subgrid_angle {true};
-    const bool m_use_cnfeat {true};
-    const bool m_use_linearkernel {false};
+    constexpr static bool m_use_scale {true};
+    constexpr static bool m_use_color {true};
+    constexpr static bool m_use_subpixel_localization {true};
+    constexpr static bool m_use_subgrid_scale {true};
+    constexpr static bool m_use_subgrid_angle {true};
+    constexpr static bool m_use_cnfeat {true};
+    constexpr static bool m_use_linearkernel {false};
     const int p_cell_size = 4;            //4 for hog (= bin_size)
 
     /*
@@ -94,8 +94,8 @@ private:
 
     bool p_resize_image = false;
 
-    const double p_downscale_factor = 0.5;
-    const double p_floating_error = 0.0001;
+    constexpr static double p_downscale_factor = 0.5;
+    constexpr static double p_floating_error = 0.0001;
 
     const double p_padding = 1.5;
     const double p_output_sigma_factor = 0.1;
@@ -106,16 +106,16 @@ private:
     cv::Size p_windows_size;              // size of the patch to find the tracked object in
     cv::Size fit_size;                    // size to which rescale the patch for better FFT performance
 
-    const uint p_num_scales = m_use_scale ? 5 : 1;
-    const double p_scale_step = 1.03;
+    constexpr static uint p_num_scales = m_use_scale ? 5 : 1;
+    constexpr static double p_scale_step = 1.03;
     double p_min_max_scale[2];
     std::vector<double> p_scales;
 
-    const uint p_num_angles = 3;
-    const int p_angle_step = 10;
+    constexpr static uint p_num_angles = 3;
+    constexpr static int p_angle_step = 10;
     std::vector<double> p_angles;
 
-    const int p_num_of_feats = 31 + (m_use_color ? 3 : 0) + (m_use_cnfeat ? 10 : 0);
+    constexpr static int p_num_of_feats = 31 + (m_use_color ? 3 : 0) + (m_use_cnfeat ? 10 : 0);
     cv::Size feature_size;
 
     std::unique_ptr<Kcf_Tracker_Private> d;
