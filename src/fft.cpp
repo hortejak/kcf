@@ -3,11 +3,6 @@
 #include <cassert>
 #include "debug.h"
 
-Fft::~Fft()
-{
-
-}
-
 void Fft::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales)
 {
     m_width = width;

@@ -15,12 +15,12 @@ class cuFFT : public Fft
 {
 public:
     cuFFT();
-    void init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales) override;
-    void set_window(const MatDynMem &window) override;
-    void forward(const MatScales &real_input, ComplexMat &complex_result) override;
-    void forward_window(MatScaleFeats &patch_feats_in, ComplexMat &complex_result, MatScaleFeats &tmp) override;
-    void inverse(ComplexMat &complex_input, MatScales &real_result) override;
-    ~cuFFT() override;
+    void init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales);
+    void set_window(const MatDynMem &window);
+    void forward(const MatScales &real_input, ComplexMat &complex_result);
+    void forward_window(MatScaleFeats &patch_feats_in, ComplexMat &complex_result, MatScaleFeats &tmp);
+    void inverse(ComplexMat &complex_input, MatScales &real_result);
+    ~cuFFT();
 
 protected:
     cufftHandle create_plan_fwd(uint howmany) const;

@@ -7,12 +7,12 @@
 class FftOpencv : public Fft
 {
 public:
-    void init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales) override;
-    void set_window(const MatDynMem &window) override;
-    void forward(const MatScales &real_input, ComplexMat &complex_result) override;
-    void forward_window(MatScaleFeats &patch_feats_in, ComplexMat &complex_result, MatScaleFeats &tmp) override;
-    void inverse(ComplexMat &complex_input, MatScales &real_result) override;
-    ~FftOpencv() override;
+    void init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales);
+    void set_window(const MatDynMem &window);
+    void forward(const MatScales &real_input, ComplexMat &complex_result);
+    void forward_window(MatScaleFeats &patch_feats_in, ComplexMat &complex_result, MatScaleFeats &tmp);
+    void inverse(ComplexMat &complex_input, MatScales &real_result);
+    ~FftOpencv();
 private:
     cv::Mat m_window;
 };

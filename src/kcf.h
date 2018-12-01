@@ -13,7 +13,16 @@
 #endif
 
 #include "cnfeat.hpp"
-#include "fft.h"
+#ifdef FFTW
+#include "fft_fftw.h"
+#define FFT Fftw
+#elif defined(CUFFT)
+#include "fft_cufft.h"
+#define FFT cuFFT
+#else
+#include "fft_opencv.h"
+#define FFT FftOpencv
+#endif
 #include "pragmas.h"
 
 class Kcf_Tracker_Private;
@@ -79,7 +88,7 @@ public:
     double getFilterResponse() const; // Measure of tracking accuracy
 
 private:
-    Fft &fft;
+    FFT &fft;
 
     // Initial pose of tracked object in internal image coordinates
     // (scaled by p_downscale_factor if p_resize_image)

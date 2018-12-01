@@ -6,17 +6,6 @@
 #include "debug.h"
 #include <limits>
 
-#ifdef FFTW
-#include "fft_fftw.h"
-#define FFT Fftw
-#elif defined(CUFFT)
-#include "fft_cufft.h"
-#define FFT cuFFT
-#else
-#include "fft_opencv.h"
-#define FFT FftOpencv
-#endif
-
 #ifdef OPENMP
 #include <omp.h>
 #endif // OPENMP
