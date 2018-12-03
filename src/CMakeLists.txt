@@ -54,7 +54,6 @@ ENDIF()
 IF(FFT STREQUAL "cuFFT")
   list(APPEND KCF_LIB_SRC complexmat.cu)
 ELSE()
-  list(APPEND KCF_LIB_SRC complexmat.cpp)
 ENDIF()
 
 IF((FFT STREQUAL "OpenCV") AND BIG_BATCH)
