@@ -130,7 +130,8 @@ static inline std::ostream &operator<<(std::ostream &os, const cufftComplex &p)
 }
 #endif
 
-std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat> &p);
+template <int CH, int S>
+std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat<CH, S>> &p);
 
 extern DbgTracer __dbgTracer;
 

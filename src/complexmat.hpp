@@ -7,30 +7,32 @@
 #include <functional>
 #include "dynmem.hpp"
 #include "pragmas.h"
+#include "prem.hpp"
 
 #ifdef CUFFT
 #include <cufft.h>
 #endif
 
+template <int C, int R, int CH, int S>
 class ComplexMat_ {
   public:
     typedef float T;
 
-    uint cols;
-    uint rows;
-    uint n_channels;
-    uint n_scales;
+    static constexpr uint cols = C;
+    static constexpr uint rows = R;
+    static constexpr uint n_channels = CH;
+    static constexpr uint n_scales = S;
 
     ComplexMat_(uint _rows, uint _cols, uint _n_channels, uint _n_scales = 1)
-        : cols(_cols), rows(_rows), n_channels(_n_channels * _n_scales), n_scales(_n_scales),
+        : //cols(_cols), rows(_rows), n_channels(_n_channels * _n_scales), n_scales(_n_scales),
           p_data(n_channels * cols * rows) {}
     ComplexMat_(cv::Size size, uint _n_channels, uint _n_scales = 1)
-        : cols(size.width), rows(size.height), n_channels(_n_channels * _n_scales), n_scales(_n_scales)
-        , p_data(n_channels * cols * rows) {}
+        : //cols(size.width), rows(size.height), n_channels(_n_channels * _n_scales), n_scales(_n_scales),
+          p_data(n_channels * cols * rows) {}
 
     // assuming that mat has 2 channels (real, img)
-    ComplexMat_(const cv::Mat &mat) : cols(uint(mat.cols)), rows(uint(mat.rows)), n_channels(1), n_scales(1)
-                                    , p_data(n_channels * cols * rows)
+    ComplexMat_(const cv::Mat &mat) : //cols(uint(mat.cols)), rows(uint(mat.rows)), n_channels(1), n_scales(1),
+                                      p_data(n_channels * cols * rows)
     {
         cudaSync();
         memcpy(p_data.hostMem(), mat.ptr<std::complex<T>>(), mat.total() * mat.elemSize());
@@ -284,6 +286,7 @@ class ComplexMat_ {
 #endif
 };
 
-typedef ComplexMat_ ComplexMat;
+template <int CH, int S>
+using ComplexMat = ComplexMat_<complexmat_w, complexmat_h, CH, S>;
 
 #endif // COMPLEX_MAT_HPP_213123048309482094
