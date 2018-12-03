@@ -7,10 +7,11 @@
 
 Fftw::Fftw(){}
 
-fftwf_plan Fftw::create_plan_fwd(uint howmany) const
+template <uint howmany>
+fftwf_plan Fftw::create_plan_fwd() const
 {
     cv::Mat mat_in = cv::Mat::zeros(howmany * m_height, m_width, CV_32F);
-    ComplexMat mat_out(m_height, m_width / 2 + 1, howmany);
+    ComplexMat<howmany,1> mat_out();
     float *in = reinterpret_cast<float *>(mat_in.data);
     fftwf_complex *out = reinterpret_cast<fftwf_complex *>(mat_out.get_p_data());
 
@@ -23,9 +24,10 @@ fftwf_plan Fftw::create_plan_fwd(uint howmany) const
     return fftwf_plan_many_dft_r2c(rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride, odist, FFTW_PATIENT);
 }
 
-fftwf_plan Fftw::create_plan_inv(uint howmany) const
+template <uint howmany>
+fftwf_plan Fftw::create_plan_inv() const
 {
-    ComplexMat mat_in(m_height, m_width / 2 + 1, howmany);
+    ComplexMat<howmany,1> mat_in();
     cv::Mat mat_out = cv::Mat::zeros(howmany * m_height, m_width, CV_32F);
     fftwf_complex *in = reinterpret_cast<fftwf_complex *>(mat_in.get_p_data());
     float *out = reinterpret_cast<float *>(mat_out.data);
@@ -39,7 +41,8 @@ fftwf_plan Fftw::create_plan_inv(uint howmany) const
     return fftwf_plan_many_dft_c2r(rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride, odist, FFTW_PATIENT);
 }
 
-void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales)
+template <unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales>
+void Fftw::init()
 {
     Fft::init(width, height, num_of_feats, num_of_scales);
 
@@ -60,14 +63,14 @@ void Fftw::init(unsigned width, unsigned height, unsigned num_of_feats, unsigned
 #endif
     fftwf_cleanup();
 
-    plan_f = create_plan_fwd(1);
-    plan_fw = create_plan_fwd(m_num_of_feats);
-    plan_i_1ch = create_plan_inv(1);
+    plan_f = create_plan_fwd<1>();
+    plan_fw = create_plan_fwd<num_of_feats>();
+    plan_i_1ch = create_plan_inv<1>();
 
 #ifdef BIG_BATCH
-    plan_f_all_scales = create_plan_fwd(m_num_of_scales);
-    plan_fw_all_scales = create_plan_fwd(m_num_of_scales * m_num_of_feats);
-    plan_i_all_scales = create_plan_inv(m_num_of_scales);
+    plan_f_all_scales = create_plan_fwd<num_of_scales>();
+    plan_fw_all_scales = create_plan_fwd<num_of_scales * num_of_feats>();
+    plan_i_all_scales = create_plan_inv<num_of_scales>();
 #endif
 }
 
@@ -77,7 +80,8 @@ void Fftw::set_window(const MatDynMem &window)
     m_window = window;
 }
 
-void Fftw::forward(const MatScales &real_input, ComplexMat &complex_result)
+template <int CH, int S>
+void Fftw::forward(const MatScales &real_input, ComplexMat<CH,S> &complex_result)
 {
     Fft::forward(real_input, complex_result);
 
@@ -91,7 +95,9 @@ void Fftw::forward(const MatScales &real_input, ComplexMat &complex_result)
 #endif
 }
 
-void Fftw::forward_window(MatScaleFeats  &feat, ComplexMat & complex_result, MatScaleFeats &temp)
+
+template <int CH, int S>
+void Fftw::forward_window(MatScaleFeats  &feat, ComplexMat<CH,S> & complex_result, MatScaleFeats &temp)
 {
     Fft::forward_window(feat, complex_result, temp);
 
@@ -115,7 +121,8 @@ void Fftw::forward_window(MatScaleFeats  &feat, ComplexMat & complex_result, Mat
 #endif
 }
 
-void Fftw::inverse(ComplexMat &complex_input, MatScales &real_result)
+template <int CH, int S>
+void Fftw::inverse(ComplexMat<CH,S> &complex_input, MatScales &real_result)
 {
     Fft::inverse(complex_input, real_result);
 

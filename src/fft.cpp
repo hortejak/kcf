@@ -23,7 +23,8 @@ void Fft::set_window(const MatDynMem &window)
     (void)window;
 }
 
-void Fft::forward(const MatScales &real_input, ComplexMat &complex_result)
+template <int CH, int S>
+void Fft::forward(const MatScales &real_input, ComplexMat<CH,S> &complex_result)
 {
     TRACE("");
     DEBUG_PRINT(real_input);
@@ -44,7 +45,8 @@ void Fft::forward(const MatScales &real_input, ComplexMat &complex_result)
     (void)complex_result;
 }
 
-void Fft::forward_window(MatScaleFeats &patch_feats, ComplexMat &complex_result, MatScaleFeats &tmp)
+template <int CH, int S>
+void Fft::forward_window(MatScaleFeats &patch_feats, ComplexMat<CH,S> &complex_result, MatScaleFeats &tmp)
 {
         assert(patch_feats.dims == 4);
 #ifdef BIG_BATCH
@@ -71,7 +73,8 @@ void Fft::forward_window(MatScaleFeats &patch_feats, ComplexMat &complex_result,
         (void)tmp;
 }
 
-void Fft::inverse(ComplexMat &complex_input, MatScales &real_result)
+template <int CH, int S>
+void Fft::inverse(ComplexMat<CH,S> &complex_input, MatScales &real_result)
 {
     TRACE("");
     DEBUG_PRINT(complex_input);

@@ -13,7 +13,7 @@
 #include <cufft.h>
 #endif
 
-template <int C, int R, int CH, int S>
+template <int C, int R, int CH, int S=1>
 class ComplexMat_ {
   public:
     typedef float T;
@@ -286,7 +286,7 @@ class ComplexMat_ {
 #endif
 };
 
-template <int CH, int S>
+template <int CH, int S=1>
 using ComplexMat = ComplexMat_<complexmat_w, complexmat_h, CH, S>;
 
 #endif // COMPLEX_MAT_HPP_213123048309482094

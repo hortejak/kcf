@@ -13,7 +13,8 @@ class Fftw : public Fft
 {
   public:
     Fftw();
-    void init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales);
+    template <unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales>
+    void init();
     void set_window(const MatDynMem &window);
     template <int CH, int S>
     void forward(const MatScales &real_input, ComplexMat<CH, S> &complex_result);
@@ -24,8 +25,10 @@ class Fftw : public Fft
     ~Fftw();
 
 protected:
-    fftwf_plan create_plan_fwd(uint howmany) const;
-    fftwf_plan create_plan_inv(uint howmany) const;
+    template <uint howmany>
+    fftwf_plan create_plan_fwd() const;
+    template <uint howmany>
+    fftwf_plan create_plan_inv() const;
 
 private:
     cv::Mat m_window;
