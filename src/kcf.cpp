@@ -39,6 +39,7 @@ cv::Point_<_Tp> operator / (const cv::Point_<_Tp>& a, double b)
 
 #endif
 
+
 class Kcf_Tracker_Private {
     friend KCF_Tracker;
 
@@ -81,13 +82,13 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
     DEBUG_PRINTM(model->model_xf);
 
     if (m_use_linearkernel) {
-        ComplexMat xfconj = model->xf.conj();
+        ComplexMat<Model::n_feats> xfconj = model->xf.conj();
         model->model_alphaf_num = xfconj.mul(model->yf);
         model->model_alphaf_den = (model->xf * xfconj);
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
         cv::Size sz(Fft::freq_size(feature_size));
-        ComplexMat kf(sz.height, sz.width, 1);
+        ComplexMat<1> kf();
         (*gaussian_correlation)(kf, model->model_xf, model->model_xf, p_kernel_sigma, true, *this);
         DEBUG_PRINTM(kf);
         model->model_alphaf_num = model->yf * kf;
@@ -194,7 +195,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     }
 #endif
 
-    model.reset(new Model(feature_size, p_num_of_feats));
+    model.reset(new Model(feature_size));
     d.reset(new Kcf_Tracker_Private(*this));
 
 #ifndef BIG_BATCH
@@ -205,7 +206,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     d->threadctxs.emplace_back(feature_size, (int)p_num_of_feats, p_scales, p_angles);
 #endif
 
-    gaussian_correlation.reset(new GaussianCorrelation(1, p_num_of_feats, feature_size));
+    gaussian_correlation.reset(new GaussianCorrelation<p_num_of_feats,1>(feature_size));
 
     p_current_center = p_init_pose.center();
     p_current_scale = 1.;
@@ -733,7 +734,7 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     return patch;
 }
 
-void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat &result, const ComplexMat &xf, const ComplexMat &yf,
+void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat<num_feats,num_scales> &result, const ComplexMat<num_feats,num_scales> &xf, const ComplexMat<num_feats,num_scales> &yf,
                                                   double sigma, bool auto_correlation, const KCF_Tracker &kcf)
 {
     TRACE("");

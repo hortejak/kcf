@@ -29,7 +29,11 @@ private:
 
 struct ThreadCtx {
   public:
-    ThreadCtx(cv::Size roi, uint num_features
+    static constexpr uint num_features = KCF_Tracker::p_num_of_feats;
+    static constexpr uint num_scales = KCF_Tracker::p_num_scales;
+    static constexpr uint num_angles = KCF_Tracker::p_num_angles;
+
+    ThreadCtx(cv::Size roi
 #ifdef BIG_BATCH
               , const std::vector<double> &scales
               , const std::vector<double> &angles
@@ -39,9 +43,6 @@ struct ThreadCtx {
 #endif
              )
         : roi(roi)
-        , num_features(num_features)
-        , num_scales(IF_BIG_BATCH(scales.size(), 1))
-        , num_angles(IF_BIG_BATCH(angles.size(), 1))
 #ifdef BIG_BATCH
         , max(scales, angles)
         , dbg_patch(scales, angles)
@@ -57,25 +58,20 @@ struct ThreadCtx {
 
 
     ThreadCtx(ThreadCtx &&) = default;
-
     void track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input_gray);
 private:
     cv::Size roi;
-    uint num_features;
-    uint num_scales;
-    uint num_angles;
     cv::Size freq_size = Fft::freq_size(roi);
 
     MatScaleFeats patch_feats{num_scales * num_angles, num_features, roi};
     MatScaleFeats temp{num_scales * num_angles, num_features, roi};
 
-    KCF_Tracker::GaussianCorrelation gaussian_correlation{num_scales * num_angles, num_features, roi};
+    KCF_Tracker::GaussianCorrelation<num_features,num_scales*num_angles> gaussian_correlation{roi};
 
-    MatScales ifft2_res{num_scales * num_angles, roi};
+    MatScales ifft1_res{num_scales * num_angles, roi};
 
-    ComplexMat zf{uint(freq_size.height), uint(freq_size.width), num_features, num_scales * num_angles};
-    ComplexMat kzf{uint(freq_size.height), uint(freq_size.width), 1, num_scales * num_angles};
-
+    ComplexMat<num_features,num_scales*num_angles> zf;
+    ComplexMat<1,num_scales*num_angles> kzf;
 public:
 #ifdef ASYNC
     std::future<void> async_res;
