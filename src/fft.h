@@ -17,9 +17,8 @@
 
 class Fft
 {
-
 public:
-    void init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales);    
+    void init(unsigned width, unsigned height, unsigned num_of_feats, unsigned num_of_scales);
     void set_window(const MatDynMem &window);
     template <int CH, int S>
     void forward(const MatScales &real_input, ComplexMat<CH, S> &complex_result);

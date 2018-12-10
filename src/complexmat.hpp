@@ -164,7 +164,7 @@ class ComplexMat_ {
     { return mat_const_operator([&rhs](std::complex<T> &c) { c += rhs; }); }
 
     // multiplying element-wise multichannel by one channel mats (rhs mat is with one channel)
-    ComplexMat_ mul(const ComplexMat_ &rhs) const
+    ComplexMat_ mul(const ComplexMat_<complexmat_w, complexmat_h, 1, n_scales> &rhs) const
     {
         return matn_mat1_operator([](std::complex<T> &c_lhs, const std::complex<T> &c_rhs) { c_lhs *= c_rhs; }, rhs);
     }

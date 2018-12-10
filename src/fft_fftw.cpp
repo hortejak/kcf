@@ -95,7 +95,6 @@ void Fftw::forward(const MatScales &real_input, ComplexMat<CH,S> &complex_result
 #endif
 }
 
-
 template <int CH, int S>
 void Fftw::forward_window(MatScaleFeats  &feat, ComplexMat<CH,S> & complex_result, MatScaleFeats &temp)
 {

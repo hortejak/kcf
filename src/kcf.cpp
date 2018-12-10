@@ -39,7 +39,6 @@ cv::Point_<_Tp> operator / (const cv::Point_<_Tp>& a, double b)
 
 #endif
 
-
 class Kcf_Tracker_Private {
     friend KCF_Tracker;
 
@@ -82,13 +81,13 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
     DEBUG_PRINTM(model->model_xf);
 
     if (m_use_linearkernel) {
-        ComplexMat<Model::n_feats> xfconj = model->xf.conj();
+        /*ComplexMat<Model::num_feats> xfconj = model->xf.conj();
         model->model_alphaf_num = xfconj.mul(model->yf);
-        model->model_alphaf_den = (model->xf * xfconj);
+        model->model_alphaf_den = (model->xf * xfconj);*/
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
         cv::Size sz(Fft::freq_size(feature_size));
-        ComplexMat<1> kf();
+        ComplexMat<1> kf(sz.height, sz.width, 1);
         (*gaussian_correlation)(kf, model->model_xf, model->model_xf, p_kernel_sigma, true, *this);
         DEBUG_PRINTM(kf);
         model->model_alphaf_num = model->yf * kf;
@@ -195,7 +194,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     }
 #endif
 
-    model.reset(new Model(feature_size));
+    model.reset(new Model(feature_size, p_num_of_feats));
     d.reset(new Kcf_Tracker_Private(*this));
 
 #ifndef BIG_BATCH
@@ -206,7 +205,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     d->threadctxs.emplace_back(feature_size, (int)p_num_of_feats, p_scales, p_angles);
 #endif
 
-    gaussian_correlation.reset(new GaussianCorrelation<p_num_of_feats,1>(feature_size));
+    gaussian_correlation.reset(new GaussianCorrelation<p_num_of_feats,1>(1, p_num_of_feats, feature_size));
 
     p_current_center = p_init_pose.center();
     p_current_scale = 1.;
@@ -229,7 +228,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_output_sigma = std::sqrt(p_init_pose.w * p_init_pose.h * double(fit_size.area()) / p_windows_size.area())
            * p_output_sigma_factor / p_cell_size;
 
-    fft.init(feature_size.width, feature_size.height, p_num_of_feats, p_num_scales * p_num_angles);
+    fft.init<complexmat_w,complexmat_h,p_num_of_feats, p_num_scales * p_num_angles>();
     fft.set_window(MatDynMem(cosine_window_function(feature_size.width, feature_size.height)));
 
     // window weights, i.e. labels
@@ -465,7 +464,7 @@ void ThreadCtx::track(const KCF_Tracker &kcf, cv::Mat &input_rgb, cv::Mat &input
     DEBUG_PRINTM(zf);
 
     if (kcf.m_use_linearkernel) {
-        kzf = zf.mul(kcf.model->model_alphaf).sum_over_channels();
+        //kzf = zf.mul(kcf.model->model_alphaf).sum_over_channels();
     } else {
         gaussian_correlation(kzf, zf, kcf.model->model_xf, kcf.p_kernel_sigma, false, kcf);
         DEBUG_PRINTM(kzf);
@@ -734,7 +733,7 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     return patch;
 }
 
-void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat<num_feats,num_scales> &result, const ComplexMat<num_feats,num_scales> &xf, const ComplexMat<num_feats,num_scales> &yf,
+void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat<1,n_scales> &result, const ComplexMat<n_feats,n_scales> &xf, const ComplexMat<n_feats,n_scales> &yf,
                                                   double sigma, bool auto_correlation, const KCF_Tracker &kcf)
 {
     TRACE("");

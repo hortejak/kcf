@@ -49,8 +49,6 @@ struct BBox_c
 
 };
 
-
-
 class KCF_Tracker
 {
     friend ThreadCtx;
@@ -133,43 +131,53 @@ private:
 
     class Model {
         cv::Size feature_size;
+        uint height, width, n_feats;
     public:
-        static constexpr uint n_feats= KCF_Tracker::p_num_of_feats;
-        ComplexMat<1> yf; 
-        ComplexMat<1> model_alphaf; 
-        ComplexMat<1> model_alphaf_num; 
-        ComplexMat<1> model_alphaf_den; 
-        ComplexMat<n_feats> model_xf; 
-        ComplexMat<n_feats> xf; 
+        static constexpr uint num_feats= KCF_Tracker::p_num_of_feats;
+        ComplexMat<1> yf {height, width, 1}; 
+        ComplexMat<1> model_alphaf {height, width, 1}; 
+        ComplexMat<1> model_alphaf_num {height, width, 1}; 
+        ComplexMat<1> model_alphaf_den {height, width, 1}; 
+        ComplexMat<num_feats> model_xf {height, width, n_feats}; 
+        ComplexMat<num_feats> xf {height, width, n_feats}; 
         // Temporary variables for trainig
         MatScaleFeats patch_feats{1, n_feats, feature_size};
         MatScaleFeats temp{1, n_feats, feature_size};
 
 
 
-        Model(cv::Size feature_size)
-            : feature_size(feature_size) {}
+        Model(cv::Size feature_size, uint _n_feats)
+            : feature_size(feature_size) 
+            , height(Fft::freq_size(feature_size).height)
+            , width(Fft::freq_size(feature_size).width)
+            , n_feats(_n_feats) 
+            {
+                assert(n_feats==num_feats);
+            }
     };
 
     std::unique_ptr<Model> model;
-
+    
     template<uint GC_CH, uint GC_S>
     class GaussianCorrelation {
       public:
-      static constexpr uint num_feats=GC_CH; 
-      static constexpr uint num_scales=GC_S;
-        GaussianCorrelation(cv::Size size)
+      static constexpr uint n_feats=GC_CH; 
+      static constexpr uint n_scales=GC_S;
+        GaussianCorrelation(uint num_scales, uint num_feats, cv::Size size)
             : xf_sqr_norm(num_scales)
-            , xyf(Fft::freq_size(size))
+            , xyf(Fft::freq_size(size),num_feats,num_scales)
             , ifft_res(num_scales, size)
             , k(num_scales, size)
-        {}
-        void operator()(ComplexMat<num_feats,num_scales> &result, const ComplexMat<num_feats,num_scales> &xf, const ComplexMat<num_feats,num_scales> &yf, double sigma, bool auto_correlation, const KCF_Tracker &kcf);
+        {
+            assert(num_scales==n_scales);
+            assert(num_feats ==n_feats);
+        }
+        void operator()(ComplexMat<1,n_scales> &result, const ComplexMat<n_feats,n_scales> &xf, const ComplexMat<n_feats,1> &yf, double sigma, bool auto_correlation, const KCF_Tracker &kcf);
 
       private:
         DynMem xf_sqr_norm;
         DynMem yf_sqr_norm{1};
-        ComplexMat<num_feats,num_scales> xyf;
+        ComplexMat<n_feats,n_scales> xyf;
         MatScales ifft_res;
         MatScales k;
     };
@@ -178,7 +186,7 @@ private:
     void scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray);
     cv::Mat get_subwindow(const cv::Mat &input, int cx, int cy, int size_x, int size_y, double angle) const;
     cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);
-    std::unique_ptr<GaussianCorrelation<KCF_Tracker::p_num_of_feats,1>> gaussian_correlation; //TODO: add real numbers here
+    std::unique_ptr<GaussianCorrelation<KCF_Tracker::p_num_of_feats,1>> gaussian_correlation;
     cv::Mat circshift(const cv::Mat &patch, int x_rot, int y_rot) const;
     cv::Mat cosine_window_function(int dim1, int dim2);
     cv::Mat get_features(cv::Mat &input_rgb, cv::Mat &input_gray, cv::Mat *dbg_patch, int cx, int cy, int size_x, int size_y, double scale, double angle) const;
