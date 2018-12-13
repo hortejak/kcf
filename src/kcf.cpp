@@ -87,7 +87,8 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
         cv::Size sz(Fft::freq_size(feature_size));
-        ComplexMat<1> kf(sz.height, sz.width, 1);
+        static constexpr uint NS= KCF_Tracker::p_num_scales*KCF_Tracker::p_num_angles;
+        ComplexMat<1,NS> kf(sz.height, sz.width, 1);
         (*gaussian_correlation)(kf, model->model_xf, model->model_xf, p_kernel_sigma, true, *this);
         DEBUG_PRINTM(kf);
         model->model_alphaf_num = model->yf * kf;
@@ -205,7 +206,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     d->threadctxs.emplace_back(feature_size, (int)p_num_of_feats, p_scales, p_angles);
 #endif
 
-    gaussian_correlation.reset(new GaussianCorrelation<p_num_of_feats,1>(1, p_num_of_feats, feature_size));
+    gaussian_correlation.reset(new GaussianCorrelation<p_num_of_feats,KCF_Tracker::p_num_scales*KCF_Tracker::p_num_angles>(1, p_num_of_feats, feature_size));
 
     p_current_center = p_init_pose.center();
     p_current_scale = 1.;
@@ -733,9 +734,8 @@ cv::Mat KCF_Tracker::get_subwindow(const cv::Mat &input, int cx, int cy, int wid
     return patch;
 }
 
-void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat<1,n_scales> &result, const ComplexMat<n_feats,n_scales> &xf, const ComplexMat<n_feats,n_scales> &yf,
-                                                  double sigma, bool auto_correlation, const KCF_Tracker &kcf)
-{
+template <uint GC_CH, uint GC_S>
+void KCF_Tracker::GaussianCorrelation<GC_CH,GC_S>::operator()(ComplexMat<1,n_scales> &result, const ComplexMat<n_feats,n_scales> &xf, const ComplexMat<n_feats,n_scales> &yf, double sigma, bool auto_correlation, const KCF_Tracker &kcf){
     TRACE("");
     DEBUG_PRINTM(xf);
     DEBUG_PRINT(xf_sqr_norm.num_elem);
@@ -754,7 +754,7 @@ void KCF_Tracker::GaussianCorrelation::operator()(ComplexMat<1,n_scales> &result
     DEBUG_PRINTM(xyf);
 
     // ifft2 and sum over 3rd dimension, we dont care about individual channels
-    ComplexMat xyf_sum = xyf.sum_over_channels();
+    ComplexMat<1,n_scales> xyf_sum = xyf.sum_over_channels();
     DEBUG_PRINTM(xyf_sum);
     kcf.fft.inverse(xyf_sum, ifft_res);
     DEBUG_PRINTM(ifft_res);

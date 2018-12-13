@@ -134,12 +134,13 @@ private:
         uint height, width, n_feats;
     public:
         static constexpr uint num_feats= KCF_Tracker::p_num_of_feats;
-        ComplexMat<1> yf {height, width, 1}; 
-        ComplexMat<1> model_alphaf {height, width, 1}; 
-        ComplexMat<1> model_alphaf_num {height, width, 1}; 
-        ComplexMat<1> model_alphaf_den {height, width, 1}; 
-        ComplexMat<num_feats> model_xf {height, width, n_feats}; 
-        ComplexMat<num_feats> xf {height, width, n_feats}; 
+        static constexpr uint num_scales= KCF_Tracker::p_num_scales*KCF_Tracker::p_num_angles;
+        ComplexMat<1,num_scales> yf {height, width, 1}; 
+        ComplexMat<1,num_scales> model_alphaf {height, width, 1}; 
+        ComplexMat<1,num_scales> model_alphaf_num {height, width, 1}; 
+        ComplexMat<1,num_scales> model_alphaf_den {height, width, 1}; 
+        ComplexMat<num_feats,num_scales> model_xf {height, width, n_feats}; 
+        ComplexMat<num_feats,num_scales> xf {height, width, n_feats}; 
         // Temporary variables for trainig
         MatScaleFeats patch_feats{1, n_feats, feature_size};
         MatScaleFeats temp{1, n_feats, feature_size};
@@ -172,7 +173,7 @@ private:
             assert(num_scales==n_scales);
             assert(num_feats ==n_feats);
         }
-        void operator()(ComplexMat<1,n_scales> &result, const ComplexMat<n_feats,n_scales> &xf, const ComplexMat<n_feats,1> &yf, double sigma, bool auto_correlation, const KCF_Tracker &kcf);
+        void operator()(ComplexMat<1,n_scales> &result, const ComplexMat<n_feats,n_scales> &xf, const ComplexMat<n_feats,n_scales> &yf, double sigma, bool auto_correlation, const KCF_Tracker &kcf);
 
       private:
         DynMem xf_sqr_norm;
@@ -186,7 +187,7 @@ private:
     void scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray);
     cv::Mat get_subwindow(const cv::Mat &input, int cx, int cy, int size_x, int size_y, double angle) const;
     cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);
-    std::unique_ptr<GaussianCorrelation<KCF_Tracker::p_num_of_feats,1>> gaussian_correlation;
+    std::unique_ptr<GaussianCorrelation<KCF_Tracker::p_num_of_feats,KCF_Tracker::p_num_scales*KCF_Tracker::p_num_angles>> gaussian_correlation;
     cv::Mat circshift(const cv::Mat &patch, int x_rot, int y_rot) const;
     cv::Mat cosine_window_function(int dim1, int dim2);
     cv::Mat get_features(cv::Mat &input_rgb, cv::Mat &input_gray, cv::Mat *dbg_patch, int cx, int cy, int size_x, int size_y, double scale, double angle) const;

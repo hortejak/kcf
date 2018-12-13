@@ -23,6 +23,8 @@ class ComplexMat_ {
     static constexpr uint n_channels = CH;
     static constexpr uint n_scales = S;
 
+    template<int, int, int, int> friend class ComplexMat_;
+
     ComplexMat_(uint _rows, uint _cols, uint _n_channels, uint _n_scales = 1)
         : //cols(_cols), rows(_rows), n_channels(_n_channels * _n_scales), n_scales(_n_scales),
           p_data(n_channels * cols * rows) {}
@@ -98,14 +100,14 @@ class ComplexMat_ {
         return mat_const_operator([](std::complex<T> &c) { c = std::complex<T>(c.real(), -c.imag()); });
     }
 
-    ComplexMat_ sum_over_channels() const
+    ComplexMat_<cols,rows,1,n_scales> sum_over_channels() const
     {
         assert(p_data.num_elem == n_channels * rows * cols);
 
         uint n_channels_per_scale = n_channels / n_scales;
         uint scale_offset = n_channels_per_scale * rows * cols;
 
-        ComplexMat_ result(this->rows, this->cols, 1, n_scales);
+        ComplexMat_<cols,rows,1,n_scales> result(this->rows, this->cols, 1, n_scales);
         for (uint scale = 0; scale < n_scales; ++scale) {
             for (uint i = 0; i < rows * cols; ++i) {
                 std::complex<T> acc = 0;

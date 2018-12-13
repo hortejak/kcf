@@ -11,7 +11,8 @@ void FftOpencv::set_window(const MatDynMem &window)
     m_window = window;
 }
 
-void FftOpencv::forward(const MatScales &real_input, ComplexMat &complex_result)
+template<uint CH, uint S>
+void FftOpencv::forward(const MatScales &real_input, ComplexMat<CH,S> &complex_result)
 {
     Fft::forward(real_input, complex_result);
 
@@ -20,7 +21,8 @@ void FftOpencv::forward(const MatScales &real_input, ComplexMat &complex_result)
     complex_result = ComplexMat(tmp);
 }
 
-void FftOpencv::forward_window(MatScaleFeats &feat, ComplexMat &complex_result, MatScaleFeats &temp)
+template<uint CH, uint S>
+void FftOpencv::forward_window(MatScaleFeats &feat, ComplexMat<CH,S> &complex_result, MatScaleFeats &temp)
 {
     Fft::forward_window(feat, complex_result, temp);
 
@@ -34,7 +36,8 @@ void FftOpencv::forward_window(MatScaleFeats &feat, ComplexMat &complex_result, 
     }
 }
 
-void FftOpencv::inverse(ComplexMat &  complex_input, MatScales & real_result)
+template<uint CH, uint S>
+void FftOpencv::inverse(ComplexMat<CH,S> &  complex_input, MatScales & real_result)
 {
     Fft::inverse(complex_input, real_result);
 
