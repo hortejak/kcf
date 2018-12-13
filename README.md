@@ -1,10 +1,13 @@
 # KCF tracker – parallel and PREM implementations
 
 The goal of this project is modify KCF tracker for use in the
-[HERCULES][1] project, where it will run on NVIDIA TX2 board. To
-achieve the needed performance we try various ways of parallelization
-of the algorithm including execution on the GPU. The aim is also to
-modify the code according to the PRedictable Execution Model (PREM).
+[HERCULES][1] project, where it will run on NVIDIA TX2 board. The
+differences from the [original version][orig] are:
+  * To achieve the needed performance on TX2, we try various ways of
+    parallelizing the algorithm, including execution on the GPU.
+  * The tracker is extended to track rotating objects.
+  * The aim is also to modify the code to comply with the PRedictable
+    Execution Model (PREM).
 
 Stable version of the tracker is available from a [CTU server][2],
 development happens at [GitHub][iig].
@@ -13,6 +16,7 @@ development happens at [GitHub][iig].
 [2]: http://rtime.felk.cvut.cz/gitweb/hercules2020/kcf.git
 [iig]: https://github.com/CTU-IIG/kcf
 [3]: https://github.com/Shanigen/kcf
+[orig]: https://github.com/vojirt/kcf
 
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
