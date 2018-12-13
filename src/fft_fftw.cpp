@@ -150,3 +150,10 @@ Fftw::~Fftw()
     if (plan_i_all_scales) fftwf_destroy_plan(plan_i_all_scales);
 #endif
 }
+
+// Template function/class instantiations
+
+template void Fftw::init<complexmat_w,complexmat_h,complexmat_ch1,complexmat_s1>();
+template void Fftw::init<complexmat_w,complexmat_h,complexmat_ch1,complexmat_s2>();
+template void Fftw::init<complexmat_w,complexmat_h,complexmat_ch2,complexmat_s1>();
+template void Fftw::init<complexmat_w,complexmat_h,complexmat_ch2,complexmat_s2>();

@@ -12,6 +12,13 @@ constexpr int complexmat_w = complexmat_h / 2 + 1;
 constexpr int complexmat_w = complexmat_h;
 #endif
 
+constexpr int complexmat_ch1 = 1;
+constexpr int complexmat_ch2 = 44;
+
+constexpr int complexmat_s1 = 1;
+constexpr int complexmat_s2 = 15;
+
+
 #define PREM_CONSTEXPR constexpr
 #define PREM_STATIC_CONSTEXPR static constexpr
 #define PREM(x) x
