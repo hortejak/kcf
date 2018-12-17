@@ -19,7 +19,7 @@ std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat<C
 {
     IOSave s(os);
     os << std::setprecision(DbgTracer::precision);
-    os << "<cplx> " << p.obj.size() << " " << p.obj.n_channels << "ch "; // << p.obj.get_p_data();
+    os << "<cplx> " << p.obj.size() << " " << p.obj.channels() << "ch "; // << p.obj.get_p_data();
     const int num = 10; //p.obj.rows * p.obj.cols * p.obj.n_channels / p.obj.n_scales;
     for (uint s = 0; s < p.obj.n_scales; ++s) {
         uint ofs = s * p.obj.rows * p.obj.cols * p.obj.n_channels / p.obj.n_scales;
