@@ -87,8 +87,7 @@ void KCF_Tracker::train(cv::Mat input_rgb, cv::Mat input_gray, double interp_fac
     } else {
         // Kernel Ridge Regression, calculate alphas (in Fourier domain)
         cv::Size sz(Fft::freq_size(feature_size));
-        static constexpr uint NS= KCF_Tracker::p_num_scales*KCF_Tracker::p_num_angles;
-        ComplexMat<1,NS> kf(sz.height, sz.width, 1);
+        ComplexMat<1> kf(sz.height, sz.width, 1);
         (*gaussian_correlation)(kf, model->model_xf, model->model_xf, p_kernel_sigma, true, *this);
         DEBUG_PRINTM(kf);
         model->model_alphaf_num = model->yf * kf;
@@ -206,7 +205,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     d->threadctxs.emplace_back(feature_size, (int)p_num_of_feats, p_scales, p_angles);
 #endif
 
-    gaussian_correlation.reset(new GaussianCorrelation<p_num_of_feats,KCF_Tracker::p_num_scales*KCF_Tracker::p_num_angles>(1, p_num_of_feats, feature_size));
+    gaussian_correlation.reset(new GaussianCorrelation<p_num_of_feats>(1, p_num_of_feats, feature_size));
 
     p_current_center = p_init_pose.center();
     p_current_scale = 1.;

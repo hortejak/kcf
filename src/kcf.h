@@ -158,7 +158,7 @@ private:
 
     std::unique_ptr<Model> model;
     
-    template<uint GC_CH, uint GC_S>
+    template<uint GC_CH, uint GC_S = 1>
     class GaussianCorrelation {
       public:
       static constexpr uint n_feats=GC_CH; 
@@ -186,7 +186,7 @@ private:
     void scale_track(ThreadCtx &vars, cv::Mat &input_rgb, cv::Mat &input_gray);
     cv::Mat get_subwindow(const cv::Mat &input, int cx, int cy, int size_x, int size_y, double angle) const;
     cv::Mat gaussian_shaped_labels(double sigma, int dim1, int dim2);
-    std::unique_ptr<GaussianCorrelation<KCF_Tracker::p_num_of_feats,KCF_Tracker::p_num_scales*KCF_Tracker::p_num_angles>> gaussian_correlation;
+    std::unique_ptr<GaussianCorrelation<KCF_Tracker::p_num_of_feats>> gaussian_correlation;
     cv::Mat circshift(const cv::Mat &patch, int x_rot, int y_rot) const;
     cv::Mat cosine_window_function(int dim1, int dim2);
     cv::Mat get_features(cv::Mat &input_rgb, cv::Mat &input_gray, cv::Mat *dbg_patch, int cx, int cy, int size_x, int size_y, double scale, double angle) const;
