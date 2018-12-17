@@ -11,7 +11,7 @@ template <uint howmany>
 fftwf_plan Fftw::create_plan_fwd() const
 {
     cv::Mat mat_in = cv::Mat::zeros(howmany * m_height, m_width, CV_32F);
-    ComplexMat<howmany,1> mat_out();
+    ComplexMat<howmany,1> mat_out(m_height, m_width / 2 + 1, howmany);
     float *in = reinterpret_cast<float *>(mat_in.data);
     fftwf_complex *out = reinterpret_cast<fftwf_complex *>(mat_out.get_p_data());
 
@@ -27,7 +27,7 @@ fftwf_plan Fftw::create_plan_fwd() const
 template <uint howmany>
 fftwf_plan Fftw::create_plan_inv() const
 {
-    ComplexMat<howmany,1> mat_in();
+    ComplexMat<howmany,1> mat_in(m_height, m_width / 2 + 1, howmany);
     cv::Mat mat_out = cv::Mat::zeros(howmany * m_height, m_width, CV_32F);
     fftwf_complex *in = reinterpret_cast<fftwf_complex *>(mat_in.get_p_data());
     float *out = reinterpret_cast<float *>(mat_out.data);
