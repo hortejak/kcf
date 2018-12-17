@@ -134,13 +134,12 @@ private:
         uint height, width, n_feats;
     public:
         static constexpr uint num_feats= KCF_Tracker::p_num_of_feats;
-        static constexpr uint num_scales= KCF_Tracker::p_num_scales*KCF_Tracker::p_num_angles;
-        ComplexMat<1,num_scales> yf {height, width, 1}; 
-        ComplexMat<1,num_scales> model_alphaf {height, width, 1}; 
-        ComplexMat<1,num_scales> model_alphaf_num {height, width, 1}; 
-        ComplexMat<1,num_scales> model_alphaf_den {height, width, 1}; 
-        ComplexMat<num_feats,num_scales> model_xf {height, width, n_feats}; 
-        ComplexMat<num_feats,num_scales> xf {height, width, n_feats}; 
+        ComplexMat<1> yf {height, width, 1};
+        ComplexMat<1> model_alphaf {height, width, 1};
+        ComplexMat<1> model_alphaf_num {height, width, 1};
+        ComplexMat<1> model_alphaf_den {height, width, 1};
+        ComplexMat<num_feats> model_xf {height, width, n_feats};
+        ComplexMat<num_feats> xf {height, width, n_feats};
         // Temporary variables for trainig
         MatScaleFeats patch_feats{1, n_feats, feature_size};
         MatScaleFeats temp{1, n_feats, feature_size};
