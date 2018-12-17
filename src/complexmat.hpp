@@ -27,7 +27,12 @@ class ComplexMat_ {
 
     ComplexMat_(uint _rows, uint _cols, uint _n_channels, uint _n_scales = 1)
         : //cols(_cols), rows(_rows), n_channels(_n_channels * _n_scales), n_scales(_n_scales),
-          p_data(n_channels * cols * rows) {}
+          p_data(n_channels * cols * rows) {
+        assert(_rows == rows);
+        assert(_cols == cols);
+        assert(_n_channels == n_channels);
+        assert(_n_scales == n_scales);
+    }
     ComplexMat_(cv::Size size, uint _n_channels, uint _n_scales = 1)
         : //cols(size.width), rows(size.height), n_channels(_n_channels * _n_scales), n_scales(_n_scales),
           p_data(n_channels * cols * rows) {}
