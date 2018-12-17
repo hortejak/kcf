@@ -109,8 +109,8 @@ class ComplexMat_ {
     {
         assert(p_data.num_elem == n_channels * rows * cols);
 
-        uint n_channels_per_scale = n_channels / n_scales;
-        uint scale_offset = n_channels_per_scale * rows * cols;
+        constexpr uint n_channels_per_scale = n_channels / n_scales;
+        constexpr uint scale_offset = n_channels_per_scale * rows * cols;
 
         ComplexMat_<cols,rows,1,n_scales> result(this->rows, this->cols, 1, n_scales);
         for (uint scale = 0; scale < n_scales; ++scale) {
