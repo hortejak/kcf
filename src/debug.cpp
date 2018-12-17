@@ -30,3 +30,10 @@ std::ostream &operator<<(std::ostream &os, const DbgTracer::Printer<ComplexMat<C
     }
     return os;
 }
+
+// Template function/class instantiations
+
+template std::ostream &operator<<<complexmat_ch1,complexmat_s1>(std::ostream &os, const DbgTracer::Printer<ComplexMat<complexmat_ch1,complexmat_s1>> &p);
+template std::ostream &operator<<<complexmat_ch1,complexmat_s2>(std::ostream &os, const DbgTracer::Printer<ComplexMat<complexmat_ch1,complexmat_s2>> &p);
+template std::ostream &operator<<<complexmat_ch2,complexmat_s1>(std::ostream &os, const DbgTracer::Printer<ComplexMat<complexmat_ch2,complexmat_s1>> &p);
+template std::ostream &operator<<<complexmat_ch2,complexmat_s2>(std::ostream &os, const DbgTracer::Printer<ComplexMat<complexmat_ch2,complexmat_s2>> &p);

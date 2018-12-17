@@ -94,3 +94,21 @@ void Fft::inverse(ComplexMat<CH,S> &complex_input, MatScales &real_result)
     (void)complex_input;
     (void)real_result;
 }
+
+// Template function/class instantiations
+
+template void Fft::forward<complexmat_ch1,complexmat_s1>(const MatScales &real_input, ComplexMat<complexmat_ch1,complexmat_s1> &complex_result);
+template void Fft::forward<complexmat_ch1,complexmat_s2>(const MatScales &real_input, ComplexMat<complexmat_ch1,complexmat_s2> &complex_result);
+template void Fft::forward<complexmat_ch2,complexmat_s1>(const MatScales &real_input, ComplexMat<complexmat_ch2,complexmat_s1> &complex_result);
+template void Fft::forward<complexmat_ch2,complexmat_s2>(const MatScales &real_input, ComplexMat<complexmat_ch2,complexmat_s2> &complex_result);
+
+template void Fft::forward_window<complexmat_ch1,complexmat_s1>(MatScaleFeats  &feat, ComplexMat    <complexmat_ch1,complexmat_s1> & complex_result, MatScaleFeats &temp);
+template void Fft::forward_window<complexmat_ch1,complexmat_s2>(MatScaleFeats  &feat, ComplexMat    <complexmat_ch1,complexmat_s2> & complex_result, MatScaleFeats &temp);
+template void Fft::forward_window<complexmat_ch2,complexmat_s1>(MatScaleFeats  &feat, ComplexMat    <complexmat_ch2,complexmat_s1> & complex_result, MatScaleFeats &temp);
+template void Fft::forward_window<complexmat_ch2,complexmat_s2>(MatScaleFeats  &feat, ComplexMat    <complexmat_ch2,complexmat_s2> & complex_result, MatScaleFeats &temp);
+
+template void Fft::inverse<complexmat_ch1,complexmat_s1>(ComplexMat<complexmat_ch1,complexmat_s1    > &complex_input, MatScales &real_result);
+template void Fft::inverse<complexmat_ch1,complexmat_s2>(ComplexMat<complexmat_ch1,complexmat_s2    > &complex_input, MatScales &real_result);
+template void Fft::inverse<complexmat_ch2,complexmat_s1>(ComplexMat<complexmat_ch2,complexmat_s1    > &complex_input, MatScales &real_result);
+template void Fft::inverse<complexmat_ch2,complexmat_s2>(ComplexMat<complexmat_ch2,complexmat_s2    > &complex_input, MatScales &real_result);
+
