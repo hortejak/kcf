@@ -23,7 +23,7 @@ class ComplexMat_ {
     static constexpr uint n_channels = CH;
     static constexpr uint n_scales = S;
 
-    template<int, int, int, int> friend class ComplexMat_;
+    template <int XCH> friend ComplexMat_<C, R, 1, S> ComplexMat_<C, R, XCH, S>::sum_over_channels();
 
     ComplexMat_(uint _rows, uint _cols, uint _n_channels, uint _n_scales = 1)
         : //cols(_cols), rows(_rows), n_channels(_n_channels * _n_scales), n_scales(_n_scales),
