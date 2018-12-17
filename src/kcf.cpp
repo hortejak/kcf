@@ -228,7 +228,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
     p_output_sigma = std::sqrt(p_init_pose.w * p_init_pose.h * double(fit_size.area()) / p_windows_size.area())
            * p_output_sigma_factor / p_cell_size;
 
-    fft.init<complexmat_w,complexmat_h,p_num_of_feats, p_num_scales * p_num_angles>();
+    fft.init<complexmat_w,complexmat_h,p_num_of_feats, 1/*p_num_scales * p_num_angles*/>();
     fft.set_window(MatDynMem(cosine_window_function(feature_size.width, feature_size.height)));
 
     // window weights, i.e. labels

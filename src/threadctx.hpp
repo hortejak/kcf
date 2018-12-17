@@ -76,12 +76,12 @@ private:
     MatScaleFeats patch_feats{num_scales * num_angles, num_features, roi};
     MatScaleFeats temp{num_scales * num_angles, num_features, roi};
 
-    KCF_Tracker::GaussianCorrelation<n_feats,n_scales*n_angles> gaussian_correlation{num_scales*num_angles, num_features, roi};
+    KCF_Tracker::GaussianCorrelation<n_feats,1/*n_scales*n_angles*/> gaussian_correlation{1/*num_scales*num_angles*/, num_features, roi};
 
     MatScales ifft1_res{num_scales * num_angles, roi};
 
-    ComplexMat<n_feats,n_scales*n_angles> zf{uint(freq_size.height), uint(freq_size.width), num_features, num_scales * num_angles};
-    ComplexMat<1,n_scales*n_angles> kzf{uint(freq_size.height), uint(freq_size.width), 1, num_scales * num_angles};
+    ComplexMat<n_feats,1/*n_scales*n_angles*/> zf{uint(freq_size.height), uint(freq_size.width), num_features, 1 /*num_scales * num_angles*/};
+    ComplexMat<1,1/*n_scales*n_angles*/> kzf{uint(freq_size.height), uint(freq_size.width), 1, /*num_scales * num_angles*/};
 public:
 #ifdef ASYNC
     std::future<void> async_res;
