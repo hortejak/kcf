@@ -1,13 +1,14 @@
 #ifndef COMPLEX_MAT_HPP_213123048309482094
 #define COMPLEX_MAT_HPP_213123048309482094
 
-#include <opencv2/opencv.hpp>
+#include <opencv2/core/types.hpp>
 #include <vector>
 #include <algorithm>
 #include <functional>
 #include "dynmem.hpp"
 #include "pragmas.h"
 #include "prem.hpp"
+#include <complex>
 
 #ifdef CUFFT
 #include <cufft.h>
@@ -23,7 +24,7 @@ class ComplexMat_ {
     static constexpr uint n_channels = CH;
     static constexpr uint n_scales = S;
 
-    template <int XCH> friend ComplexMat_<C, R, 1, S> ComplexMat_<C, R, XCH, S>::sum_over_channels();
+    template <int, int, int, int> friend class ComplexMat_;
 
     ComplexMat_(uint _rows, uint _cols, uint _n_channels, uint _n_scales = 1)
         : //cols(_cols), rows(_rows), n_channels(_n_channels * _n_scales), n_scales(_n_scales),
@@ -43,12 +44,12 @@ class ComplexMat_ {
     }
 
     // assuming that mat has 2 channels (real, img)
-    ComplexMat_(const cv::Mat &mat) : //cols(uint(mat.cols)), rows(uint(mat.rows)), n_channels(1), n_scales(1),
-                                      p_data(n_channels * cols * rows)
-    {
-        cudaSync();
-        memcpy(p_data.hostMem(), mat.ptr<std::complex<T>>(), mat.total() * mat.elemSize());
-    }
+//     ComplexMat_(const cv::Mat &mat) : //cols(uint(mat.cols)), rows(uint(mat.rows)), n_channels(1), n_scales(1),
+//                                       p_data(n_channels * cols * rows)
+//     {
+//         cudaSync();
+//         memcpy(p_data.hostMem(), mat.ptr<std::complex<T>>(), mat.total() * mat.elemSize());
+//     }
 
     static ComplexMat_ same_size(const ComplexMat_ &o)
     {
@@ -60,16 +61,16 @@ class ComplexMat_ {
     uint channels() const { return n_channels; }
 
     // assuming that mat has 2 channels (real, imag)
-    void set_channel(uint idx, const cv::Mat &mat)
-    {
-        assert(idx < n_channels);
-        cudaSync();
-        for (uint i = 0; i < rows; ++i) {
-            const std::complex<T> *row = mat.ptr<std::complex<T>>(i);
-            for (uint j = 0; j < cols; ++j)
-                p_data.hostMem()[idx * rows * cols + i * cols + j] = row[j];
-        }
-    }
+//     void set_channel(uint idx, const cv::Mat &mat)
+//     {
+//         assert(idx < n_channels);
+//         cudaSync();
+//         for (uint i = 0; i < rows; ++i) {
+//             const std::complex<T> *row = mat.ptr<std::complex<T>>(i);
+//             for (uint j = 0; j < cols; ++j)
+//                 p_data.hostMem()[idx * rows * cols + i * cols + j] = row[j];
+//         }
+//     }
 
     T sqr_norm() const
     {
@@ -130,22 +131,22 @@ class ComplexMat_ {
     }
 
     // return 2 channels (real, imag) for first complex channel
-    cv::Mat to_cv_mat() const
-    {
-        assert(p_data.num_elem >= 1);
-        return channel_to_cv_mat(0);
-    }
+//     cv::Mat to_cv_mat() const
+//     {
+//         assert(p_data.num_elem >= 1);
+//         return channel_to_cv_mat(0);
+//     }
     // return a vector of 2 channels (real, imag) per one complex channel
-    std::vector<cv::Mat> to_cv_mat_vector() const
-    {
-        std::vector<cv::Mat> result;
-        result.reserve(n_channels);
+//     std::vector<cv::Mat> to_cv_mat_vector() const
+//     {
+//         std::vector<cv::Mat> result;
+//         result.reserve(n_channels);
 
-        for (uint i = 0; i < n_channels; ++i)
-            result.push_back(channel_to_cv_mat(i));
+//         for (uint i = 0; i < n_channels; ++i)
+//             result.push_back(channel_to_cv_mat(i));
 
-        return result;
-    }
+//         return result;
+//     }
 
     std::complex<T> *get_p_data() {
         cudaSync();
@@ -176,7 +177,7 @@ class ComplexMat_ {
     { return mat_const_operator([&rhs](std::complex<T> &c) { c += rhs; }); }
 
     // multiplying element-wise multichannel by one channel mats (rhs mat is with one channel)
-    ComplexMat_ mul(const ComplexMat_<complexmat_w, complexmat_h, 1, n_scales> &rhs) const
+    ComplexMat_ mul(const ComplexMat_<C, R, 1, S> &rhs) const
     {
         return matn_mat1_operator([](std::complex<T> &c_lhs, const std::complex<T> &c_rhs) { c_lhs *= c_rhs; }, rhs);
     }
@@ -206,18 +207,18 @@ class ComplexMat_ {
     DynMem_<std::complex<T>> p_data;
 
     // convert 2 channel mat (real, imag) to vector row-by-row
-    std::vector<std::complex<T>> convert(const cv::Mat &mat)
-    {
-        std::vector<std::complex<T>> result;
-        result.reserve(mat.cols * mat.rows);
-        for (int y = 0; y < mat.rows; ++y) {
-            const T *row_ptr = mat.ptr<T>(y);
-            for (int x = 0; x < 2 * mat.cols; x += 2) {
-                result.push_back(std::complex<T>(row_ptr[x], row_ptr[x + 1]));
-            }
-        }
-        return result;
-    }
+//     std::vector<std::complex<T>> convert(const cv::Mat &mat)
+//     {
+//         std::vector<std::complex<T>> result;
+//         result.reserve(mat.cols * mat.rows);
+//         for (int y = 0; y < mat.rows; ++y) {
+//             const T *row_ptr = mat.ptr<T>(y);
+//             for (int x = 0; x < 2 * mat.cols; x += 2) {
+//                 result.push_back(std::complex<T>(row_ptr[x], row_ptr[x + 1]));
+//             }
+//         }
+//         return result;
+//     }
 
     ComplexMat_ mat_mat_operator(void (*op)(std::complex<T> &c_lhs, const std::complex<T> &c_rhs),
                                  const ComplexMat_ &mat_rhs) const
@@ -235,7 +236,7 @@ class ComplexMat_ {
         return result;
     }
     ComplexMat_ matn_mat1_operator(void (*op)(std::complex<T> &c_lhs, const std::complex<T> &c_rhs),
-                                   const ComplexMat_ &mat_rhs) const
+                                   const ComplexMat_<C, R, 1, S> &mat_rhs) const
     {
         assert(mat_rhs.n_channels == 1 && mat_rhs.cols == cols && mat_rhs.rows == rows);
 
@@ -279,17 +280,17 @@ class ComplexMat_ {
         return result;
     }
 
-    cv::Mat channel_to_cv_mat(int channel_id) const
-    {
-        cv::Mat result(rows, cols, CV_32FC2);
-        for (uint y = 0; y < rows; ++y) {
-            std::complex<T> *row_ptr = result.ptr<std::complex<T>>(y);
-            for (uint x = 0; x < cols; ++x) {
-                row_ptr[x] = p_data[channel_id * rows * cols + y * cols + x];
-            }
-        }
-        return result;
-    }
+//     cv::Mat channel_to_cv_mat(int channel_id) const
+//     {
+//         cv::Mat result(rows, cols, CV_32FC2);
+//         for (uint y = 0; y < rows; ++y) {
+//             std::complex<T> *row_ptr = result.ptr<std::complex<T>>(y);
+//             for (uint x = 0; x < cols; ++x) {
+//                 row_ptr[x] = p_data[channel_id * rows * cols + y * cols + x];
+//             }
+//         }
+//         return result;
+//     }
 
 #ifdef CUFFT
     void cudaSync() const;

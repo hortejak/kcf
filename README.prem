@@ -1,0 +1,5 @@
+<!-- -*-markdown-*- -->
+
+Command for CPU PREMization:
+
+    /opt/hercules-compiler/bin/clang++ -Rpass=inline -DNDEBUG -g -O3 -std=c++11 -Wall -Wextra -pedantic -Wno-long-long -fno-exceptions -fno-omit-frame-pointer  -rdynamic ../src/complexmat-test.cpp /opt/hercules-compiler/lib/hercules/libpremnotify-cpu.a -o complexmat-test |& c++filt | less -R

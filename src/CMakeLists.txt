@@ -147,3 +147,5 @@ endif()
 if(CMAKE_THREAD_LIBS_INIT)
   target_link_libraries(kcf "${CMAKE_THREAD_LIBS_INIT}")
 endif()
+
+add_executable(complexmat-test complexmat-test.cpp)
