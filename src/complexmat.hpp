@@ -167,8 +167,20 @@ class ComplexMat_ {
     { return mat_mat_operator([](std::complex<T> &c_lhs, const std::complex<T> &c_rhs) { c_lhs *= c_rhs; }, rhs); }
     ComplexMat_ operator/(const ComplexMat_ &rhs) const
     { return mat_mat_operator([](std::complex<T> &c_lhs, const std::complex<T> &c_rhs) { c_lhs /= c_rhs; }, rhs); }
-    ComplexMat_ operator+(const ComplexMat_ &rhs) const
-    { return mat_mat_operator([](std::complex<T> &c_lhs, const std::complex<T> &c_rhs) { c_lhs += c_rhs; }, rhs); }
+    ComplexMat_ operator+(const ComplexMat_ &mat_rhs) const
+    {
+	    ComplexMat_ result = *this;
+	    assert(mat_rhs.n_channels == n_channels/n_scales && mat_rhs.cols == cols && mat_rhs.rows == rows);
+
+	    for (uint s = 0; s < n_scales; ++s) {
+		    auto lhs = result.p_data.hostMem() + (s * n_channels/n_scales * rows * cols);
+		    auto rhs = mat_rhs.p_data.hostMem();
+		    for (uint i = 0; i < n_channels/n_scales * rows * cols; ++i)
+			    *(lhs + i) += *(rhs + i);
+	    }
+	    result.p_data.hostMem()[0] = 1;
+	    return result;
+    }
 
     // multiplying or adding constant
     ComplexMat_ operator*(const T &rhs) const
@@ -298,8 +310,5 @@ class ComplexMat_ {
     void cudaSync() const {}
 #endif
 };
-
-template <int CH, int S=1>
-using ComplexMat = ComplexMat_<complexmat_w, complexmat_h, CH, S>;
 
 #endif // COMPLEX_MAT_HPP_213123048309482094
