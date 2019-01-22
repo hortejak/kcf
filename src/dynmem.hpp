@@ -51,10 +51,9 @@ template <typename T> class DynMem_ {
     {
 #ifdef CUFFT
         ptr_h = reinterpret_cast<T*>(mmng.get(num_elem));
-        if (!ptr_h) {
-            printf("malloc(%zu)\n", num_elem);
+        if (!ptr_h)
             CudaSafeCall(cudaHostAlloc(reinterpret_cast<void **>(&ptr_h), num_elem * sizeof(T), cudaHostAllocMapped));
-	}
+
         CudaSafeCall(cudaHostGetDevicePointer(reinterpret_cast<void **>(&ptr_d), reinterpret_cast<void *>(ptr_h), 0));
 #else
         ptr_h = new T[num_elem];
