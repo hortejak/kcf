@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
         std::cerr << "Too many arguments\n";
         return 1;
     }
-    VOT vot_io(region, images, output);
+    VOT io(region, images, output);
 
     // if groundtruth.txt is used use intersection over union (IOU) to calculate tracker accuracy
     std::ifstream groundtruth_stream;
@@ -151,9 +151,9 @@ int main(int argc, char *argv[])
     cv::Mat image;
 
     //img = firts frame, initPos = initial position in the first frame
-    cv::Rect init_rect = vot_io.getInitRectangle();
-    vot_io.outputBoundingBox(init_rect);
-    vot_io.getNextImage(image);
+    cv::Rect init_rect = io.getInitRectangle();
+    io.outputBoundingBox(init_rect);
+    io.getNextImage(image);
 
     if (!video_out.empty()) {
         int codec = CV_FOURCC('M', 'J', 'P', 'G');  // select desired codec (must be available at runtime)
@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
 
     std::cout << std::fixed << std::setprecision(2);
 
-    while (vot_io.getNextImage(image) == 1){
+    while (io.getNextImage(image) == 1){
         double time_profile_counter = cv::getCPUTickCount();
         tracker.track(image);
         time_profile_counter = cv::getCPUTickCount() - time_profile_counter;
@@ -182,7 +182,7 @@ int main(int argc, char *argv[])
 
         bb = tracker.getBBox();
         bb_rect = cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h);
-        vot_io.outputBoundingBox(bb_rect);
+        io.outputBoundingBox(bb_rect);
 
         if (groundtruth_stream.is_open()) {
             std::string line;
