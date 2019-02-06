@@ -3,9 +3,13 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <iomanip>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <memory>
 
 #include "kcf.h"
 #include "vot.hpp"
+#include "videoio.hpp"
 
 double calcAccuracy(std::string line, cv::Rect bb_rect, cv::Rect &groundtruth_rect)
 {
@@ -75,6 +79,7 @@ int main(int argc, char *argv[])
             std::cerr << "Usage: \n"
                       << argv[0] << " [options]\n"
                       << argv[0] << " [options] <directory>\n"
+                      << argv[0] << " [options] <video_file>\n"
                       << argv[0] << " [options] <path/to/region.txt or groundtruth.txt> <path/to/images.txt> [path/to/output.txt]\n"
                       << "Options:\n"
                       << " --visualize    | -v[delay_ms]\n"
@@ -109,11 +114,23 @@ int main(int argc, char *argv[])
         }
     }
 
+    std::unique_ptr<VideoIO> io;
+
     switch (argc - optind) {
     case 1:
-        if (chdir(argv[optind]) == -1) {
+        struct stat st;
+        if (stat(argv[optind], &st) != 0) {
             perror(argv[optind]);
             exit(1);
+        }
+        if (S_ISDIR(st.st_mode)) {
+            if (chdir(argv[optind]) == -1) {
+                perror(argv[optind]);
+                exit(1);
+            }
+        } else if (S_ISREG(st.st_mode)) {
+            io.reset(new FileIO(argv[optind]));
+            break;
         }
         // Fall through
     case 0:
@@ -138,7 +155,9 @@ int main(int argc, char *argv[])
         std::cerr << "Too many arguments\n";
         return 1;
     }
-    VOT io(region, images, output);
+
+    if (!io)
+        io.reset(new VOT(region, images, output));
 
     // if groundtruth.txt is used use intersection over union (IOU) to calculate tracker accuracy
     std::ifstream groundtruth_stream;
@@ -151,9 +170,9 @@ int main(int argc, char *argv[])
     cv::Mat image;
 
     //img = firts frame, initPos = initial position in the first frame
-    cv::Rect init_rect = io.getInitRectangle();
-    io.outputBoundingBox(init_rect);
-    io.getNextImage(image);
+    cv::Rect init_rect = io->getInitRectangle();
+    io->outputBoundingBox(init_rect);
+    io->getNextImage(image);
 
     if (!video_out.empty()) {
         int codec = CV_FOURCC('M', 'J', 'P', 'G');  // select desired codec (must be available at runtime)
@@ -171,7 +190,7 @@ int main(int argc, char *argv[])
 
     std::cout << std::fixed << std::setprecision(2);
 
-    while (io.getNextImage(image) == 1){
+    while (io->getNextImage(image) == 1){
         double time_profile_counter = cv::getCPUTickCount();
         tracker.track(image);
         time_profile_counter = cv::getCPUTickCount() - time_profile_counter;
@@ -182,7 +201,7 @@ int main(int argc, char *argv[])
 
         bb = tracker.getBBox();
         bb_rect = cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h);
-        io.outputBoundingBox(bb_rect);
+        io->outputBoundingBox(bb_rect);
 
         if (groundtruth_stream.is_open()) {
             std::string line;

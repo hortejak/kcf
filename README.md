@@ -165,6 +165,10 @@ The binary can be run as follows:
 
 3. `./kcf_vot [options] <path/to/region.txt or groundtruth.txt> <path/to/images.txt> [path/to/output.txt]`
 
+4. `./kcf_vot [options] <file>`
+
+   Reads the images from `<file>`.
+
 By default the program generates file `output.txt` containing the
 bounding boxes of the tracked object in the format "top_left_x,
 top_left_y, width, height".

@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <opencv2/opencv.hpp>
+#include "videoio.hpp"
 
 
 // Bounding box type
@@ -30,7 +31,7 @@ typedef struct {
     float y4;
 } VOTPolygon;
 
-class VOT
+class VOT : public VideoIO
 {
 public:
     VOT(const std::string & region_file, const std::string & images, const std::string & ouput)
@@ -103,13 +104,13 @@ public:
         p_region_stream.close();
     }
 
-    ~VOT()
+    ~VOT() override
     {
         p_images_stream.close();
         p_output_stream.close();
     }
 
-    inline cv::Rect getInitRectangle() const 
+    inline cv::Rect getInitRectangle() const override
     {   
         // read init box from ground truth file
         VOTPolygon initPolygon = getInitPolygon();
@@ -120,11 +121,11 @@ public:
         return cv::Rect(x1, y1, x2-x1, y2-y1);
     }
 
-    inline VOTPolygon getInitPolygon() const 
+    inline VOTPolygon getInitPolygon() const
     {   return p_init_polygon;    }
 
 
-    inline void outputBoundingBox(const cv::Rect & bbox)
+    inline void outputBoundingBox(const cv::Rect & bbox) override
     {
         p_output_stream << bbox.x << "," << bbox.y << ",";
         p_output_stream << bbox.width << "," << bbox.height << std::endl;
@@ -138,7 +139,7 @@ public:
       p_output_stream << poly.x4 << "," << poly.y4 << std::endl;
     }
 
-    inline int getNextFileName(char * fName)
+    inline int getNextFileName(char * fName) override
     {
         if (p_images_stream.eof() || !p_images_stream.is_open())
             return -1;
@@ -148,7 +149,7 @@ public:
         return 1;
     }
 
-    inline int getNextImage(cv::Mat & img)
+    inline int getNextImage(cv::Mat & img) override
     {
         if (p_images_stream.eof() || !p_images_stream.is_open())
                 return -1;

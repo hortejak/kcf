@@ -27,7 +27,7 @@ include_directories(${CMAKE_SOURCE_DIR}/sse2neon)
 add_subdirectory(src)
 
 IF(NOT use_cuda)
-  add_executable(kcf_vot main_vot.cpp vot.hpp)
+  add_executable(kcf_vot main_vot.cpp vot.hpp videoio.cpp)
 ELSE()
   cuda_add_executable( kcf_vot main_vot.cpp vot.hpp )
   target_link_libraries(kcf_vot ${CUDA_LIBRARIES})
