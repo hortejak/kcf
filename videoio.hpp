@@ -23,6 +23,7 @@ public:
 
 private:
     cv::VideoCapture capture;
+    std::string filename;
 };
 
 #endif // VIDEOIO_HPP

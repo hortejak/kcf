@@ -256,7 +256,7 @@ int main(int argc, char *argv[])
 
     //img = firts frame, initPos = initial position in the first frame
     if (empty(init_rect))
-        init_rect = io->getInitRectangle(); // Try to get BBox from VOT files
+        init_rect = io->getInitRectangle(); // Try to get BBox from VOT or .txt files
 
     io->getNextImage(image);
 
