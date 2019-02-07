@@ -18,6 +18,72 @@ bool empty(cv::Rect r)
     return r.width <= 0 || r.height <= 0;
 }
 
+#if CV_MAJOR_VERSION < 3
+void setWindowTitle(const cv::String& winname, const cv::String& title)
+{
+    (void)winname;
+    (void)title;
+}
+#endif
+
+cv::Rect selectBBox(cv::Mat image)
+{
+    using namespace cv;
+
+    struct state {
+        Mat img;
+        Rect bbox;
+        bool secondPoint = false;
+        bool done = false;
+    } state;
+
+    state.img = image;
+
+    namedWindow("bboxsel", WINDOW_NORMAL);
+    setWindowTitle("bboxsel", "Select region to be tracked");
+
+    auto callback = [](int event, int x, int y, int flags, void* userdata)
+    {
+        (void)flags;
+        auto state = reinterpret_cast<struct state*>(userdata);
+
+        Mat ui;
+        state->img.copyTo(ui);
+
+        switch (event) {
+        case EVENT_MOUSEMOVE:
+            if (!state->secondPoint) {
+                line(ui, Point(x, 0), Point(x, ui.rows), Scalar(0, 255, 0), 1);
+                line(ui, Point(0, y), Point(ui.cols, y), Scalar(0, 255, 0), 1);
+                state->bbox.x = x;
+                state->bbox.y = y;
+            } else {
+                rectangle(ui, state->bbox.tl(), state->bbox.br(), Scalar(0, 255, 0), 1);
+                state->bbox.width = x - state->bbox.x;
+                state->bbox.height = y - state->bbox.y;
+            }
+            imshow("bboxsel", ui);
+            break;
+        case EVENT_LBUTTONDOWN:
+            if (!state->secondPoint) {
+                state->secondPoint = true;
+            } else {
+                state->done = true;
+            }
+        }
+    };
+
+    callback(EVENT_MOUSEMOVE, image.cols / 2, image.rows / 2, 0, &state);
+    setMouseCallback("bboxsel", callback, &state);
+
+    int key = 0;
+    while (key != 27 /*esc*/ && key != 'q' && !state.done) {
+        key = waitKey(50);
+    }
+    destroyWindow("bboxsel");
+    return state.bbox;
+}
+
 double calcAccuracy(std::string line, cv::Rect bb_rect, cv::Rect &groundtruth_rect)
 {
     std::vector<float> numbers;
@@ -78,7 +144,6 @@ int main(int argc, char *argv[])
                     errx(1, "Invalid box specification: %s", optarg);
             } else {
                 set_box_interactively = true;
-                errx(1, "Interactive box specification not implemented");
             }
             break;
         case 'd':
@@ -192,8 +257,15 @@ int main(int argc, char *argv[])
     //img = firts frame, initPos = initial position in the first frame
     if (empty(init_rect))
         init_rect = io->getInitRectangle(); // Try to get BBox from VOT files
-    io->outputBoundingBox(init_rect);
+
     io->getNextImage(image);
+
+    if (empty(init_rect) || set_box_interactively) {
+        init_rect = selectBBox(image);
+        auto b = init_rect;
+        printf("--box=%d,%d,%d,%d\n", b.x, b.y, b.width, b.height);
+    }
+    io->outputBoundingBox(init_rect);
 
     if (!video_out.empty()) {
         int codec = CV_FOURCC('M', 'J', 'P', 'G');  // select desired codec (must be available at runtime)
