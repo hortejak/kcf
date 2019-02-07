@@ -185,6 +185,7 @@ top_left_y, width, height".
 | --output, -o <output.txt>	 | Specify name of output file. |
 | --debug, -d				 | Generate debug output. |
 | --visual_debug, -p[p\|r] | Show graphical window with debugging information (either **p**atch or filter **r**esponse). |
+| --box, -b[X,Y,W,H] | Specify initial bounding box via command line rather than via `region.txt` or `groundtruth.txt`. |
 
 ## Automated testing
 

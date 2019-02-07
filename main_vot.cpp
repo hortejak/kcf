@@ -6,10 +6,17 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <memory>
+#include <err.h>
 
 #include "kcf.h"
 #include "vot.hpp"
 #include "videoio.hpp"
+
+// Needed for OpenCV <= 3.2 as replacement for Rect::empty()
+bool empty(cv::Rect r)
+{
+    return r.width <= 0 || r.height <= 0;
+}
 
 double calcAccuracy(std::string line, cv::Rect bb_rect, cv::Rect &groundtruth_rect)
 {
@@ -43,6 +50,8 @@ int main(int argc, char *argv[])
     int visualize_delay = -1, fit_size_x = -1, fit_size_y = -1;
     KCF_Tracker tracker;
     cv::VideoWriter videoWriter;
+    cv::Rect init_rect;
+    bool set_box_interactively = false;
 
     while (1) {
         int option_index = 0;
@@ -54,14 +63,24 @@ int main(int argc, char *argv[])
             {"video_out", optional_argument, 0,  'O' },
             {"visualize", optional_argument, 0,  'v' },
             {"fit",       optional_argument, 0,  'f' },
+            {"box",       optional_argument, 0,  'b' },
             {0,           0,                 0,  0 }
         };
 
-        int c = getopt_long(argc, argv, "dp::hv::f::o:O::", long_options, &option_index);
+        int c = getopt_long(argc, argv, "b::dp::hv::f::o:O::", long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'b':
+            if (optarg) {
+                if (sscanf(optarg, "%d,%d,%d,%d", &init_rect.x, &init_rect.y, &init_rect.width, &init_rect.height) != 4)
+                    errx(1, "Invalid box specification: %s", optarg);
+            } else {
+                set_box_interactively = true;
+                errx(1, "Interactive box specification not implemented");
+            }
+            break;
         case 'd':
             tracker.m_debug = true;
             break;
@@ -86,7 +105,8 @@ int main(int argc, char *argv[])
                       << " --output       | -o <output.txt>\n"
                       << " --fit          | -f[W[xH]]\n"
                       << " --debug        | -d\n"
-                      << " --visual_debug | -p [p|r]\n";
+                      << " --visual_debug | -p [p|r]\n"
+                      << " --box          | -b [X,Y,W,H]\n";
             exit(0);
             break;
         case 'o':
@@ -170,7 +190,8 @@ int main(int argc, char *argv[])
     cv::Mat image;
 
     //img = firts frame, initPos = initial position in the first frame
-    cv::Rect init_rect = io->getInitRectangle();
+    if (empty(init_rect))
+        init_rect = io->getInitRectangle(); // Try to get BBox from VOT files
     io->outputBoundingBox(init_rect);
     io->getNextImage(image);
 
