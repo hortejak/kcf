@@ -209,6 +209,7 @@ void KCF_Tracker::init(cv::Mat &img, const cv::Rect &bbox, int fit_size_x, int f
 
     p_current_center = p_init_pose.center();
     p_current_scale = 1.;
+    p_current_angle = 0.;
 
     double min_size_ratio = std::max(5. * p_cell_size / p_windows_size.width, 5. * p_cell_size / p_windows_size.height);
     double max_size_ratio =
