@@ -7,25 +7,41 @@ FileIO::FileIO(std::string video_in)
 {
     if (!capture.isOpened())
         throw std::runtime_error("Cannot open video stream '" + video_in + "'");
-}
 
-cv::Rect FileIO::getInitRectangle() const
-{
     size_t lastdot = filename.find_last_of(".");
     std::string txt = (lastdot == std::string::npos) ? filename : filename.substr(0, lastdot);
     txt += ".txt";
 
-    FILE *f = fopen(txt.c_str(), "r");
-    if (!f) {
+    rect_file.open(txt);
+    if (!rect_file.is_open())
         std::cout << txt << " not found - using empty init rectangle" << std::endl;
+}
+
+cv::Rect FileIO::getInitRectangle()
+{
+    if (!rect_file.is_open())
         return cv::Rect();
-    }
+
+    if (rect_line.empty())
+        std::getline(rect_file, rect_line);
+
     cv::Rect r;
-    if (fscanf(f, "%d,%d,%d,%d", &r.x, &r.y, &r.width, &r.height) != 4) {
-        std::cerr << "Error reading init rectangle from " << txt << std::endl;
-        return cv::Rect();
+    if (sscanf(rect_line.c_str(), "%d,%d,%d,%d", &r.x, &r.y, &r.width, &r.height) == 4) {
+        rect_line.clear();
+        return r;
     }
-    return r;
+    int num;
+    if (sscanf(rect_line.c_str(), "%d:%d,%d,%d,%d", &num, &r.x, &r.y, &r.width, &r.height) == 5) {
+        if (num == getImageNum()) {
+            rect_line.clear();
+            return r;
+        } else {
+            return cv::Rect();
+        }
+    }
+    std::cerr << "Error parsing init rectangle: " << rect_line << std::endl;
+    rect_line.clear();
+    return cv::Rect();
 }
 
 void FileIO::outputBoundingBox(const cv::Rect &bbox)
@@ -42,5 +58,11 @@ int FileIO::getNextFileName(char *fName)
 int FileIO::getNextImage(cv::Mat &img)
 {
     capture >> img;
+    num++;
     return img.empty() ? 0 : 1;
+}
+
+int FileIO::getImageNum() const
+{
+    return num;
 }

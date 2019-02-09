@@ -110,8 +110,11 @@ public:
         p_output_stream.close();
     }
 
-    inline cv::Rect getInitRectangle() const override
+    inline cv::Rect getInitRectangle() override
     {   
+        if (getImageNum() > 1)
+            return cv::Rect();
+
         // read init box from ground truth file
         VOTPolygon initPolygon = getInitPolygon();
         float x1 = std::min(initPolygon.x1, std::min(initPolygon.x2, std::min(initPolygon.x3, initPolygon.x4)));
@@ -158,9 +161,16 @@ public:
         std::getline (p_images_stream, line);
     	if (line.empty() && p_images_stream.eof()) return -1;
         img = cv::imread(line, CV_LOAD_IMAGE_COLOR);
+        num++;
 
         return 1;
     }
+
+    int getImageNum() const override
+    {
+        return num;
+    }
+
 
 private:
     std::string _images;
@@ -168,6 +178,7 @@ private:
     std::ifstream p_region_stream;
     std::ifstream p_images_stream;
     std::ofstream p_output_stream;
+    int num = 0;
 
 };
 

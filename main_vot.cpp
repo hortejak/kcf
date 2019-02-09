@@ -26,7 +26,7 @@ void setWindowTitle(const cv::String& winname, const cv::String& title)
 }
 #endif
 
-cv::Rect selectBBox(cv::Mat image)
+cv::Rect selectBBox(cv::Mat image, std::string box_out = "", int frame_num = 0)
 {
     using namespace cv;
 
@@ -80,6 +80,15 @@ cv::Rect selectBBox(cv::Mat image)
     while (key != 27 /*esc*/ && key != 'q' && !state.done) {
         key = waitKey(50);
     }
+
+    if (state.done && !box_out.empty()) {
+        // TODO: Check for errors
+        FILE *f = fopen(box_out.c_str(), "a");
+        auto b = state.bbox;
+        fprintf(f, "%d:%d,%d,%d,%d\n", frame_num, b.x, b.y, b.width, b.height);
+        fclose(f);
+    }
+
     setWindowTitle("KCF output", "KCF output");
     setMouseCallback("KCF output", nullptr);
     return state.bbox;
@@ -113,7 +122,7 @@ double calcAccuracy(std::string line, cv::Rect bb_rect, cv::Rect &groundtruth_re
 int main(int argc, char *argv[])
 {
     //load region, images and prepare for output
-    std::string region, images, output, video_out;
+    std::string region, images, output, video_out, box_out;
     int visualize_delay = -1, fit_size_x = -1, fit_size_y = -1;
     KCF_Tracker tracker;
     cv::VideoWriter videoWriter;
@@ -131,10 +140,11 @@ int main(int argc, char *argv[])
             {"visualize", optional_argument, 0,  'v' },
             {"fit",       optional_argument, 0,  'f' },
             {"box",       optional_argument, 0,  'b' },
+            {"box_out",   required_argument, 0,  'B' },
             {0,           0,                 0,  0 }
         };
 
-        int c = getopt_long(argc, argv, "b::dp::hv::f::o:O::", long_options, &option_index);
+        int c = getopt_long(argc, argv, "b::B:dp::hv::f::o:O::", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -146,6 +156,9 @@ int main(int argc, char *argv[])
             } else {
                 set_box_interactively = true;
             }
+            break;
+        case 'B':
+            box_out = optarg;
             break;
         case 'd':
             tracker.m_debug = true;
@@ -173,7 +186,8 @@ int main(int argc, char *argv[])
                       << " --fit          | -f[W[xH]]\n"
                       << " --debug        | -d\n"
                       << " --visual_debug | -p [p|r]\n"
-                      << " --box          | -b [X,Y,W,H]\n";
+                      << " --box          | -b [X,Y,W,H]\n"
+                      << " --box_out      | -B <filename>\n";
             exit(0);
             break;
         case 'o':
@@ -255,15 +269,14 @@ int main(int argc, char *argv[])
     }
 
     cv::Mat image;
+    io->getNextImage(image);
 
     //img = firts frame, initPos = initial position in the first frame
     if (empty(init_rect))
         init_rect = io->getInitRectangle(); // Try to get BBox from VOT or .txt files
 
-    io->getNextImage(image);
-
     if (empty(init_rect) || set_box_interactively) {
-        init_rect = selectBBox(image);
+        init_rect = selectBBox(image, box_out, 1);
         auto b = init_rect;
         printf("--box=%d,%d,%d,%d\n", b.x, b.y, b.width, b.height);
     }
@@ -287,7 +300,12 @@ int main(int argc, char *argv[])
 
     while (io->getNextImage(image) == 1){
         double time_profile_counter = cv::getCPUTickCount();
-        tracker.track(image);
+        init_rect = io->getInitRectangle();
+        if (empty(init_rect))
+            tracker.track(image);
+        else
+            tracker.init(image, init_rect, fit_size_x, fit_size_y);
+
         time_profile_counter = cv::getCPUTickCount() - time_profile_counter;
          std::cout << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms per frame, "
                       "response : " << tracker.getFilterResponse();
@@ -330,7 +348,7 @@ int main(int argc, char *argv[])
                     break;
                 switch (key) {
                 case 'i':
-                    init_rect = selectBBox(image);
+                    init_rect = selectBBox(image, box_out, io->getImageNum());
                     tracker.init(image, init_rect, fit_size_x, fit_size_y);
                     break;
                 }
