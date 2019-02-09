@@ -39,8 +39,8 @@ cv::Rect selectBBox(cv::Mat image)
 
     state.img = image;
 
-    namedWindow("bboxsel", WINDOW_NORMAL);
-    setWindowTitle("bboxsel", "Select region to be tracked");
+    namedWindow("KCF output", WINDOW_NORMAL);
+    setWindowTitle("KCF output", "Select region to be tracked");
 
     auto callback = [](int event, int x, int y, int flags, void* userdata)
     {
@@ -62,7 +62,7 @@ cv::Rect selectBBox(cv::Mat image)
                 state->bbox.width = x - state->bbox.x;
                 state->bbox.height = y - state->bbox.y;
             }
-            imshow("bboxsel", ui);
+            imshow("KCF output", ui);
             break;
         case EVENT_LBUTTONDOWN:
             if (!state->secondPoint) {
@@ -74,13 +74,14 @@ cv::Rect selectBBox(cv::Mat image)
     };
 
     callback(EVENT_MOUSEMOVE, image.cols / 2, image.rows / 2, 0, &state);
-    setMouseCallback("bboxsel", callback, &state);
+    setMouseCallback("KCF output", callback, &state);
 
     int key = 0;
     while (key != 27 /*esc*/ && key != 'q' && !state.done) {
         key = waitKey(50);
     }
-    destroyWindow("bboxsel");
+    setWindowTitle("KCF output", "KCF output");
+    setMouseCallback("KCF output", nullptr);
     return state.bbox;
 }
 
@@ -323,10 +324,16 @@ int main(int argc, char *argv[])
                 cv::line(image, vertices[i], vertices[(i + 1) % 4], cv::Scalar(0, 255, 0), 2);
             if (visualize_delay >= 0) {
                 cv::imshow("KCF output", image);
-                int ret = cv::waitKey(visualize_delay);
-                if ((visualize_delay > 0 && ret != -1 && ret < 128) ||
-                        (visualize_delay == 0 && (ret == 27 /*esc*/ || ret == 'q')))
+
+                int key = cv::waitKey(visualize_delay);
+                if (key == 27 /*esc*/ || key == 'q')
                     break;
+                switch (key) {
+                case 'i':
+                    init_rect = selectBBox(image);
+                    tracker.init(image, init_rect, fit_size_x, fit_size_y);
+                    break;
+                }
             }
             if (!video_out.empty())
                 videoWriter << image;
