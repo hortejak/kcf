@@ -168,6 +168,7 @@ int main(int argc, char *argv[])
                       << "Options:\n"
                       << " --visualize    | -v[delay_ms]\n"
                       << " --output       | -o <output.txt>\n"
+                      << " --video_out    | -O <filename>\n"
                       << " --fit          | -f[W[xH]]\n"
                       << " --debug        | -d\n"
                       << " --visual_debug | -p [p|r]\n"
