@@ -26,6 +26,14 @@ void setWindowTitle(const cv::String& winname, const cv::String& title)
 }
 #endif
 
+void writeBBox(std::string box_out, int frame_num, cv::Rect b)
+{
+    // TODO: Check for errors
+    FILE *f = fopen(box_out.c_str(), "a");
+    fprintf(f, "%d:%d,%d,%d,%d\n", frame_num, b.x, b.y, b.width, b.height);
+    fclose(f);
+}
+
 cv::Rect selectBBox(cv::Mat image, std::string box_out = "", int frame_num = 0)
 {
     using namespace cv;
@@ -81,13 +89,8 @@ cv::Rect selectBBox(cv::Mat image, std::string box_out = "", int frame_num = 0)
         key = waitKey(50);
     }
 
-    if (state.done && !box_out.empty()) {
-        // TODO: Check for errors
-        FILE *f = fopen(box_out.c_str(), "a");
-        auto b = state.bbox;
-        fprintf(f, "%d:%d,%d,%d,%d\n", frame_num, b.x, b.y, b.width, b.height);
-        fclose(f);
-    }
+    if (state.done && !box_out.empty())
+        writeBBox(box_out, frame_num, state.bbox);
 
     setWindowTitle("KCF output", "KCF output");
     setMouseCallback("KCF output", nullptr);
@@ -128,6 +131,7 @@ int main(int argc, char *argv[])
     cv::VideoWriter videoWriter;
     cv::Rect init_rect;
     bool set_box_interactively = false;
+    bool do_track = true;
 
     while (1) {
         int option_index = 0;
@@ -301,13 +305,17 @@ int main(int argc, char *argv[])
     while (io->getNextImage(image) == 1){
         double time_profile_counter = cv::getCPUTickCount();
         init_rect = io->getInitRectangle();
-        if (empty(init_rect))
+        if (init_rect.x == -1)
+            do_track = false;
+        if (empty(init_rect) && do_track) {
             tracker.track(image);
-        else
+        } else {
+            do_track = true;
             tracker.init(image, init_rect, fit_size_x, fit_size_y);
+        }
 
         time_profile_counter = cv::getCPUTickCount() - time_profile_counter;
-         std::cout << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms per frame, "
+        std::cout << io->getImageNum() << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms per frame, "
                       "response : " << tracker.getFilterResponse();
         avg_time += time_profile_counter/((double)cvGetTickFrequency()*1000);
         frames++;
@@ -338,8 +346,9 @@ int main(int argc, char *argv[])
             cv::Point2f vertices[4];
             rotatedRectangle.points(vertices);
 
-            for (int i = 0; i < 4; i++)
-                cv::line(image, vertices[i], vertices[(i + 1) % 4], cv::Scalar(0, 255, 0), 2);
+            if (do_track)
+                for (int i = 0; i < 4; i++)
+                    cv::line(image, vertices[i], vertices[(i + 1) % 4], cv::Scalar(0, 255, 0), 2);
             if (visualize_delay >= 0) {
                 cv::imshow("KCF output", image);
 
@@ -350,6 +359,11 @@ int main(int argc, char *argv[])
                 case 'i':
                     init_rect = selectBBox(image, box_out, io->getImageNum());
                     tracker.init(image, init_rect, fit_size_x, fit_size_y);
+                    break;
+                case 'o':
+                    // switch tracker off
+                    do_track = false;
+                    writeBBox(box_out, io->getImageNum(), cv::Rect(-1,-1,-1,-1));
                     break;
                 }
             }
