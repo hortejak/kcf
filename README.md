@@ -169,6 +169,10 @@ The binary can be run as follows:
 
    Reads the images from `<file>`.
 
+5. `./kcf_vot [options] <number>`
+
+   Captures the images from camera `<number>`.
+
 By default the program generates file `output.txt` containing the
 bounding boxes of the tracked object in the format "top_left_x,
 top_left_y, width, height".
