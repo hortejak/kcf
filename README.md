@@ -191,7 +191,7 @@ top_left_y, width, height".
 | --debug, -d				 | Generate debug output. |
 | --visual_debug, -p[p\|r] | Show graphical window with debugging information (either **p**atch or filter **r**esponse). |
 | --box, -b[X,Y,W,H] | Specify initial bounding box via command line rather than via `region.txt` or `groundtruth.txt` or by selecting it with mouse (if no coordinates are given). |
-| --box_out, -B <filename> | Specify the file name where to store manually specified bounding boxes (with the <kbd>i<kbd> key) |
+| --box_out, -B <box.txt> | Specify the file name where to store manually specified bounding boxes (with the <kbd>i</kbd> key) |
 
 ## Automated testing
 
