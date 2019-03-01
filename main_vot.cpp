@@ -291,6 +291,8 @@ int main(int argc, char *argv[])
         init_rect = selectBBox(image, box_out, 1);
         auto b = init_rect;
         printf("--box=%d,%d,%d,%d\n", b.x, b.y, b.width, b.height);
+        if (visualize_delay < 0)
+            cv::destroyWindow("KCF output");
     }
     io->outputBoundingBox(init_rect);
 
