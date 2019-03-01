@@ -138,7 +138,8 @@ No matter which method is used to compile the code, the result will be
 a `kcf_vot` binary.
 
 It operates on an image sequence created according to [VOT 2014
-methodology][10]. You can find some image sequences in [vot2016
+methodology][10]. Alternatively, you can use a video file or a camera
+as an input. You can find some image sequences in [vot2016
 datatset][11].
 
 The binary can be run as follows:
@@ -167,7 +168,7 @@ The binary can be run as follows:
 
 4. `./kcf_vot [options] <file>`
 
-   Reads the images from `<file>`.
+   Reads the images from video `<file>`.
 
 5. `./kcf_vot [options] <number>`
 
