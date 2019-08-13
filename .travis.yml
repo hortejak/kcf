@@ -19,15 +19,14 @@ script: make
 
 matrix:
   include:
-    - compiler: gcc-5
+    - compiler: gcc
       addons:
         apt:
           sources: *common_sources
           packages:
             - *common_packages
-            - g++-5
             - cuda-command-line-tools-8-0 cuda-cufft-dev-8-0 cuda-cublas-dev-8-0
-      script: make CC=gcc-5 CXX=g++-5
+      script: make CC=gcc CXX=g++
     - compiler: clang-3.8
       addons:
         apt:
