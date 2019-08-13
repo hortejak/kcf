@@ -1,11 +1,11 @@
 language: c++
+dist: xenial
 addons:
   apt:
     sources: &common_sources
       - sourceline: deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /
         key_url: http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub
       - ubuntu-toolchain-r-test
-      - llvm-toolchain-precise-3.8
     packages: &common_packages
       - cmake
       - ninja-build
