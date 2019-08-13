@@ -39,6 +39,8 @@ matrix:
       script: make CC=clang-3.8 CXX=clang++-3.8 $(make print_BUILDS|grep -v openmp)
     - compiler: clang
       name: clang & test
+      env:
+        - OMP_NUM_THREADS=4     # See https://docs.travis-ci.com/user/languages/c/#openmp-projects
       script:
         - make BUILDS="$(make print_BUILDS|grep -v cufft|paste -s)"
         - LD_LIBRARY_PATH=/usr/local/clang-7.0.0/lib/ LD_PRELOAD=libSegFault.so SEGFAULT_SIGNALS=all ninja test
