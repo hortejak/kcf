@@ -19,10 +19,10 @@ include_directories ( ${OpenCV_INCLUDE_DIRS} )
 MESSAGE(STATUS "OpenCV_LIB_DIR: ${OpenCV_LIB_DIR} ")
 MESSAGE(STATUS "OpenCV_INCLUDE_DIRS: ${OpenCV_INCLUDE_DIRS}")
 
-INCLUDE_DIRECTORIES( ${CMAKE_BINARY_DIR}/)
-include_directories(${CMAKE_SOURCE_DIR}/src/ ${CMAKE_SOURCE_DIR}/src/piotr_fhog ${CMAKE_SOURCE_DIR}/src/cn)
+INCLUDE_DIRECTORIES( ${CMAKE_CURRENT_BINARY_DIR}/)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/ ${CMAKE_CURRENT_SOURCE_DIR}/src/piotr_fhog ${CMAKE_CURRENT_SOURCE_DIR}/src/cn)
 
-include_directories(${CMAKE_SOURCE_DIR}/sse2neon)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/sse2neon)
 
 add_subdirectory(src)
 
@@ -34,3 +34,16 @@ ELSE()
 ENDIF() #OPENCV_CUFFT
 
 target_link_libraries(kcf_vot ${OpenCV_LIBS} kcf)
+target_link_libraries(kcf_vot ${catkin_LIBRARIES})
+
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  rospy
+  std_msgs
+  genmsg
+)
+add_dependencies(kcf_vot kcf_generate_messages_cpp)
+
+generate_messages(DEPENDENCIES std_msgs)
+
+include_directories(${catkin_INCLUDE_DIRS})

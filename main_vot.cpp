@@ -12,6 +12,10 @@
 #include "vot.hpp"
 #include "videoio.hpp"
 
+#include "ros/ros.h"
+#include "std_msgs/String.h"
+#include <sstream>
+
 // Needed for OpenCV <= 3.2 as replacement for Rect::empty()
 bool empty(cv::Rect r)
 {
@@ -124,6 +128,12 @@ double calcAccuracy(std::string line, cv::Rect bb_rect, cv::Rect &groundtruth_re
 
 int main(int argc, char *argv[])
 {
+	ros::init(argc, argv, "kcf_vot");
+	ros::NodeHandle n;
+	ros::Publisher chatter_pub = n.advertise<std_msgs::String>("chatter", 1000);
+ 
+   	ros::Rate loop_rate(10);
+   	
     //load region, images and prepare for output
     std::string region, images, output, video_out, box_out;
     int visualize_delay = -1, fit_size_x = -1, fit_size_y = -1;
@@ -132,8 +142,10 @@ int main(int argc, char *argv[])
     cv::Rect init_rect;
     bool set_box_interactively = false;
     bool do_track = true;
-
+	
     while (1) {
+    
+ 
         int option_index = 0;
         static struct option long_options[] = {
             {"debug",     no_argument,       0,  'd' },
@@ -312,7 +324,16 @@ int main(int argc, char *argv[])
 
     std::cout << std::fixed << std::setprecision(2);
 
-    while (io->getNextImage(image) == 1){
+    while (io->getNextImage(image) == 1 and ros::ok()){
+    
+    	//ros stuff
+    	std_msgs::String msg;
+    	std::stringstream ss;
+     	msg.data = ss.str();
+     	ROS_INFO("%s", msg.data.c_str());
+     	
+     	//end
+     	
         double time_profile_counter = cv::getCPUTickCount();
         init_rect = io->getInitRectangle();
         if (init_rect.x == -1)
@@ -325,14 +346,16 @@ int main(int argc, char *argv[])
         }
 
         time_profile_counter = cv::getCPUTickCount() - time_profile_counter;
-        std::cout << io->getImageNum() << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms per frame, "
-                      "response : " << tracker.getFilterResponse();
+        //std::cout << io->getImageNum() << "  -> speed : " <<  time_profile_counter/((double)cvGetTickFrequency()*1000) << "ms per frame, "
+        //              "response : " << tracker.getFilterResponse();
         avg_time += time_profile_counter/((double)cvGetTickFrequency()*1000);
         frames++;
 
         bb = tracker.getBBox();
         bb_rect = cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h);
         io->outputBoundingBox(bb_rect);
+        
+        std::cout <<"X: "<< bb.cx <<" Y: "<< bb.cy <<" WIDTH: "<< bb.w <<" HEIGHT: "<< bb.h;
 
         if (groundtruth_stream.is_open()) {
             std::string line;
@@ -380,26 +403,11 @@ int main(int argc, char *argv[])
             if (!video_out.empty())
                 videoWriter << image;
         }
-
-//        std::stringstream s;
-//        std::string ss;
-//        int countTmp = frames;
-//        s << "imgs" << "/img" << (countTmp/10000);
-//        countTmp = countTmp%10000;
-//        s << (countTmp/1000);
-//        countTmp = countTmp%1000;
-//        s << (countTmp/100);
-//        countTmp = countTmp%100;
-//        s << (countTmp/10);
-//        countTmp = countTmp%10;
-//        s << (countTmp);
-//        s << ".jpg";
-//        s >> ss;
-//        //set image output parameters
-//        std::vector<int> compression_params;
-//        compression_params.push_back(CV_IMWRITE_JPEG_QUALITY);
-//        compression_params.push_back(90);
-//        cv::imwrite(ss.c_str(), image, compression_params);
+		chatter_pub.publish(msg);
+ 
+     	ros::spinOnce();
+ 
+     	loop_rate.sleep();
     }
 
     std::cout << "Average processing speed: " << avg_time / frames << "ms (" << 1. / (avg_time / frames) * 1000 << " fps)";
