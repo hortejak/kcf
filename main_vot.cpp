@@ -14,6 +14,7 @@
 
 #include "ros/ros.h"
 #include "std_msgs/String.h"
+#include "geometry_msgs/Point.h"
 #include <sstream>
 
 // Needed for OpenCV <= 3.2 as replacement for Rect::empty()
@@ -130,7 +131,7 @@ int main(int argc, char *argv[])
 {
 	ros::init(argc, argv, "kcf_vot");
 	ros::NodeHandle n;
-	ros::Publisher chatter_pub = n.advertise<std_msgs::String>("chatter", 1000);
+	ros::Publisher leader_position_pub = n.advertise<geometry_msgs::Point>("leader_position", 1000);
  
    	ros::Rate loop_rate(10);
    	
@@ -327,10 +328,7 @@ int main(int argc, char *argv[])
     while (io->getNextImage(image) == 1 and ros::ok()){
     
     	//ros stuff
-    	std_msgs::String msg;
-    	std::stringstream ss;
-     	msg.data = ss.str();
-     	ROS_INFO("%s", msg.data.c_str());
+     	geometry_msgs::Point p;
      	
      	//end
      	
@@ -355,7 +353,11 @@ int main(int argc, char *argv[])
         bb_rect = cv::Rect(bb.cx - bb.w/2., bb.cy - bb.h/2., bb.w, bb.h);
         io->outputBoundingBox(bb_rect);
         
-        std::cout <<"X: "<< bb.cx <<" Y: "<< bb.cy <<" WIDTH: "<< bb.w <<" HEIGHT: "<< bb.h;
+        //std::cout <<"X: "<< bb.cx <<" Y: "<< bb.cy <<" WIDTH: "<< bb.w <<" HEIGHT: "<< bb.h;
+        
+        p.x = bb.cx;
+        p.y = bb.cy;
+        p.z = 0;
 
         if (groundtruth_stream.is_open()) {
             std::string line;
@@ -369,7 +371,7 @@ int main(int argc, char *argv[])
             sum_accuracy += accuracy;
         }
 
-        std::cout << std::endl;
+        //std::cout << std::endl;
 
         if (visualize_delay >= 0 || !video_out.empty()) {
             cv::Point pt(bb.cx, bb.cy);
@@ -403,8 +405,7 @@ int main(int argc, char *argv[])
             if (!video_out.empty())
                 videoWriter << image;
         }
-		chatter_pub.publish(msg);
- 
+		leader_position_pub.publish(p);
      	ros::spinOnce();
  
      	loop_rate.sleep();

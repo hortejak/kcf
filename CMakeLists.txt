@@ -41,9 +41,10 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   genmsg
+  geometry_msgs
 )
 add_dependencies(kcf_vot kcf_generate_messages_cpp)
 
-generate_messages(DEPENDENCIES std_msgs)
+generate_messages(DEPENDENCIES std_msgs geometry_msgs)
 
 include_directories(${catkin_INCLUDE_DIRS})
